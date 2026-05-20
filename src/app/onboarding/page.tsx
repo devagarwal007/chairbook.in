@@ -1,0 +1,813 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { makeSalonSlug, saveOnboarding } from "@/lib/onboarding";
+
+// ===== TYPES =====
+interface Stylist {
+  id: number;
+  name: string;
+  role: string;
+  tone: string;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  duration: number;
+  price: number;
+  preset?: boolean;
+}
+
+interface DayHour {
+  open: boolean;
+  from: string;
+  to: string;
+}
+
+interface HoursData {
+  [key: string]: DayHour;
+}
+
+interface OnboardingData {
+  name: string;
+  area: string;
+  type: string;
+  hours: HoursData;
+  stylists: Stylist[];
+  services: Service[];
+  waNumber: string;
+}
+
+// ===== ICONS =====
+const IO = {
+  back: () => (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6"/>
+    </svg>
+  ),
+  check: () => (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5"/>
+    </svg>
+  ),
+  plus: () => (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+  ),
+  x: () => (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12"/>
+    </svg>
+  ),
+  wa: ({ style }: { style?: React.CSSProperties }) => (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={style}>
+      <path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.8-.7-1.4-1.6-1.6-1.9-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.6-.9-2.2-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1.1 1.1-1.1 2.6 0 1.5 1.1 3 1.2 3.2.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.3c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/>
+    </svg>
+  ),
+  copy: () => (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  ),
+};
+
+const DAYS = [
+  { id: "mon", name: "Monday", short: "M" },
+  { id: "tue", name: "Tuesday", short: "T" },
+  { id: "wed", name: "Wednesday", short: "W" },
+  { id: "thu", name: "Thursday", short: "T" },
+  { id: "fri", name: "Friday", short: "F" },
+  { id: "sat", name: "Saturday", short: "S" },
+  { id: "sun", name: "Sunday", short: "S" },
+];
+
+const PRESET_SERVICES: Service[] = [
+  { id: "haircut", name: "Haircut", duration: 30, price: 300, preset: true },
+  { id: "color", name: "Hair Color", duration: 90, price: 1800, preset: true },
+  { id: "spa", name: "Hair Spa", duration: 60, price: 900, preset: true },
+  { id: "facial", name: "Facial — Classic", duration: 45, price: 700, preset: true },
+  { id: "threading", name: "Threading", duration: 15, price: 80, preset: true },
+  { id: "mani", name: "Manicure", duration: 30, price: 350, preset: true },
+  { id: "pedi", name: "Pedicure", duration: 45, price: 500, preset: true },
+  { id: "beard", name: "Beard Trim", duration: 20, price: 200, preset: true },
+];
+
+const STEPS = [
+  { id: "welcome", label: "Welcome" },
+  { id: "salon", label: "Salon basics" },
+  { id: "hours", label: "Hours" },
+  { id: "team", label: "Team" },
+  { id: "services", label: "Services" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "done", label: "Done" },
+];
+
+// ===== PROGRESS RAIL =====
+function ProgressRail({ stepIdx }: { stepIdx: number }) {
+  return (
+    <div className="ob-rail">
+      <div className="ob-rail-inner">
+        {STEPS.slice(1, -1).map((s, i) => {
+          const realIdx = i + 1; // skip welcome
+          const done = stepIdx > realIdx;
+          const active = stepIdx === realIdx;
+          return (
+            <React.Fragment key={s.id}>
+              <div className={`ob-rail-step ${active ? "active" : ""} ${done ? "done" : ""}`}>
+                <div className="ob-rail-num">{done ? <IO.check /> : realIdx}</div>
+                <div className="ob-rail-lbl">{s.label}</div>
+              </div>
+              {i < STEPS.length - 3 && <div className={`ob-rail-line ${done ? "done" : ""}`}></div>}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ===== FOOTER =====
+interface ObFooterProps {
+  onBack: () => void;
+  onNext: () => void;
+  canNext: boolean;
+  hint: string | null;
+  nextLabel?: string;
+}
+
+function ObFooter({ onBack, onNext, canNext, hint, nextLabel = "Continue" }: ObFooterProps) {
+  return (
+    <div className="ob-footer">
+      <button className="btn btn-ghost" onClick={onBack}>
+        <IO.back /> Back
+      </button>
+      <div className="ob-footer-hint">{hint}</div>
+      <button
+        className="btn btn-primary btn-lg"
+        disabled={!canNext}
+        style={!canNext ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+        onClick={canNext ? onNext : undefined}
+      >
+        {nextLabel} <span aria-hidden>→</span>
+      </button>
+    </div>
+  );
+}
+
+// ===== STEP COMPONENTS =====
+
+// 0. Welcome
+function StepWelcome({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="ob-step ob-welcome">
+      <div className="ob-welcome-mark">
+        <div className="brand-mark" style={{ width: 56, height: 56, fontSize: 26, borderRadius: 16 }}>C</div>
+      </div>
+      <h1 className="ob-h1">
+        Welcome to ChairBook.<br />
+        <span style={{ color: "var(--ink-3)", fontWeight: 500 }}>Let's get you set up.</span>
+      </h1>
+      <p className="ob-sub">
+        We'll do this together in <strong style={{ color: "var(--ink)" }}>5 quick steps</strong> — about 4 minutes. By the end you'll have a booking link you can drop in your WhatsApp status.
+      </p>
+      <ul className="ob-checklist">
+        <li>
+          <span className="ob-check-ic"><IO.check /></span> Add your salon's basics
+        </li>
+        <li>
+          <span className="ob-check-ic"><IO.check /></span> Set your working hours
+        </li>
+        <li>
+          <span className="ob-check-ic"><IO.check /></span> Add your stylists &amp; services
+        </li>
+        <li>
+          <span className="ob-check-ic"><IO.check /></span> Connect WhatsApp
+        </li>
+      </ul>
+      <button className="btn btn-primary btn-lg" onClick={onNext}>
+        Let's start <span aria-hidden>→</span>
+      </button>
+      <div className="ob-skip">
+        Already have an account?{" "}
+        <Link href="/signin" style={{ color: "var(--teal)" }}>
+          Sign in
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// 1. Salon Basics
+interface StepSalonProps {
+  data: OnboardingData;
+  onChange: (d: OnboardingData) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+function StepSalon({ data, onChange, onNext, onBack }: StepSalonProps) {
+  const valid = data.name.trim().length > 1 && data.area.trim().length > 1;
+  const SALON_TYPES = ["Unisex salon", "Ladies salon", "Men's salon", "Barbershop", "Beauty parlour", "Spa"];
+  return (
+    <div className="ob-step">
+      <div className="ob-step-head">
+        <div className="ob-eyebrow">STEP 1 OF 5</div>
+        <h2 className="ob-h2">First, tell us about your salon</h2>
+        <p className="ob-sub">This is what your customers will see on the booking page.</p>
+      </div>
+
+      <div className="field">
+        <label>Salon name</label>
+        <input
+          placeholder="e.g. Glow Salon &amp; Spa"
+          value={data.name}
+          onChange={(e) => onChange({ ...data, name: e.target.value })}
+          autoFocus
+        />
+      </div>
+      <div className="field" style={{ marginTop: 14 }}>
+        <label>Area / locality</label>
+        <input
+          placeholder="e.g. Andheri West, Mumbai"
+          value={data.area}
+          onChange={(e) => onChange({ ...data, area: e.target.value })}
+        />
+      </div>
+      <div className="field" style={{ marginTop: 14 }}>
+        <label>Salon type</label>
+        <div className="chip-grid">
+          {SALON_TYPES.map((type) => (
+            <button
+              key={type}
+              className={`chip ${data.type === type ? "on" : ""}`}
+              onClick={() => onChange({ ...data, type })}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <ObFooter onBack={onBack} onNext={onNext} canNext={valid} hint={!valid ? "Add salon name and area to continue" : null} />
+    </div>
+  );
+}
+
+// 2. Hours
+interface StepHoursProps {
+  data: OnboardingData;
+  onChange: (d: OnboardingData) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+function StepHours({ data, onChange, onNext, onBack }: StepHoursProps) {
+  const setDay = (id: string, patch: Partial<DayHour>) => {
+    onChange({
+      ...data,
+      hours: {
+        ...data.hours,
+        [id]: { ...data.hours[id], ...patch },
+      },
+    });
+  };
+
+  const applyToAll = (id: string) => {
+    const src = data.hours[id];
+    const next: HoursData = {};
+    DAYS.forEach((d) => {
+      next[d.id] = { ...src, open: data.hours[d.id].open };
+    });
+    onChange({ ...data, hours: next });
+  };
+
+  const valid = DAYS.some((d) => data.hours[d.id].open);
+
+  return (
+    <div className="ob-step">
+      <div className="ob-step-head">
+        <div className="ob-eyebrow">STEP 2 OF 5</div>
+        <h2 className="ob-h2">When are you open?</h2>
+        <p className="ob-sub">Customers will only see slots inside your working hours.</p>
+      </div>
+
+      <div className="ob-days">
+        {DAYS.map((d) => {
+          const h = data.hours[d.id];
+          return (
+            <div key={d.id} className={`ob-day ${h.open ? "on" : "off"}`}>
+              <button
+                className={`ob-day-toggle ${h.open ? "on" : ""}`}
+                onClick={() => setDay(d.id, { open: !h.open })}
+                aria-label={`${d.name} ${h.open ? "open" : "closed"}`}
+              >
+                {h.open && <IO.check />}
+              </button>
+              <div className="ob-day-name">{d.name}</div>
+              {h.open ? (
+                <div className="ob-day-times">
+                  <input className="ob-time" value={h.from} onChange={(e) => setDay(d.id, { from: e.target.value })} />
+                  <span className="ob-time-sep">to</span>
+                  <input className="ob-time" value={h.to} onChange={(e) => setDay(d.id, { to: e.target.value })} />
+                  <button className="ob-day-copy" onClick={() => applyToAll(d.id)}>
+                    Apply to all
+                  </button>
+                </div>
+              ) : (
+                <div className="ob-day-times closed">Closed</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <ObFooter onBack={onBack} onNext={onNext} canNext={valid} hint={!valid ? "You need to be open at least one day" : null} />
+    </div>
+  );
+}
+
+// 3. Team
+interface StepTeamProps {
+  data: OnboardingData;
+  onChange: (d: OnboardingData) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+function StepTeam({ data, onChange, onNext, onBack }: StepTeamProps) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("Stylist");
+  const tones = ["b", "d", "c", "e", "a", "f"];
+
+  const addStylist = () => {
+    if (!name.trim()) return;
+    const tone = tones[data.stylists.length % tones.length];
+    onChange({
+      ...data,
+      stylists: [...data.stylists, { id: Date.now(), name: name.trim(), role, tone }],
+    });
+    setName("");
+    setRole("Stylist");
+  };
+
+  const removeStylist = (id: number) => {
+    onChange({ ...data, stylists: data.stylists.filter((s) => s.id !== id) });
+  };
+
+  const valid = data.stylists.length >= 1;
+
+  return (
+    <div className="ob-step">
+      <div className="ob-step-head">
+        <div className="ob-eyebrow">STEP 3 OF 5</div>
+        <h2 className="ob-h2">Add your team</h2>
+        <p className="ob-sub">You can add more later. Even if it's just you, add yourself.</p>
+      </div>
+
+      {data.stylists.length > 0 && (
+        <div className="ob-team-list">
+          {data.stylists.map((s) => (
+            <div key={s.id} className="ob-team-row">
+              <div className={`avatar md tone-${s.tone}`} style={{ borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "bold" }}>{s.name[0]}</div>
+              <div className="ob-team-main">
+                <div className="ob-team-name">{s.name}</div>
+                <div className="ob-team-role">{s.role}</div>
+              </div>
+              <button className="ob-team-remove" onClick={() => removeStylist(s.id)} aria-label="Remove">
+                <IO.x />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="ob-add-row">
+        <div className="field" style={{ flex: 1 }}>
+          <label>Name</label>
+          <input
+            placeholder="e.g. Anjali"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addStylist()}
+          />
+        </div>
+        <div className="field" style={{ width: 160 }}>
+          <label>Role</label>
+          <select value={role} onChange={(e) => setRole(e.target.value)} style={{ height: 42, background: "#fff", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 10px", width: "100%", outline: 0 }}>
+            <option>Stylist</option>
+            <option>Senior stylist</option>
+            <option>Color specialist</option>
+            <option>Beautician</option>
+            <option>Owner / Manager</option>
+          </select>
+        </div>
+        <button className="btn btn-outline" style={{ height: 42 }} onClick={addStylist} disabled={!name.trim()}>
+          <IO.plus /> Add
+        </button>
+      </div>
+
+      <ObFooter onBack={onBack} onNext={onNext} canNext={valid} hint={!valid ? "Add at least one team member" : null} />
+    </div>
+  );
+}
+
+// 4. Services
+interface StepServicesProps {
+  data: OnboardingData;
+  onChange: (d: OnboardingData) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+function StepServices({ data, onChange, onNext, onBack }: StepServicesProps) {
+  const togglePreset = (id: string) => {
+    const exists = data.services.find((s) => s.id === id);
+    if (exists) {
+      onChange({ ...data, services: data.services.filter((s) => s.id !== id) });
+    } else {
+      const preset = PRESET_SERVICES.find((s) => s.id === id);
+      if (preset) {
+        onChange({ ...data, services: [...data.services, preset] });
+      }
+    }
+  };
+
+  const [custom, setCustom] = useState({ name: "", duration: "", price: "" });
+
+  const addCustom = () => {
+    if (!custom.name.trim() || !custom.duration || !custom.price) return;
+    onChange({
+      ...data,
+      services: [
+        ...data.services,
+        {
+          id: `c_${Date.now()}`,
+          name: custom.name.trim(),
+          duration: parseInt(custom.duration, 10),
+          price: parseInt(custom.price, 10),
+        },
+      ],
+    });
+    setCustom({ name: "", duration: "", price: "" });
+  };
+
+  const valid = data.services.length >= 1;
+  const customServices = data.services.filter((s) => !s.preset);
+
+  return (
+    <div className="ob-step">
+      <div className="ob-step-head">
+        <div className="ob-eyebrow">STEP 4 OF 5</div>
+        <h2 className="ob-h2">What do you offer?</h2>
+        <p className="ob-sub">Tap to add — adjust prices anytime later. Most salons start with 6–10 services.</p>
+      </div>
+
+      <div className="ob-section-lbl">Quick picks</div>
+      <div className="ob-svc-grid">
+        {PRESET_SERVICES.map((s) => {
+          const on = !!data.services.find((x) => x.id === s.id);
+          return (
+            <button key={s.id} className={`ob-svc ${on ? "on" : ""}`} onClick={() => togglePreset(s.id)}>
+              <div className="ob-svc-l">
+                <div className="ob-svc-name">{s.name}</div>
+                <div className="ob-svc-meta">
+                  {s.duration} min · ₹{s.price}
+                </div>
+              </div>
+              <div className={`svc-check ${on ? "on" : ""}`} style={{ width: 18, height: 18, border: "1.5px solid var(--line-2)", borderRadius: "50%", display: "grid", placeItems: "center" }}>
+                {on && <IO.check />}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="ob-section-lbl" style={{ marginTop: 18 }}>
+        Add a custom service
+        {customServices.length > 0 && (
+          <span style={{ color: "var(--ink-3)", fontWeight: 400, fontSize: 11, marginLeft: 8 }}>
+            + {customServices.length} added
+          </span>
+        )}
+      </div>
+
+      {customServices.map((s) => (
+        <div key={s.id} className="ob-team-row" style={{ marginBottom: 6 }}>
+          <div className="avatar md tone-e" style={{ width: 32, height: 32, fontSize: 11, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "bold" }}>
+            {s.name[0]}
+          </div>
+          <div className="ob-team-main">
+            <div className="ob-team-name">{s.name}</div>
+            <div className="ob-team-role">
+              {s.duration} min · ₹{s.price.toLocaleString("en-IN")}
+            </div>
+          </div>
+          <button className="ob-team-remove" onClick={() => onChange({ ...data, services: data.services.filter((x) => x.id !== s.id) })}>
+            <IO.x />
+          </button>
+        </div>
+      ))}
+
+      <div className="ob-custom-row">
+        <input
+          placeholder="Service name"
+          value={custom.name}
+          onChange={(e) => setCustom({ ...custom, name: e.target.value })}
+          style={{ flex: 1.5 }}
+        />
+        <input
+          placeholder="Duration (min)"
+          type="number"
+          value={custom.duration}
+          onChange={(e) => setCustom({ ...custom, duration: e.target.value })}
+          style={{ width: 130 }}
+        />
+        <input
+          placeholder="Price ₹"
+          type="number"
+          value={custom.price}
+          onChange={(e) => setCustom({ ...custom, price: e.target.value })}
+          style={{ width: 110 }}
+        />
+        <button className="btn btn-outline" style={{ height: 42 }} onClick={addCustom} disabled={!custom.name.trim() || !custom.duration || !custom.price}>
+          <IO.plus /> Add
+        </button>
+      </div>
+
+      <ObFooter
+        onBack={onBack}
+        onNext={onNext}
+        canNext={valid}
+        hint={!valid ? "Add at least one service" : `${data.services.length} service${data.services.length === 1 ? "" : "s"} selected`}
+      />
+    </div>
+  );
+}
+
+// 5. WhatsApp
+interface StepWhatsAppProps {
+  data: OnboardingData;
+  onChange: (d: OnboardingData) => void;
+  onNext: () => void;
+  onBack: () => void;
+  isSaving: boolean;
+  error: string | null;
+}
+
+function StepWhatsApp({ data, onChange, onNext, onBack, isSaving, error }: StepWhatsAppProps) {
+  const valid = data.waNumber.replace(/\s/g, "").length >= 10;
+  return (
+    <div className="ob-step">
+      <div className="ob-step-head">
+        <div className="ob-eyebrow">STEP 5 OF 5</div>
+        <h2 className="ob-h2">Connect your WhatsApp business number</h2>
+        <p className="ob-sub">Customers will receive booking confirmations, reminders, and replies from this number.</p>
+      </div>
+
+      <div className="field">
+        <label>WhatsApp number</label>
+        <div className="phone-input" style={{ display: "flex", alignItems: "center", border: "1px solid var(--line-2)", borderRadius: "10px", overflow: "hidden", height: "46px" }}>
+          <span className="phone-prefix" style={{ padding: "0 14px", borderRight: "1px solid var(--line-2)", background: "var(--bg-2)", color: "var(--ink-2)", fontSize: "14px", fontWeight: 500 }}>+91</span>
+          <input
+            style={{ border: 0, padding: "0 14px", outline: 0, width: "100%", height: "100%", fontSize: "16px", color: "var(--ink)", fontFamily: "inherit" }}
+            type="tel"
+            placeholder="98xxx xxxxx"
+            value={data.waNumber}
+            onChange={(e) => onChange({ ...data, waNumber: e.target.value.replace(/[^\d ]/g, "") })}
+            maxLength={11}
+            autoFocus
+          />
+        </div>
+      </div>
+
+      <div className="ob-wa-preview">
+        <div className="ob-wa-lbl">Sample reminder customers will receive:</div>
+        <div className="wa-thread" style={{ background: "#1A2320", padding: 16, borderRadius: 12 }}>
+          <div
+            className="b out"
+            style={{
+              background: "#0E5C2C",
+              color: "#DBFAE5",
+              alignSelf: "flex-end",
+              marginLeft: "auto",
+              maxWidth: "86%",
+              padding: "10px 12px",
+              fontSize: 13,
+              lineHeight: 1.4,
+              borderRadius: 12,
+              borderBottomRightRadius: 4,
+              display: "block",
+            }}
+          >
+            Hi Priya 🙏 This is a reminder from <strong>{data.name || "your salon"}</strong>: Haircut with Anjali tomorrow at 4 PM.
+            <br />
+            Reply <strong>YES</strong> to confirm or <strong>RESCHEDULE</strong> to pick a new slot.
+          </div>
+        </div>
+      </div>
+
+      <div className="trust" style={{ marginTop: 16, display: "flex", gap: 10, fontSize: 12, color: "var(--ink-3)", lineHeight: 1.4 }}>
+        <IO.wa style={{ color: "var(--wa)", width: 18, height: 18, flexShrink: 0 }} />
+        <div>Automated messages will be sent using the connected business API. Standard WhatsApp business policies apply.</div>
+      </div>
+
+      {error && (
+        <div className="form-alert" role="alert" style={{ marginTop: 16 }}>
+          {error}
+        </div>
+      )}
+
+      <ObFooter
+        onBack={onBack}
+        onNext={onNext}
+        canNext={valid && !isSaving}
+        hint={!valid ? "Enter a 10-digit number" : isSaving ? "Saving your setup..." : null}
+        nextLabel={isSaving ? "Saving..." : "Finish setup"}
+      />
+    </div>
+  );
+}
+
+// 6. Done
+interface StepDoneProps {
+  data: OnboardingData;
+  savedSlug: string | null;
+  onCopy: () => void;
+  copied: boolean;
+}
+
+function StepDone({ data, savedSlug, onCopy, copied }: StepDoneProps) {
+  const slug = savedSlug || makeSalonSlug(data.name || "your-salon");
+  const link = `chairbook.in/${slug}`;
+
+  return (
+    <div className="ob-step ob-done">
+      <div className="ob-done-check">
+        <svg width="72" height="72" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="36" fill="none" stroke="var(--teal)" strokeWidth="2.5" />
+          <path d="M22 41 35 54 58 28" fill="none" stroke="var(--teal)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <h1 className="ob-h1" style={{ textAlign: "center", fontSize: 32 }}>
+        You're all set 🎉
+      </h1>
+      <p className="ob-sub" style={{ textAlign: "center", maxWidth: 480, margin: "0 auto 28px" }}>
+        <strong style={{ color: "var(--ink)" }}>{data.name}</strong> is live. Share your booking link below — drop it in your WhatsApp status or pin it to your Instagram bio.
+      </p>
+
+      <div className="ob-link-card">
+        <div className="ob-link-l">
+          <div className="ob-eyebrow" style={{ marginBottom: 4 }}>
+            YOUR BOOKING LINK
+          </div>
+          <div className="ob-link-url">{link}</div>
+        </div>
+        <button className="btn btn-outline btn-sm" onClick={onCopy} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          {copied ? (
+            <>
+              <IO.check /> Copied
+            </>
+          ) : (
+            <>
+              <IO.copy /> Copy
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="ob-share-row">
+        <button className="btn btn-wa" style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#0E5C2C", color: "#fff", border: 0 }}>
+          <IO.wa /> Share via WhatsApp
+        </button>
+        <button className="btn btn-outline" style={{ flex: 1 }}>
+          Add to Instagram bio
+        </button>
+      </div>
+
+      <div className="ob-summary">
+        <div className="ob-summary-lbl">Your salon at a glance</div>
+        <div className="ob-summary-grid">
+          <div>
+            <div className="num">{data.stylists.length}</div>
+            <div className="lbl">team member{data.stylists.length === 1 ? "" : "s"}</div>
+          </div>
+          <div>
+            <div className="num">{data.services.length}</div>
+            <div className="lbl">services</div>
+          </div>
+          <div>
+            <div className="num">{Object.values(data.hours).filter((h) => h.open).length}</div>
+            <div className="lbl">days open</div>
+          </div>
+        </div>
+      </div>
+
+      <Link className="btn btn-primary btn-lg" href="/dashboard" style={{ width: "100%", marginTop: 20, textAlign: "center" }}>
+        Open your dashboard <span aria-hidden>→</span>
+      </Link>
+    </div>
+  );
+}
+
+// ===== APP PAGE =====
+const defaultHours: HoursData = {
+  mon: { open: true, from: "10:00", to: "20:00" },
+  tue: { open: true, from: "10:00", to: "20:00" },
+  wed: { open: true, from: "10:00", to: "20:00" },
+  thu: { open: true, from: "10:00", to: "20:00" },
+  fri: { open: true, from: "10:00", to: "21:00" },
+  sat: { open: true, from: "09:00", to: "21:00" },
+  sun: { open: false, from: "10:00", to: "18:00" },
+};
+
+export default function OnboardingPage() {
+  const router = useRouter();
+  const [stepIdx, setStepIdx] = useState(0);
+  const [data, setData] = useState<OnboardingData>({
+    name: "",
+    area: "",
+    type: "Unisex salon",
+    hours: defaultHours,
+    stylists: [],
+    services: [PRESET_SERVICES[0], PRESET_SERVICES[2]], // pre-select haircut and spa
+    waNumber: "",
+  });
+  const [copied, setCopied] = useState(false);
+  const [savedSlug, setSavedSlug] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const step = STEPS[stepIdx];
+  const next = () => setStepIdx(Math.min(stepIdx + 1, STEPS.length - 1));
+  const back = () => setStepIdx(Math.max(stepIdx - 1, 0));
+
+  const finishSetup = async () => {
+    if (isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const saved = await saveOnboarding(data);
+      setSavedSlug(saved.slug);
+      setStepIdx(STEPS.length - 1);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save onboarding. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCopy = () => {
+    const slug = savedSlug || makeSalonSlug(data.name || "your-salon");
+    navigator.clipboard.writeText(`chairbook.in/${slug}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="ob-app">
+      <header className="ob-topbar">
+        <div className="ob-topbar-inner">
+          <div className="brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="brand-mark">C</div>
+            <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.015em" }}>ChairBook</span>
+          </div>
+          {step.id !== "done" && step.id !== "welcome" && <div className="ob-step-count">Step {stepIdx} of 5</div>}
+          {step.id !== "done" && (
+            <button className="ob-exit" onClick={() => router.push("/")}>
+              Save &amp; exit
+            </button>
+          )}
+        </div>
+        {step.id !== "welcome" && step.id !== "done" && <ProgressRail stepIdx={stepIdx} />}
+      </header>
+
+      <main className="ob-main">
+        {step.id === "welcome" && <StepWelcome onNext={next} />}
+        {step.id === "salon" && <StepSalon data={data} onChange={setData} onNext={next} onBack={back} />}
+        {step.id === "hours" && <StepHours data={data} onChange={setData} onNext={next} onBack={back} />}
+        {step.id === "team" && <StepTeam data={data} onChange={setData} onNext={next} onBack={back} />}
+        {step.id === "services" && <StepServices data={data} onChange={setData} onNext={next} onBack={back} />}
+        {step.id === "whatsapp" && (
+          <StepWhatsApp
+            data={data}
+            onChange={setData}
+            onNext={finishSetup}
+            onBack={back}
+            isSaving={isSaving}
+            error={saveError}
+          />
+        )}
+        {step.id === "done" && <StepDone data={data} savedSlug={savedSlug} onCopy={handleCopy} copied={copied} />}
+      </main>
+    </div>
+  );
+}

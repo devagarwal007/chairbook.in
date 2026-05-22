@@ -7,21 +7,10 @@ import { Icons as I } from "@/components/ui/Icons";
 import { toMin } from "@/lib/utils";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
+import { insertNotification } from "@/lib/notifications";
+import { useSalonData, DbStylist, DbService } from "@/lib/useSalonData";
 
 // ===== TYPES =====
-interface Stylist {
-  id: string;
-  name: string;
-  tone: string;
-}
-
-interface Service {
-  id: string;
-  name: string;
-  duration: number;
-  price: number;
-}
-
 interface Appointment {
   id: string | number;
   customerId?: string | number;
@@ -39,42 +28,15 @@ interface Appointment {
   note: string;
 }
 
-// ===== CONSTANTS =====
-const STYLISTS: Stylist[] = [
-  { id: "all", name: "All stylists", tone: "" },
-  { id: "anjali", name: "Anjali", tone: "b" },
-  { id: "pooja", name: "Pooja", tone: "d" },
-  { id: "kiran", name: "Kiran", tone: "c" },
-  { id: "rekha", name: "Rekha", tone: "e" },
+// ===== FALLBACK DATA (only used when Supabase is unavailable) =====
+const FALLBACK_STYLISTS: DbStylist[] = [
+  { id: "all", name: "All stylists", tone: "", short: "?" },
 ];
 
-const SERVICES: Service[] = [
-  { id: "s1", name: "Haircut", duration: 30, price: 300 },
-  { id: "s2", name: "Hair Color", duration: 90, price: 1800 },
-  { id: "s3", name: "Hair Spa", duration: 60, price: 900 },
-  { id: "s4", name: "Threading", duration: 15, price: 80 },
-  { id: "s5", name: "Facial — Classic", duration: 45, price: 700 },
-  { id: "s6", name: "Manicure", duration: 30, price: 350 },
-  { id: "s7", name: "Pedicure", duration: 45, price: 500 },
-  { id: "s8", name: "Beard Trim", duration: 20, price: 200 },
-];
-
-const INITIAL_APPTS: Appointment[] = [
-  { id: 1, time: "09:30", duration: 30, customer: "Priya Sharma", initials: "PS", tone: "b", service: "Haircut", stylist: "anjali", price: 300, status: "completed", visits: 12, phone: "+91 98xxx 12345", note: "Prefers shorter on the sides." },
-  { id: 2, time: "10:15", duration: 45, customer: "Meera Iyer", initials: "MI", tone: "c", service: "Facial — Classic", stylist: "pooja", price: 700, status: "completed", visits: 5, phone: "+91 98xxx 22119", note: "Sensitive skin on cheeks." },
-  { id: 3, time: "11:00", duration: 90, customer: "Kavya Reddy", initials: "KR", tone: "e", service: "Hair Color", stylist: "anjali", price: 1800, status: "arrived", visits: 8, phone: "+91 98xxx 30247", note: "Color: chestnut brown, no ammonia." },
-  { id: 4, time: "12:00", duration: 30, customer: "Sneha P.", initials: "SP", tone: "d", service: "Threading", stylist: "rekha", price: 80, status: "confirmed", visits: 3, phone: "+91 98xxx 41902", note: "" },
-  { id: 5, time: "12:45", duration: 60, customer: "Anita Verma", initials: "AV", tone: "a", service: "Hair Spa", stylist: "pooja", price: 900, status: "confirmed", visits: 22, phone: "+91 98xxx 50819", note: "Regular — Saturday lunchtime slot." },
-  { id: 6, time: "14:30", duration: 30, customer: "Lakshmi N.", initials: "LN", tone: "f", service: "Manicure", stylist: "rekha", price: 350, status: "confirmed", visits: 1, phone: "+91 98xxx 60372", note: "First visit — referred by Anita V." },
-  { id: 7, time: "15:30", duration: 45, customer: "Divya Menon", initials: "DM", tone: "e", service: "Pedicure", stylist: "kiran", price: 500, status: "noshow", visits: 4, phone: "+91 98xxx 72184", note: "" },
-  { id: 8, time: "16:30", duration: 30, customer: "Ravi K.", initials: "RK", tone: "c", service: "Beard Trim", stylist: "kiran", price: 200, status: "confirmed", visits: 7, phone: "+91 98xxx 80091", note: "" },
-];
+const FALLBACK_SERVICES: DbService[] = [];
 
 const STATUS_LABEL = { confirmed: "Confirmed", arrived: "Arrived", completed: "Completed", noshow: "No-show" };
 const STATUS_ORDER: ("confirmed" | "arrived" | "completed" | "noshow")[] = ["confirmed", "arrived", "completed", "noshow"];
-const NOW_TIME_MIN = 13 * 60 + 14; // 1:14 PM simulated "now"
-
-const stylistById = (id: string) => STYLISTS.find((s) => s.id === id) || STYLISTS[1];
 
 // ===== MAIN DASHBOARD PAGE =====
 export default function DashboardPage() {
@@ -88,15 +50,29 @@ export default function DashboardPage() {
   const [flash, setFlash] = useState<string | null>(null);
 
   const [loadingBookings, setLoadingBookings] = useState(false);
-  const [dbStylists, setDbStylists] = useState<Stylist[]>([]);
-  const [dbServices, setDbServices] = useState<Service[]>([]);
-  const [nowTimeMin, setNowTimeMin] = useState(13 * 60 + 14); // 1:14 PM simulated "now"
-  const [dateDisplayStr, setDateDisplayStr] = useState("SUN · 19 MAY 2026 · 01:14 PM");
+
+  const { stylists: dbStylists, services: dbServices, loading: salonDataLoading } = useSalonData(salonId);
+  const d = new Date();
+  const [nowTimeMin, setNowTimeMin] = useState(d.getHours() * 60 + d.getMinutes());
+  const [dateDisplayStr, setDateDisplayStr] = useState(formatDateDisplay(d));
+
+  function formatDateDisplay(date: Date) {
+    const dayName = date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+    const dayNum = String(date.getDate()).padStart(2, "0");
+    const monthName = date.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${dayName} · ${dayNum} ${monthName} ${year} · ${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
+  }
 
   useEffect(() => {
     if (profileLoading) return;
     if (!salonId) {
-      setAppts(INITIAL_APPTS);
+      setAppts([]);
       setPageLoading(false);
     }
   }, [profileLoading, salonId]);
@@ -106,72 +82,14 @@ export default function DashboardPage() {
     if (!salonId) return;
 
     const updateTime = () => {
-      const d = new Date();
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-      const dayNum = String(d.getDate()).padStart(2, '0');
-      const monthName = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-      const year = d.getFullYear();
-      let hours = d.getHours();
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      const timeStr = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
-
-      setDateDisplayStr(`${dayName} · ${dayNum} ${monthName} ${year} · ${timeStr}`);
-      setNowTimeMin(d.getHours() * 60 + d.getMinutes());
+      const now = new Date();
+      setDateDisplayStr(formatDateDisplay(now));
+      setNowTimeMin(now.getHours() * 60 + now.getMinutes());
     };
 
     updateTime();
     const interval = setInterval(updateTime, 60000);
     return () => clearInterval(interval);
-  }, [salonId]);
-
-  // Load stylists and services when salonId changes
-  useEffect(() => {
-    if (!salonId) return;
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-
-    const loadStylistsAndServices = async () => {
-      try {
-        const { data: stylistsData } = await supabase
-          .from("stylists")
-          .select("id, name, tone")
-          .eq("salon_id", salonId)
-          .eq("active", true);
-
-        if (stylistsData) {
-          const cleanTone = (t: string) => t.replace("tone-", "");
-          const mappedStylists: Stylist[] = stylistsData.map((s) => ({
-            id: s.id,
-            name: s.name,
-            tone: cleanTone(s.tone || "tone-a")
-          }));
-          setDbStylists(mappedStylists);
-        }
-
-        const { data: servicesData } = await supabase
-          .from("services")
-          .select("id, name, duration_min, price")
-          .eq("salon_id", salonId)
-          .eq("active", true);
-
-        if (servicesData) {
-          const mappedServices: Service[] = servicesData.map((s) => ({
-            id: s.id,
-            name: s.name,
-            duration: s.duration_min,
-            price: Number(s.price)
-          }));
-          setDbServices(mappedServices);
-        }
-      } catch (err) {
-        console.error("Error loading stylists and services:", err);
-      }
-    };
-
-    loadStylistsAndServices();
   }, [salonId]);
 
   const loadDbBookings = async (activeSalonId: string, activeDay: string) => {
@@ -281,7 +199,7 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error("Error loading bookings from Supabase:", err);
-      setAppts(INITIAL_APPTS);
+      setAppts([]);
     } finally {
       setLoadingBookings(false);
       setPageLoading(false);
@@ -297,16 +215,16 @@ export default function DashboardPage() {
   // Combine lists depending on connection state
   const activeStylists = useMemo(() => {
     if (dbStylists.length > 0) {
-      return [{ id: "all", name: "All stylists", tone: "" }, ...dbStylists];
+      return [{ id: "all", name: "All stylists", tone: "", short: "?" }, ...dbStylists];
     }
-    return STYLISTS;
+    return FALLBACK_STYLISTS;
   }, [dbStylists]);
 
   const activeServices = useMemo(() => {
     if (dbServices.length > 0) {
       return dbServices;
     }
-    return SERVICES;
+    return FALLBACK_SERVICES;
   }, [dbServices]);
 
   // Layout settings
@@ -343,6 +261,18 @@ export default function DashboardPage() {
           .eq("id", id);
         if (error) {
           console.error("Error updating status in Supabase:", error);
+        } else {
+          // Insert notification
+          const appt = appts.find(a => a.id === id);
+          if (appt && salonId) {
+            insertNotification({
+              salon_id: salonId,
+              type: "status_update",
+              title: "Booking updated",
+              body: `${appt.customer} marked as ${STATUS_LABEL[status]}`,
+              meta: { booking_id: id, status },
+            });
+          }
         }
       }
     }
@@ -353,7 +283,7 @@ export default function DashboardPage() {
     setTimeout(() => setFlash(null), 1800);
   };
 
-  const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: Service; stylistId: string }) => {
+  const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: DbService; stylistId: string }) => {
     const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     const supabase = getSupabaseBrowserClient();
     
@@ -378,6 +308,14 @@ export default function DashboardPage() {
         });
 
         if (error) throw error;
+
+        insertNotification({
+          salon_id: salonId!,
+          type: "walk_in",
+          title: "Walk-in arrived",
+          body: `${name} walked in for ${svc.name}`,
+          meta: { customer_name: name, service: svc.name },
+        });
 
         setFlash(`${name} added to schedule`);
         setTimeout(() => setFlash(null), 2000);
@@ -698,25 +636,6 @@ function MiniSpark({ points, tone = "teal", height = 28, width = 80 }: { points:
   );
 }
 
-// Helper to map customer name to ID
-const getCustomerId = (name: string) => {
-  const n = name.toLowerCase();
-  if (n.includes("priya")) return 1;
-  if (n.includes("meera")) return 2;
-  if (n.includes("kavya")) return 3;
-  if (n.includes("sneha")) return 4;
-  if (n.includes("anita")) return 5;
-  if (n.includes("lakshmi")) return 6;
-  if (n.includes("divya")) return 7;
-  if (n.includes("ravi")) return 8;
-  return 1;
-};
-
-// Helper to format appointment ID to Booking Ref
-const getBookingId = (id: number) => {
-  return `BK-2026-05${String(id).padStart(2, "0")}`;
-};
-
 // Appointment Timeline Row
 interface ApptRowProps {
   appt: Appointment;
@@ -724,7 +643,7 @@ interface ApptRowProps {
   onToggle: () => void;
   onStatus: (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => void;
   onWA: (a: Appointment) => void;
-  stylists: Stylist[];
+  stylists: DbStylist[];
   nowTimeMin: number;
 }
 
@@ -735,8 +654,8 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
   const endTime = `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
   const isActive = start <= nowTimeMin && nowTimeMin < end;
 
-  const bookingParam = typeof appt.id === "string" ? appt.id : getBookingId(appt.id as number);
-  const customerParam = appt.customerId ? appt.customerId : getCustomerId(appt.customer);
+  const bookingParam = typeof appt.id === "string" ? appt.id : String(appt.id);
+  const customerParam = appt.customerId ? String(appt.customerId) : String(appt.id);
 
   return (
     <div className={`tl-row ${isActive ? "is-active" : ""} ${appt.status === "completed" ? "is-done" : ""}`}>
@@ -851,9 +770,9 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
 // Add Walk-In Appointment Modal
 interface WalkInModalProps {
   onClose: () => void;
-  onAdd: (data: { name: string; phone: string; svc: Service; stylistId: string }) => void;
-  services: Service[];
-  stylists: Stylist[];
+  onAdd: (data: { name: string; phone: string; svc: DbService; stylistId: string }) => void;
+  services: DbService[];
+  stylists: DbStylist[];
 }
 
 function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {

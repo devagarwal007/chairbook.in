@@ -120,29 +120,26 @@ interface BookingData {
   activity: { ts: string; icon: string; text: string; meta: string; tone: string }[];
 }
 
-// ===== MOCK DATA =====
+// FALLBACK: only used when no DB data available
 const BOOKING: BookingData = {
-  id: "BK-2026-0517",
+  id: "",
   status: "confirmed",
-  date: "Saturday, 24 May 2026",
-  time: "16:00",
-  duration: 90,
+  date: "",
+  time: "",
+  duration: 0,
   customer: {
-    id: 1,
-    name: "Priya Sharma",
-    initials: "PS",
-    tone: "b",
-    phone: "+91 98xxx 12345",
-    visits: 12,
-    lastVisit: "13 May 2026",
-    spend: 12400,
-    memberSince: "Oct 2023",
+    id: 0,
+    name: "",
+    initials: "",
+    tone: "a",
+    phone: "",
+    visits: 0,
+    lastVisit: "",
+    spend: 0,
+    memberSince: "",
   },
-  services: [
-    { name: "Hair Color",  duration: 60, price: 1800 },
-    { name: "Hair Spa",    duration: 30, price: 900 },
-  ],
-  stylist: { name: "Anjali", short: "A", tone: "b" },
+  services: [],
+  stylist: { name: "", short: "", tone: "a" },
   notes: "Allergic to ammonia-based color brands. Use ammonia-free range.",
   payment: { status: "pending", method: null },
   activity: [
@@ -162,8 +159,9 @@ const CANCEL_REASONS = [
   { id: "other",    label: "Other reason" },
 ];
 
-const RESCH_DAYS = (() => {
-  const today = new Date(2026, 4, 19);
+function generateReschDays() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const arr = [];
   const dayNames = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
   for (let i = 0; i < 14; i++) {
@@ -172,12 +170,14 @@ const RESCH_DAYS = (() => {
       key: d.toISOString().slice(0,10),
       dow: dayNames[d.getDay()],
       dom: d.getDate(),
-      label: i === 5 ? "Original" : null,
+      label: null as string | null,
       full: d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }),
     });
   }
   return arr;
-})();
+}
+
+const RESCH_DAYS = generateReschDays();
 
 const ALL_SLOTS = ["10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"];
 

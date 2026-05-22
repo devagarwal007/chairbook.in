@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { useProfile } from "@/context/ProfileContext";
 
 // ===== ICONS =====
 const I = {
@@ -155,9 +157,74 @@ const FILTERS = [
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const [notifs, setNotifs] = useState<NotificationItem[]>(INITIAL_NOTIFS);
+  const { salonId } = useProfile();
+  const [notifs, setNotifs] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [flash, setFlash] = useState<string | null>(null);
+
+  // Load notifications from DB
+  useEffect(() => {
+    if (!salonId) {
+      setNotifs(INITIAL_NOTIFS);
+      setLoading(false);
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setNotifs(INITIAL_NOTIFS);
+      setLoading(false);
+      return;
+    }
+
+    const loadNotifs = async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from("notifications")
+          .select("*")
+          .eq("salon_id", salonId)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (data && data.length > 0) {
+          const mappedNotifs: NotificationItem[] = data.map((n: any, i: number) => {
+            const created = new Date(n.created_at);
+            const now = new Date();
+            const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+            const day = diffDays === 0 ? "Today" : diffDays === 1 ? "Yesterday" : "Earlier";
+            const hours = created.getHours();
+            const minutes = String(created.getMinutes()).padStart(2, "0");
+            const ampm = hours >= 12 ? "PM" : "AM";
+            const h = hours % 12 || 12;
+            const ts = `${h}:${minutes} ${ampm}`;
+
+            return {
+              id: i + 1,
+              kind: n.type || "new_booking",
+              ts,
+              day,
+              unread: !n.read,
+              title: n.title,
+              meta: n.body || "",
+              actor: n.meta?.actor ? { name: n.meta.actor.name, initials: n.meta.actor.initials || "?", tone: n.meta.actor.tone || "a" } : null,
+              link: "/dashboard/bookings",
+            };
+          });
+          setNotifs(mappedNotifs);
+        } else {
+          setNotifs(INITIAL_NOTIFS);
+        }
+      } catch (err) {
+        console.error("Error loading notifications:", err);
+        setNotifs(INITIAL_NOTIFS);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNotifs();
+  }, [salonId]);
 
   const flashMsg = (m: string) => {
     setFlash(m);
@@ -187,6 +254,20 @@ export default function NotificationsPage() {
   const markRead = (id: number) => {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
   };
+
+  const dateStr = (() => {
+    const d = new Date();
+    const dayName = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+    const dayNum = String(d.getDate()).padStart(2, "0");
+    const monthName = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${dayName} · ${dayNum} ${monthName} ${year} · ${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
+  })();
 
   const markAllRead = () => {
     setNotifs(prev => prev.map(n => ({ ...n, unread: false })));
@@ -225,7 +306,7 @@ export default function NotificationsPage() {
               Notifications
               {counts.unread > 0 && <span className="nt-unread-pill" style={{ fontSize: 10, background: "var(--rose-soft)", color: "var(--rose)", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{counts.unread} unread</span>}
             </div>
-            <div className="d" style={{ fontSize: "var(--t-body-sm)", color: "var(--ink-3)", marginTop: 2 }}>SUN · 19 MAY 2026 · 01:14 PM</div>
+            <div className="d" style={{ fontSize: "var(--t-body-sm)", color: "var(--ink-3)", marginTop: 2 }}>{dateStr}</div>
           </div>
           <div className="top-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {counts.unread > 0 && (

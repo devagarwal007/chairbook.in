@@ -204,8 +204,17 @@ export default function SettingsPage() {
         let salonType = "Unisex salon";
         let salonHours = INITIAL_DATA.hours;
         let salonWa = INITIAL_DATA.wa.number;
+        let orgPlan = INITIAL_DATA.plan;
 
         if (userProfile.org_id) {
+          // Load plan from organizations
+          const { data: org } = await supabase
+            .from("organizations")
+            .select("plan")
+            .eq("id", userProfile.org_id)
+            .maybeSingle();
+          if (org) orgPlan = org.plan.toLowerCase();
+
           const { data: salon } = await supabase
             .from("salons")
             .select("id, name, area, city, type, hours, wa_number")
@@ -235,6 +244,47 @@ export default function SettingsPage() {
           }
         }
 
+        // Load services and team from DB
+        let dbServices = INITIAL_DATA.services;
+        let dbTeam = INITIAL_DATA.team;
+
+        if (supabaseSalonId) {
+          try {
+            const { data: svcData } = await supabase
+              .from("services")
+              .select("id, name, category, duration_min, price, active")
+              .eq("salon_id", supabaseSalonId);
+
+            if (svcData && svcData.length > 0) {
+              dbServices = svcData.map((s: any, idx: number) => ({
+                id: idx + 1,
+                name: s.name,
+                cat: s.category || "General",
+                duration: s.duration_min,
+                price: Number(s.price),
+                active: s.active,
+              }));
+            }
+
+            const { data: teamData } = await supabase
+              .from("stylists")
+              .select("id, name, role_label, tone, commission_pct, active")
+              .eq("salon_id", supabaseSalonId);
+
+            if (teamData && teamData.length > 0) {
+              dbTeam = teamData.map((s: any, idx: number) => ({
+                id: idx + 1,
+                name: s.name,
+                role: s.role_label || "Stylist",
+                tone: (s.tone || "tone-a").replace("tone-", ""),
+                commission: Number(s.commission_pct || 0),
+              }));
+            }
+          } catch (err) {
+            console.error("Error loading services/team:", err);
+          }
+        }
+
         // Global profile is handled by the ProfileContext, no need to set it locally.
 
         setData(prev => ({
@@ -246,6 +296,9 @@ export default function SettingsPage() {
             type: salonType,
           },
           hours: salonHours,
+          services: dbServices,
+          team: dbTeam,
+          plan: orgPlan,
           wa: {
             ...prev.wa,
             number: salonWa,
@@ -297,6 +350,34 @@ export default function SettingsPage() {
             })
             .eq("id", supabaseSalonId);
           if (salonError) throw salonError;
+
+          // Save services
+          for (const svc of data.services) {
+            await supabase
+              .from("services")
+              .upsert({
+                salon_id: supabaseSalonId,
+                name: svc.name,
+                category: svc.cat,
+                duration_min: svc.duration,
+                price: svc.price,
+                active: svc.active,
+              }, { onConflict: "id" });
+          }
+
+          // Save team
+          for (const stylist of data.team) {
+            await supabase
+              .from("stylists")
+              .upsert({
+                salon_id: supabaseSalonId,
+                name: stylist.name,
+                role_label: stylist.role,
+                tone: `tone-${stylist.tone}`,
+                commission_pct: stylist.commission,
+                active: true,
+              }, { onConflict: "id" });
+          }
         }
 
         if (data.account) {
@@ -896,11 +977,17 @@ export default function SettingsPage() {
                     <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>Log out from this device.</div>
                   </div>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setFlash("Signing out...");
+                      const supabase = getSupabaseBrowserClient();
+                      if (supabase) {
+                        await supabase.auth.signOut();
+                      }
+                      localStorage.removeItem("cb_profile");
+                      localStorage.removeItem("cb_salon_id");
                       setTimeout(() => {
-                        router.push("/");
-                      }, 1000);
+                        router.push("/signin");
+                      }, 500);
                     }}
                     style={{
                       padding: "8px 16px",

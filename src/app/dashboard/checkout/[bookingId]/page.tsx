@@ -33,100 +33,12 @@ interface PaymentInfo {
   received: number;
 }
 
-// ===== MOCK DATA =====
-const MOCK_BOOKINGS: Record<string, Booking> = {
-  "BK-2026-0517": {
-    id: "BK-2026-0517",
-    customer: { name: "Priya Sharma", initials: "PS", tone: "b", phone: "+91 98xxx 12345" },
-    stylist: "Anjali",
-    services: [
-      { id: 1, name: "Hair Color", qty: 1, price: 1800 },
-      { id: 2, name: "Hair Spa", qty: 1, price: 900 },
-    ],
-  },
-  "1": {
-    id: "BK-2026-0517",
-    customer: { name: "Priya Sharma", initials: "PS", tone: "b", phone: "+91 98xxx 12345" },
-    stylist: "Anjali",
-    services: [
-      { id: 1, name: "Hair Color", qty: 1, price: 1800 },
-      { id: 2, name: "Hair Spa", qty: 1, price: 900 },
-    ],
-  },
-  "2": {
-    id: "BK-2026-0518",
-    customer: { name: "Meera Iyer", initials: "MI", tone: "c", phone: "+91 98xxx 22119" },
-    stylist: "Pooja",
-    services: [
-      { id: 1, name: "Facial — Classic", qty: 1, price: 700 },
-    ],
-  },
-  "3": {
-    id: "BK-2026-0519",
-    customer: { name: "Kavya Reddy", initials: "KR", tone: "e", phone: "+91 98xxx 30247" },
-    stylist: "Anjali",
-    services: [
-      { id: 1, name: "Hair Color", qty: 1, price: 1800 },
-    ],
-  },
-  "4": {
-    id: "BK-2026-0520",
-    customer: { name: "Sneha P.", initials: "SP", tone: "d", phone: "+91 98xxx 41902" },
-    stylist: "Rekha",
-    services: [
-      { id: 1, name: "Threading", qty: 1, price: 80 },
-    ],
-  },
-  "5": {
-    id: "BK-2026-0521",
-    customer: { name: "Anita Verma", initials: "AV", tone: "a", phone: "+91 98xxx 50819" },
-    stylist: "Pooja",
-    services: [
-      { id: 1, name: "Hair Spa", qty: 1, price: 900 },
-    ],
-  },
-  "6": {
-    id: "BK-2026-0522",
-    customer: { name: "Lakshmi N.", initials: "LN", tone: "f", phone: "+91 98xxx 60372" },
-    stylist: "Rekha",
-    services: [
-      { id: 1, name: "Manicure", qty: 1, price: 350 },
-    ],
-  },
-  "7": {
-    id: "BK-2026-0523",
-    customer: { name: "Divya Menon", initials: "DM", tone: "e", phone: "+91 98xxx 72184" },
-    stylist: "Kiran",
-    services: [
-      { id: 1, name: "Pedicure", qty: 1, price: 500 },
-    ],
-  },
-  "8": {
-    id: "BK-2026-0524",
-    customer: { name: "Ravi K.", initials: "RK", tone: "c", phone: "+91 98xxx 80091" },
-    stylist: "Kiran",
-    services: [
-      { id: 1, name: "Beard Trim", qty: 1, price: 200 },
-    ],
-  },
-};
-
+// ===== CONSTANTS =====
 const PAYMENT_METHODS = [
   { id: "upi", label: "UPI / QR", desc: "GPay, PhonePe, Paytm — anyone", icon: "upi" },
   { id: "card", label: "Card", desc: "Credit or debit", icon: "card" },
   { id: "cash", label: "Cash", desc: "Counter cash", icon: "cash" },
   { id: "split", label: "Split", desc: "Mix UPI + cash + tip", icon: "split" },
-];
-
-const AVAILABLE_ITEMS = [
-  { name: "Haircut", price: 300 },
-  { name: "Hair Color", price: 1800 },
-  { name: "Hair Spa", price: 900 },
-  { name: "Threading", price: 80 },
-  { name: "Facial — Classic", price: 700 },
-  { name: "Manicure", price: 350 },
-  { name: "Pedicure", price: 500 },
-  { name: "Beard Trim", price: 200 },
 ];
 
 // ===== ICONS =====
@@ -204,20 +116,20 @@ export default function CheckoutPage() {
   const params = useParams();
   const router = useRouter();
 
-  const bookingId = (params?.bookingId as string) || "BK-2026-0517";
+  const bookingId = (params?.bookingId as string) || "";
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbServices, setDbServices] = useState<{ id: string; name: string; price: number }[]>([]);
 
-  // Resolve booking from mock data, default to Priya Sharma if not found
+  // Resolve booking — only for UUID-sourced bookings loaded from DB
   const baseBooking = useMemo(() => {
-    return booking || MOCK_BOOKINGS[bookingId] || MOCK_BOOKINGS["BK-2026-0517"];
-  }, [booking, bookingId]);
+    return booking || null;
+  }, [booking]);
 
   const [stage, setStage] = useState<"bill" | "pay" | "receipt">("bill");
   const [method, setMethod] = useState<string>("upi");
-  const [items, setItems] = useState<ServiceItem[]>(baseBooking.services);
+  const [items, setItems] = useState<ServiceItem[]>(baseBooking?.services || []);
   const [discount, setDiscount] = useState<number>(0);
   const [tip, setTip] = useState<number>(100);
   const [roundOff, setRoundOff] = useState<boolean>(true);
@@ -231,9 +143,8 @@ export default function CheckoutPage() {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
 
     if (!isUuid || !supabase) {
-      const base = MOCK_BOOKINGS[bookingId] || MOCK_BOOKINGS["BK-2026-0517"];
-      setBooking(base);
-      setItems(base.services);
+      setBooking(null);
+      setItems([]);
       setLoading(false);
       return;
     }
@@ -348,15 +259,14 @@ export default function CheckoutPage() {
 
   const availableServices = dbServices.length > 0
     ? dbServices
-    : AVAILABLE_ITEMS.map((item, idx) => ({ ...item, id: idx + 1 }));
+    : [];
 
   // Sync state if booking ID changes
   useEffect(() => {
     if (booking) {
       setItems(booking.services);
     } else {
-      const base = MOCK_BOOKINGS[bookingId] || MOCK_BOOKINGS["BK-2026-0517"];
-      setItems(base.services);
+      setItems([]);
     }
     setDiscount(0);
     setTip(100);
@@ -577,6 +487,19 @@ export default function CheckoutPage() {
               </div>
             </div>
           </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (!baseBooking) {
+    return (
+      <div className="ck-stage">
+        <div className="ck-frame" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 16 }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>🔍</div>
+          <h2 style={{ fontSize: 18, fontWeight: 600 }}>Booking not found</h2>
+          <p style={{ color: "var(--ink-3)", fontSize: 13 }}>This booking may have been removed or the link is invalid.</p>
+          <Link href="/dashboard" className="btn btn-primary" style={{ textDecoration: "none" }}>Back to Dashboard</Link>
         </div>
       </div>
     );

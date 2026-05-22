@@ -88,8 +88,12 @@ export default function CustomersPage() {
   const [flash, setFlash] = useState<string | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
 
-  const [customers, setCustomers] = useState<Customer[]>(CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [showCreateCust, setShowCreateCust] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -592,7 +596,7 @@ export default function CustomersPage() {
       {/* FAB - Add customer */}
       <button
         className="fab"
-        onClick={() => setFlash("Create Customer form modal coming soon!")}
+        onClick={() => setShowCreateCust(true)}
         style={{
           position: "fixed",
           right: 24,
@@ -614,7 +618,112 @@ export default function CustomersPage() {
         +
       </button>
 
+      {/* Create Customer Modal */}
+      {showCreateCust && (
+        <div className="modal-back" onClick={() => setShowCreateCust(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Add new customer</h3>
+              <button className="modal-close" onClick={() => setShowCreateCust(false)}>
+                <I.x style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="field">
+                <label>Customer name</label>
+                <input
+                  placeholder="e.g. Priya Sharma"
+                  value={newCustName}
+                  onChange={e => setNewCustName(e.target.value)}
+                  autoFocus
+                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+                />
+              </div>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label>Phone number</label>
+                <input
+                  type="tel"
+                  placeholder="+91 98xxx xxxxx"
+                  value={newCustPhone}
+                  onChange={e => setNewCustPhone(e.target.value.replace(/[^\d+]/g, ""))}
+                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+                />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-ghost" onClick={() => setShowCreateCust(false)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                disabled={!newCustName.trim() || saving}
+                style={{ opacity: !newCustName.trim() || saving ? 0.5 : 1 }}
+                onClick={async () => {
+                  if (!newCustName.trim()) return;
+                  setSaving(true);
+                  const supabase = getSupabaseBrowserClient();
+                  if (supabase && salonId) {
+                    try {
+                      const { data: newCust, error } = await supabase
+                        .from("customers")
+                        .insert({
+                          salon_id: salonId,
+                          name: newCustName.trim(),
+                          phone: newCustPhone || "+91 99999 99999",
+                        })
+                        .select("id, name, phone, created_at")
+                        .single();
 
+                      if (error) throw error;
+
+                      if (newCust) {
+                        const tone = ["a", "b", "c", "d", "e", "f"][Math.floor(Math.random() * 6)];
+                        const newEntry: Customer = {
+                          id: newCust.id,
+                          name: newCust.name,
+                          phone: newCust.phone || "",
+                          tone,
+                          visits: 0,
+                          lastDays: 0,
+                          spend: 0,
+                          fav: "—",
+                          stylist: "—",
+                        };
+                        setCustomers(prev => [newEntry, ...prev]);
+                        setFlash("Customer added!");
+                        setTimeout(() => setFlash(null), 1800);
+                      }
+                    } catch (err: any) {
+                      setFlash(`Error: ${err.message || "Failed to add customer"}`);
+                      setTimeout(() => setFlash(null), 3000);
+                    }
+                  } else {
+                    setFlash("Customer added (local preview)");
+                    const tone = ["a", "b", "c", "d", "e", "f"][Math.floor(Math.random() * 6)];
+                    const newEntry: Customer = {
+                      id: Date.now(),
+                      name: newCustName.trim(),
+                      phone: newCustPhone || "",
+                      tone,
+                      visits: 0,
+                      lastDays: 0,
+                      spend: 0,
+                      fav: "—",
+                      stylist: "—",
+                    };
+                    setCustomers(prev => [newEntry, ...prev]);
+                    setTimeout(() => setFlash(null), 1800);
+                  }
+                  setNewCustName("");
+                  setNewCustPhone("");
+                  setShowCreateCust(false);
+                  setSaving(false);
+                }}
+              >
+                {saving ? "Saving..." : "Add customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Flash Messages */}
       {flash && (

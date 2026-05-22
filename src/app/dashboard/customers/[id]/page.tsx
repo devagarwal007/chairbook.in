@@ -406,16 +406,32 @@ export default function CustomerProfilePage() {
   const engColor = c.engagement === "active" ? "green" : c.engagement === "cooling" ? "amber" : "red";
   const engLabel = c.engagement === "active" ? "Active customer" : c.engagement === "cooling" ? "Cooling off" : "Lost";
 
-  const saveNote = () => {
+  const saveNote = async () => {
     if (!newNote.trim()) return;
     const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-    setNotes([
-      { id: Date.now(), date: today, author: ownerName, text: newNote.trim() },
-      ...notes
-    ]);
+    const note = { id: Date.now(), date: today, author: ownerName, text: newNote.trim() };
+    const updatedNotes = [note, ...notes];
+    setNotes(updatedNotes);
     setNewNote("");
     setAddingNote(false);
     setFlash("Note saved successfully!");
+
+    // Save to DB
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId);
+      if (isUuid) {
+        try {
+          await supabase
+            .from("customers")
+            .update({ notes_new: updatedNotes })
+            .eq("id", customerId);
+        } catch (err) {
+          console.error("Error saving customer notes:", err);
+        }
+      }
+    }
+
     setTimeout(() => setFlash(null), 1500);
   };
 

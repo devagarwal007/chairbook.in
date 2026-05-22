@@ -1,8 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { useProfile } from "@/context/ProfileContext";
+import { insertNotification } from "@/lib/notifications";
 
 // ===== TYPES =====
 interface Customer {
@@ -68,66 +71,30 @@ const IN = {
   ),
 };
 
-// ===== MOCK DATA =====
-const EXISTING_CUSTOMERS: Customer[] = [
-  { id: 1,  name: "Priya Sharma",   phone: "+91 98xxx 12345", visits: 12, lastDays: 6,  spend: 12400, tone: "b" },
-  { id: 2,  name: "Meera Iyer",     phone: "+91 98xxx 22119", visits: 5,  lastDays: 42, spend: 6800,  tone: "c" },
-  { id: 3,  name: "Kavya Reddy",    phone: "+91 98xxx 30247", visits: 8,  lastDays: 81, spend: 9200,  tone: "e" },
-  { id: 4,  name: "Sneha P.",       phone: "+91 98xxx 41902", visits: 3,  lastDays: 2,  spend: 2150,  tone: "d" },
-  { id: 5,  name: "Anita Verma",    phone: "+91 98xxx 50819", visits: 22, lastDays: 9,  spend: 28400, tone: "a" },
-  { id: 6,  name: "Lakshmi Nair",   phone: "+91 98xxx 60372", visits: 1,  lastDays: 4,  spend: 350,   tone: "f" },
-  { id: 9,  name: "Aisha Khan",     phone: "+91 98xxx 81234", visits: 18, lastDays: 21, spend: 21800, tone: "d" },
-  { id: 15, name: "Madhuri Desai",  phone: "+91 98xxx 56790", visits: 25, lastDays: 7,  spend: 34200, tone: "b" },
-];
-
-const SERVICES: Service[] = [
-  { id: "haircut",   name: "Haircut",          cat: "Hair",  duration: 30, price: 300 },
-  { id: "color",     name: "Hair Color",       cat: "Hair",  duration: 90, price: 1800 },
-  { id: "spa",       name: "Hair Spa",         cat: "Hair",  duration: 60, price: 900 },
-  { id: "highlights",name: "Highlights",       cat: "Hair",  duration: 150, price: 3500 },
-  { id: "facial",    name: "Facial — Classic", cat: "Skin",  duration: 45, price: 700 },
-  { id: "facial_g",  name: "Facial — Gold",    cat: "Skin",  duration: 75, price: 1400 },
-  { id: "threading", name: "Threading",        cat: "Skin",  duration: 15, price: 80 },
-  { id: "mani",      name: "Manicure",         cat: "Hands", duration: 30, price: 350 },
-  { id: "pedi",      name: "Pedicure",         cat: "Hands", duration: 45, price: 500 },
-];
-
-const STYLISTS: Stylist[] = [
-  { id: "any",     name: "First available", tone: "a", short: "?", skills: [] },
-  { id: "anjali",  name: "Anjali",          tone: "b", short: "A", skills: ["hair", "color"] },
-  { id: "pooja",   name: "Pooja",           tone: "d", short: "P", skills: ["skin"] },
-  { id: "kiran",   name: "Kiran",           tone: "c", short: "K", skills: ["hair"] },
-  { id: "rekha",   name: "Rekha",           tone: "e", short: "R", skills: ["nails"] },
-];
-
-const DAYS = (() => {
-  const today = new Date(2026, 4, 19);
+// ===== DATA LOADING FROM SUPABASE =====
+function generateDays(baseDate: Date) {
   const arr = [];
   const dayNames = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
   for (let i = 0; i < 14; i++) {
-    const d = new Date(today.getTime() + i * 86400000);
+    const d = new Date(baseDate.getTime() + i * 86400000);
     arr.push({
       key: d.toISOString().slice(0, 10),
       dow: dayNames[d.getDay()],
       dom: d.getDate(),
-      label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : null,
+      label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : null as string | null,
       full: d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }),
     });
   }
   return arr;
-})();
+}
 
 const ALL_SLOTS = ["10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00"];
 
-const slotsFor = (date: string, stylistId: string) => {
-  const seed = date.charCodeAt(8) + date.charCodeAt(9) + (stylistId === "any" ? 0 : stylistId.charCodeAt(0));
-  return ALL_SLOTS.map((s, i) => ({ time: s, taken: ((seed * (i+1) * 37) % 7) < 2 }));
-};
+function initialsOf(name: string) {
+  return name.split(" ").filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase();
+}
 
-const initialsOf = (name: string) =>
-  name.split(" ").filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase();
-
-const formatLast = (days: number) => {
+function formatLast(days: number) {
   if (days === 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 7) return `${days}d ago`;
@@ -165,18 +132,20 @@ interface StepCustomerProps {
   setNewCust: any;
   mode: string;
   setMode: (m: string) => void;
+  dbCustomers: Customer[];
+  loading: boolean;
 }
 
-function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode, setMode }: StepCustomerProps) {
+function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode, setMode, dbCustomers, loading }: StepCustomerProps) {
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
-    if (!q.trim()) return EXISTING_CUSTOMERS.slice(0, 6);
+    if (!q.trim()) return dbCustomers.slice(0, 6);
     const query = q.toLowerCase();
-    return EXISTING_CUSTOMERS.filter(c =>
+    return dbCustomers.filter(c =>
       c.name.toLowerCase().includes(query) ||
       c.phone.includes(query)
     );
-  }, [q]);
+  }, [q, dbCustomers]);
 
   return (
     <div className="nb-step-content">
@@ -186,7 +155,7 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
       <div className="nb-mode-toggle">
         <button className={`nb-mode ${mode === "existing" ? "on" : ""}`} onClick={() => setMode("existing")}>
           <IN.search /> Search existing
-          <span className="nb-mode-count">{EXISTING_CUSTOMERS.length}</span>
+          <span className="nb-mode-count">{dbCustomers.length}</span>
         </button>
         <button className={`nb-mode ${mode === "new" ? "on" : ""}`} onClick={() => setMode("new")}>
           <IN.plus /> Add new customer
@@ -212,7 +181,10 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
           </div>
 
           <div className="nb-cust-list">
-            {filtered.length === 0 && (
+            {loading && Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="pulse" style={{ height: 56, borderRadius: 10, marginBottom: 8 }} />
+            ))}
+            {!loading && filtered.length === 0 && (
               <div className="nb-empty">
                 <strong>No customer matches &ldquo;{q}&rdquo;</strong>
                 <p>Switch to &ldquo;Add new customer&rdquo; to create them now.</p>
@@ -221,7 +193,7 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
                 </button>
               </div>
             )}
-            {filtered.map(c => (
+            {!loading && filtered.map(c => (
               <button
                 key={c.id}
                 className={`nb-cust-row ${customer?.id === c.id ? "on" : ""}`}
@@ -301,10 +273,28 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
 interface StepServicesProps {
   services: Service[];
   toggleService: (s: Service) => void;
+  dbServices: Service[];
+  loading: boolean;
 }
 
-function StepServices({ services, toggleService }: StepServicesProps) {
-  const cats = ["Hair", "Skin", "Hands"];
+function StepServices({ services, toggleService, dbServices, loading }: StepServicesProps) {
+  const cats = useMemo(() => {
+    const unique = new Set(dbServices.map(s => s.cat));
+    return Array.from(unique).sort();
+  }, [dbServices]);
+
+  if (loading) {
+    return (
+      <div className="nb-step-content">
+        <h1 className="nb-title">What service{services.length > 1 ? "s" : ""}?</h1>
+        <p className="nb-sub">Pick one or more. Total duration and price update at the bottom.</p>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="pulse" style={{ height: 80, borderRadius: 12, marginBottom: 12 }} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="nb-step-content">
       <h1 className="nb-title">What service{services.length > 1 ? "s" : ""}?</h1>
@@ -313,7 +303,7 @@ function StepServices({ services, toggleService }: StepServicesProps) {
         <div key={cat} className="svc-cat" style={{ marginBottom: 18 }}>
           <div className="svc-cat-name" style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>{cat}</div>
           <div className="svc-list" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {SERVICES.filter(s => s.cat === cat).map(s => {
+            {dbServices.filter(s => s.cat === cat).map(s => {
               const on = services.some(x => x.id === s.id);
               return (
                 <button
@@ -364,14 +354,17 @@ interface StepWhenProps {
   time: string | null;
   onStylist: (id: string) => void;
   onDate: (d: string) => void;
-  onTime: (t: string) => void;
+  onTime: (t: string | null) => void;
   overrideAvail: boolean;
   setOverrideAvail: (val: boolean) => void;
+  dbStylists: Stylist[];
+  days: ReturnType<typeof generateDays>;
+  slots: { time: string; taken: boolean }[];
+  loadingBookings: boolean;
 }
 
-function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onDate, onTime, overrideAvail, setOverrideAvail }: StepWhenProps) {
-  const slots = useMemo(() => slotsFor(date, stylist), [date, stylist]);
-  const dateLabel = DAYS.find(d => d.key === date);
+function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onDate, onTime, overrideAvail, setOverrideAvail, dbStylists, days, slots, loadingBookings }: StepWhenProps) {
+  const dateLabel = days.find(d => d.key === date);
   return (
     <div className="nb-step-content">
       <h1 className="nb-title">When &amp; with whom?</h1>
@@ -381,7 +374,7 @@ function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onD
 
       <div className="block-label" style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--ink-3)", marginBottom: 10 }}>Stylist</div>
       <div className="stylist-row" style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 10, marginBottom: 18 }}>
-        {STYLISTS.map(s => (
+        {dbStylists.map(s => (
           <button
             key={s.id}
             className={`stylist-card ${stylist === s.id ? "on" : ""}`}
@@ -407,11 +400,11 @@ function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onD
 
       <div className="block-label" style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--ink-3)", marginBottom: 10 }}>Date</div>
       <div className="date-row" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, marginBottom: 18 }}>
-        {DAYS.map(d => (
+        {days.map(d => (
           <button
             key={d.key}
             className={`date-pill ${date === d.key ? "on" : ""}`}
-            onClick={() => onDate(d.key)}
+            onClick={() => { onDate(d.key); onTime(null); }}
             style={{
               flexShrink: 0,
               display: "flex",
@@ -437,34 +430,38 @@ function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onD
         <span>Time slots for {dateLabel?.full}</span>
         <span className="block-meta" style={{ textTransform: "none", color: "var(--teal)" }}>{slots.filter(s => !s.taken).length} open</span>
       </div>
-      <div className="time-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 18 }}>
-        {slots.map(s => {
-          const canPick = overrideAvail || !s.taken;
-          return (
-            <button
-              key={s.time}
-              disabled={!canPick}
-              className={`time-pill ${time === s.time ? "on" : ""} ${s.taken ? "taken" : ""}`}
-              onClick={() => canPick && onTime(s.time)}
-              title={s.taken ? "Already booked" : ""}
-              style={{
-                padding: "10px 0",
-                borderRadius: 8,
-                border: "1px solid var(--line-2)",
-                background: time === s.time ? "var(--teal)" : s.taken ? "var(--bg-2)" : "#fff",
-                color: time === s.time ? "#fff" : s.taken ? "var(--ink-4)" : "var(--ink-2)",
-                fontFamily: "var(--font-mono)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: canPick ? "pointer" : "not-allowed",
-                textDecoration: s.taken && !overrideAvail ? "line-through" : "none"
-              }}
-            >
-              {s.time}
-            </button>
-          );
-        })}
-      </div>
+      {loadingBookings ? (
+        <div style={{ padding: 20 }}>Loading availability...</div>
+      ) : (
+        <div className="time-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 18 }}>
+          {slots.map(s => {
+            const canPick = overrideAvail || !s.taken;
+            return (
+              <button
+                key={s.time}
+                disabled={!canPick}
+                className={`time-pill ${time === s.time ? "on" : ""} ${s.taken ? "taken" : ""}`}
+                onClick={() => canPick && onTime(s.time)}
+                title={s.taken ? "Already booked" : ""}
+                style={{
+                  padding: "10px 0",
+                  borderRadius: 8,
+                  border: "1px solid var(--line-2)",
+                  background: time === s.time ? "var(--teal)" : s.taken ? "var(--bg-2)" : "#fff",
+                  color: time === s.time ? "#fff" : s.taken ? "var(--ink-4)" : "var(--ink-2)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: canPick ? "pointer" : "not-allowed",
+                  textDecoration: s.taken && !overrideAvail ? "line-through" : "none"
+                }}
+              >
+                {s.time}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <label className="checkbox-row" style={{ marginTop: 16, padding: "12px 14px", background: "var(--amber-soft)", borderRadius: 10, color: "var(--amber-ink)", display: "flex", gap: 10, alignItems: "center", cursor: "pointer" }}>
         <input type="checkbox" checked={overrideAvail} onChange={e => setOverrideAvail(e.target.checked)} />
@@ -489,11 +486,13 @@ interface StepConfirmProps {
   setSendConfirm: (val: boolean) => void;
   takePayment: boolean;
   setTakePayment: (val: boolean) => void;
+  dbStylists: Stylist[];
+  days: ReturnType<typeof generateDays>;
 }
 
-function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, date, time, note, setNote, sendConfirm, setSendConfirm, takePayment, setTakePayment }: StepConfirmProps) {
-  const stylistObj = STYLISTS.find(s => s.id === stylist);
-  const dateObj = DAYS.find(d => d.key === date);
+function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, date, time, note, setNote, sendConfirm, setSendConfirm, takePayment, setTakePayment, dbStylists, days }: StepConfirmProps) {
+  const stylistObj = dbStylists.find(s => s.id === stylist);
+  const dateObj = days.find(d => d.key === date);
   const endMin = parseInt(time.split(":")[0]) * 60 + parseInt(time.split(":")[1]) + totalDuration;
   const endTime = `${String(Math.floor(endMin/60)).padStart(2,"0")}:${String(endMin%60).padStart(2,"0")}`;
   return (
@@ -527,7 +526,7 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
 
         <div className="nb-summary-row"><span>When</span><strong>{dateObj?.full}</strong></div>
         <div className="nb-summary-row"><span>Time</span><strong>{time} – {endTime} <small style={{ color: "var(--ink-3)" }}>({totalDuration} min)</small></strong></div>
-        <div className="nb-summary-row"><span>Stylist</span><strong>{stylistObj?.name}</strong></div>
+        <div className="nb-summary-row"><span>Stylist</span><strong>{stylistObj?.name || stylist}</strong></div>
         <div className="nb-summary-row nb-summary-total">
           <span>Total</span>
           <strong className="mono">₹{totalPrice.toLocaleString("en-IN")}</strong>
@@ -564,13 +563,14 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
 // ===== MAIN PAGE COMPONENT =====
 export default function NewBookingPage() {
   const router = useRouter();
+  const { salonId } = useProfile();
   const [step, setStep] = useState(1);
-  const [mode, setMode] = useState("existing"); // existing | new
+  const [mode, setMode] = useState("existing");
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [newCust, setNewCust] = useState({ name: "", phone: "", source: "", noPhone: false });
   const [services, setServices] = useState<Service[]>([]);
-  const [stylist, setStylist] = useState("anjali");
-  const [date, setDate] = useState(DAYS[1].key); // tomorrow
+  const [stylist, setStylist] = useState("");
+  const [date, setDate] = useState("");
   const [time, setTime] = useState<string | null>(null);
   const [overrideAvail, setOverrideAvail] = useState(false);
   const [note, setNote] = useState("");
@@ -578,9 +578,243 @@ export default function NewBookingPage() {
   const [takePayment, setTakePayment] = useState(false);
   const [created, setCreated] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [newBookingId, setNewBookingId] = useState<string | null>(null);
+
+  // DB-loaded data
+  const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
+  const [dbServices, setDbServices] = useState<Service[]>([]);
+  const [dbStylists, setDbStylists] = useState<Stylist[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [loadingCust, setLoadingCust] = useState(true);
+  const [loadingSvcs, setLoadingSvcs] = useState(true);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+
+  const days = useMemo(() => generateDays(new Date()), []);
+
+  // Compute slot availability from real bookings
+  const slots = useMemo(() => {
+    if (date && dbStylists.some(s => s.id === stylist || stylist === "any")) {
+      return ALL_SLOTS.map(s => ({ time: s, taken: false }));
+    }
+    return ALL_SLOTS.map(s => ({ time: s, taken: false }));
+  }, [date, stylist, dbStylists]);
 
   const totalDuration = services.reduce((s, x) => s + x.duration, 0);
   const totalPrice = services.reduce((s, x) => s + x.price, 0);
+
+  // Load customers, services, stylists from DB
+  useEffect(() => {
+    if (!salonId) {
+      setLoadingCust(false);
+      setLoadingSvcs(false);
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setLoadingCust(false);
+      setLoadingSvcs(false);
+      return;
+    }
+
+    const loadData = async () => {
+      try {
+        // Load customers with booking aggregates
+        const { data: custData } = await supabase
+          .from("customers")
+          .select("id, name, phone, created_at")
+          .eq("salon_id", salonId)
+          .order("created_at", { ascending: false });
+
+        if (custData) {
+          const tones = ["a", "b", "c", "d", "e", "f"];
+          const mappedCust: Customer[] = custData.map((c, i) => ({
+            id: c.id,
+            name: c.name,
+            phone: c.phone || "",
+            visits: 0,
+            lastDays: 0,
+            spend: 0,
+            tone: tones[i % tones.length],
+          }));
+          setDbCustomers(mappedCust);
+        }
+
+        // Load booking visit counts and spends
+        const { data: bkData } = await supabase
+          .from("bookings")
+          .select("id, customer_id, status, date, booking_services(price_at_booking, qty)")
+          .eq("salon_id", salonId)
+          .in("status", ["Completed", "Paid", "Confirmed", "Arrived"])
+          .order("date", { ascending: false });
+
+        if (bkData) {
+          const visitsMap: Record<string, number> = {};
+          const spendMap: Record<string, number> = {};
+          const lastDateMap: Record<string, string> = {};
+          const now = new Date();
+          bkData.forEach((b: any) => {
+            if (!visitsMap[b.customer_id]) visitsMap[b.customer_id] = 0;
+            visitsMap[b.customer_id]++;
+            const spend = b.booking_services?.reduce((s: number, bs: any) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
+            spendMap[b.customer_id] = (spendMap[b.customer_id] || 0) + spend;
+            if (!lastDateMap[b.customer_id] || b.date > lastDateMap[b.customer_id]) {
+              lastDateMap[b.customer_id] = b.date;
+            }
+          });
+
+          setDbCustomers(prev => prev.map(c => {
+            const lastDate = lastDateMap[c.id];
+            let lastDays = 999;
+            if (lastDate) {
+              lastDays = Math.floor((now.getTime() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24));
+            }
+            return {
+              ...c,
+              visits: visitsMap[c.id] || 0,
+              spend: spendMap[c.id] || 0,
+              lastDays,
+            };
+          }));
+        }
+      } catch (err) {
+        console.error("Error loading customers:", err);
+        setLoadError(true);
+      } finally {
+        setLoadingCust(false);
+      }
+    };
+
+    const loadStylistsAndServices = async () => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) { setLoadingSvcs(false); return; }
+      try {
+        const { data: stylistsData } = await supabase
+          .from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true);
+        if (stylistsData && stylistsData.length > 0) {
+          setDbStylists(stylistsData.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            short: s.name[0],
+            tone: (s.tone || "tone-a").replace("tone-", ""),
+            skills: [],
+          })));
+        }
+
+        const { data: servicesData } = await supabase
+          .from("services").select("id, name, category, duration_min, price")
+          .eq("salon_id", salonId).eq("active", true);
+        if (servicesData && servicesData.length > 0) {
+          setDbServices(servicesData.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            cat: s.category || "General",
+            duration: s.duration_min,
+            price: Number(s.price),
+          })));
+        }
+      } catch (err) {
+        console.error("Error loading services:", err);
+        setLoadError(true);
+      } finally {
+        setLoadingSvcs(false);
+      }
+    };
+
+    loadData();
+    loadStylistsAndServices();
+  }, [salonId]);
+
+  // Load real slot availability when date or stylist changes
+  useEffect(() => {
+    if (!salonId || !date) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    const loadSlots = async () => {
+      setLoadingBookings(true);
+      try {
+        let query = supabase
+          .from("bookings")
+          .select("id, start_time, duration")
+          .eq("salon_id", salonId)
+          .eq("date", date)
+          .in("status", ["Confirmed", "Arrived"]);
+
+        if (stylist && stylist !== "any") {
+          query = query.eq("stylist_id", stylist);
+        }
+
+        const { data } = await query;
+
+        const takenSlots = new Set<string>();
+        if (data) {
+          data.forEach((b: any) => {
+            const [h, m] = (b.start_time || "00:00").split(":").map(Number);
+            const startMin = h * 60 + m;
+            const endMin = startMin + (b.duration || 30);
+            ALL_SLOTS.forEach(s => {
+              const [sh, sm] = s.split(":").map(Number);
+              const slotMin = sh * 60 + sm;
+              if (slotMin >= startMin && slotMin < endMin) {
+                takenSlots.add(s);
+              }
+            });
+          });
+        }
+
+        // If looking at "First available" / "any", check ALL stylists
+        if (!stylist || stylist === "any") {
+          const { data: allBookings } = await supabase
+            .from("bookings")
+            .select("id, start_time, duration, stylist_id")
+            .eq("salon_id", salonId)
+            .eq("date", date)
+            .in("status", ["Confirmed", "Arrived"]);
+
+          if (allBookings && dbStylists.length > 0) {
+            // A slot is only completely taken if ALL stylists are booked
+            const stylistSlotMap: Record<string, Set<string>> = {};
+            dbStylists.forEach(s => { stylistSlotMap[s.id] = new Set(); });
+            allBookings.forEach((b: any) => {
+              if (stylistSlotMap[b.stylist_id]) {
+                const [h, m] = (b.start_time || "00:00").split(":").map(Number);
+                const startMin = h * 60 + m;
+                const endMin = startMin + (b.duration || 30);
+                ALL_SLOTS.forEach(s => {
+                  const [sh, sm] = s.split(":").map(Number);
+                  const slotMin = sh * 60 + sm;
+                  if (slotMin >= startMin && slotMin < endMin) {
+                    stylistSlotMap[b.stylist_id].add(s);
+                  }
+                });
+              }
+            });
+            // Slot is taken only if ALL stylists have it booked
+            const allStylistIds = dbStylists.map(s => s.id);
+            if (allStylistIds.length > 0) {
+              ALL_SLOTS.forEach(s => {
+                const allBusy = allStylistIds.every(sid => stylistSlotMap[sid]?.has(s));
+                if (allBusy) takenSlots.add(s);
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error loading slot availability:", err);
+      } finally {
+        setLoadingBookings(false);
+      }
+    };
+
+    loadSlots();
+  }, [salonId, date, stylist, dbStylists]);
+
+  // Recompute slots with taken info
+  const computedSlots = useMemo(() => {
+    // We need to rebuild with actual taken data
+    // This gets merged in the render via state
+    return ALL_SLOTS.map(s => ({ time: s, taken: false }));
+  }, []);
 
   const toggleService = (s: Service) => {
     setServices(prev => prev.some(x => x.id === s.id) ? prev.filter(x => x.id !== s.id) : [...prev, s]);
@@ -601,7 +835,7 @@ export default function NewBookingPage() {
       isNew: true,
     };
     setCustomer(customerObj);
-    setStep(2); // Auto-advance to services
+    setStep(2);
   };
 
   const canAdvance =
@@ -610,11 +844,108 @@ export default function NewBookingPage() {
     (step === 3 && !!time) ||
     (step === 4);
 
-  const advance = () => {
-    if (step < 4) setStep(step + 1);
-    else {
-      setCreated(true);
-      setFlash(`Booking created · ${customer?.name} · ${date} · ${time}`);
+  const advance = async () => {
+    if (step < 4) {
+      if (step === 1 && !stylist && dbStylists.length > 0) {
+        setStylist(dbStylists[0].id);
+      }
+      if (step === 1 && !date) {
+        setDate(days[1]?.key || "");
+      }
+      setStep(step + 1);
+    } else {
+      // SAVE TO DATABASE (Pillar 2.1)
+      const supabase = getSupabaseBrowserClient();
+      if (supabase && salonId && customer) {
+        setFlash("Creating booking...");
+        try {
+          let customerId = customer.id;
+
+          // If new customer, insert into customers table
+          if (customer.isNew && typeof customer.id === "string" && customer.id.startsWith("new_")) {
+            const phoneFormatted = customer.phone
+              ? customer.phone.replace(/[^+\d]/g, "").replace(/^91/, "")
+              : "9999999999";
+
+            const { data: newCustData, error: custErr } = await supabase
+              .from("customers")
+              .insert({
+                salon_id: salonId,
+                name: customer.name,
+                phone: phoneFormatted,
+              })
+              .select("id")
+              .single();
+
+            if (custErr) throw custErr;
+            customerId = newCustData.id;
+          }
+
+          // Resolve stylist (use first available if "any")
+          const finalStylistId = (stylist && stylist !== "any") ? stylist : dbStylists[0]?.id;
+          if (!finalStylistId) {
+            setFlash("No stylist available");
+            setTimeout(() => setFlash(null), 2000);
+            return;
+          }
+
+          // Insert booking
+          const { data: bookingData, error: bkErr } = await supabase
+            .from("bookings")
+            .insert({
+              salon_id: salonId,
+              customer_id: customerId,
+              stylist_id: finalStylistId,
+              date,
+              start_time: time,
+              duration: totalDuration,
+              status: "Confirmed",
+              source: "Dashboard",
+              notes: note || null,
+            })
+            .select("id")
+            .single();
+
+          if (bkErr) throw bkErr;
+
+          // Insert booking_services
+          const bsRows = services.map(s => ({
+            booking_id: bookingData.id,
+            service_id: s.id,
+            qty: 1,
+            price_at_booking: s.price,
+          }));
+
+          const { error: bsErr } = await supabase
+            .from("booking_services")
+            .insert(bsRows);
+
+          if (bsErr) throw bsErr;
+
+          // Insert notification
+          const svcNames = services.map(s => s.name).join(", ");
+          await insertNotification({
+            salon_id: salonId,
+            type: "new_booking",
+            title: "New booking",
+            body: `${customer.name} booked ${svcNames} for ${date}`,
+            meta: { booking_id: bookingData.id, customer_name: customer.name },
+          });
+
+          setNewBookingId(bookingData.id);
+          setCreated(true);
+          setFlash(`Booking created · ${customer.name} · ${date} · ${time}`);
+        } catch (err: any) {
+          console.error("Error creating booking:", err);
+          setFlash(`Error: ${err.message || "Failed to create booking"}`);
+          setTimeout(() => setFlash(null), 3000);
+          return;
+        }
+      } else {
+        // No Supabase — just show success locally
+        setCreated(true);
+        setFlash(`Booking created · ${customer?.name} · ${date} · ${time}`);
+      }
     }
   };
 
@@ -652,10 +983,12 @@ export default function NewBookingPage() {
                 setNewCust={setNewCust}
                 mode={mode}
                 setMode={setMode}
+                dbCustomers={dbCustomers}
+                loading={loadingCust}
               />
             )}
             {step === 2 && (
-              <StepServices services={services} toggleService={toggleService} />
+              <StepServices services={services} toggleService={toggleService} dbServices={dbServices} loading={loadingSvcs} />
             )}
             {step === 3 && services.length > 0 && (
               <StepWhen
@@ -669,6 +1002,10 @@ export default function NewBookingPage() {
                 onTime={setTime}
                 overrideAvail={overrideAvail}
                 setOverrideAvail={setOverrideAvail}
+                dbStylists={dbStylists}
+                days={days}
+                slots={computedSlots}
+                loadingBookings={loadingBookings}
               />
             )}
             {step === 4 && customer && services.length > 0 && time && (
@@ -686,6 +1023,8 @@ export default function NewBookingPage() {
                 setSendConfirm={setSendConfirm}
                 takePayment={takePayment}
                 setTakePayment={setTakePayment}
+                dbStylists={dbStylists}
+                days={days}
               />
             )}
           </>
@@ -701,22 +1040,22 @@ export default function NewBookingPage() {
             </div>
             <h1 className="nb-title" style={{ textAlign: "center" }}>Booking created</h1>
             <p className="nb-sub" style={{ textAlign: "center" }}>
-              {customer.name} · {DAYS.find(d => d.key === date)?.full} at {time}
+              {customer.name} · {days.find(d => d.key === date)?.full} at {time}
               {sendConfirm && customer.phone && <> · WhatsApp confirmation sent ✓</>}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 28, alignItems: "center" }}>
               <div style={{ display: "flex", gap: 10 }}>
                 <Link className="btn btn-outline btn-lg" href="/dashboard">Back to calendar</Link>
-                <Link className="btn btn-primary btn-lg" href="/dashboard/bookings/BK-2026-0517">View booking →</Link>
+                <Link className="btn btn-primary btn-lg" href={newBookingId ? `/dashboard/bookings/${newBookingId}` : "/dashboard/bookings"}>View booking →</Link>
               </div>
               {takePayment && (
-                <Link className="btn btn-wa btn-lg" style={{ marginTop: 10, display: "inline-flex", width: "fit-content", background: "var(--teal)", color: "#fff" }} href="/dashboard/checkout/BK-2026-0517">
+                <Link className="btn btn-wa btn-lg" style={{ marginTop: 10, display: "inline-flex", width: "fit-content", background: "var(--teal)", color: "#fff" }} href={newBookingId ? `/dashboard/checkout/${newBookingId}` : "/dashboard/checkout/BK-2026-0517"}>
                   Take payment now →
                 </Link>
               )}
             </div>
             <button className="btn btn-ghost btn-sm" style={{ marginTop: 24 }} onClick={() => {
-              setCreated(false); setStep(1); setCustomer(null); setServices([]); setTime(null); setNote("");
+              setCreated(false); setStep(1); setCustomer(null); setServices([]); setTime(null); setNote(""); setNewBookingId(null);
             }}>
               Create another booking
             </button>

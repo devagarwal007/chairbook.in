@@ -54,13 +54,8 @@ for (let h = START_HOUR; h < END_HOUR; h++) {
   TIME_LABELS.push(`${hh} ${ampm}`);
 }
 
-// ===== MOCK DATA =====
-const MOCK_STYLISTS: Stylist[] = [
-  { id: "anjali", name: "Anjali", short: "A", tone: "b" },
-  { id: "pooja",  name: "Pooja",  short: "P", tone: "d" },
-  { id: "kiran",  name: "Kiran",  short: "K", tone: "c" },
-  { id: "rekha",  name: "Rekha",  short: "R", tone: "e" },
-];
+// ===== FALLBACK DATA (only used when Supabase is unavailable) =====
+const FALLBACK_STYLISTS: Stylist[] = [];
 
 // Helpers
 const getWeekStart = (date: Date): Date => {
@@ -94,6 +89,7 @@ function getWeekNumber(d: Date): number {
   return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
+// FALLBACK: only used when salonId is missing (preview / no Supabase)
 function generateMockAppts(weekDays: Date[]): CalAppt[] {
   const appts: CalAppt[] = [];
   const stylists = ["anjali", "pooja", "kiran", "rekha"];
@@ -187,6 +183,104 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
           {a.service}
         </div>
       )}
+    </div>
+  );
+}
+
+// ===== BLOCK TIME MODAL =====
+function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () => void; salonId: string | null; stylists: Stylist[]; baseDate: Date }) {
+  const [blockStylist, setBlockStylist] = useState("all");
+  const [dateFrom, setDateFrom] = useState(baseDate.toISOString().slice(0, 10));
+  const [dateTo, setDateTo] = useState("");
+  const [timeFrom, setTimeFrom] = useState("09:00");
+  const [timeTo, setTimeTo] = useState("18:00");
+  const [allDay, setAllDay] = useState(false);
+  const [reason, setReason] = useState("Lunch");
+  const [saving, setSaving] = useState(false);
+
+  const handleBlock = async () => {
+    setSaving(true);
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && salonId) {
+      try {
+        await supabase.from("blocks").insert({
+          salon_id: salonId,
+          stylist_id: blockStylist !== "all" ? blockStylist : null,
+          reason,
+          date_from: dateFrom,
+          date_to: dateTo || null,
+          time_from: allDay ? null : timeFrom,
+          time_to: allDay ? null : timeTo,
+          all_day: allDay,
+        });
+      } catch (err) {
+        console.error("Error saving block:", err);
+      }
+    }
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(420px, 100%)" }}>
+        <div className="modal-head">
+          <h3>Block time</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="field">
+            <label>Stylist</label>
+            <select value={blockStylist} onChange={e => setBlockStylist(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14, background: "#fff" }}>
+              <option value="all">All stylists (whole salon)</option>
+              {stylists.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="field">
+              <label>From date</label>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+            </div>
+            <div className="field">
+              <label>To date (optional)</label>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+            </div>
+          </div>
+          <label className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
+            <span>All-day block</span>
+          </label>
+          {!allDay && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div className="field">
+                <label>From</label>
+                <input type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+              </div>
+              <div className="field">
+                <label>To</label>
+                <input type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+              </div>
+            </div>
+          )}
+          <div className="field">
+            <label>Reason</label>
+            <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14, background: "#fff" }}>
+              <option>Lunch</option>
+              <option>Holiday</option>
+              <option>Vacation</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleBlock} disabled={saving}>
+            {saving ? "Saving..." : "Block time"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -351,9 +445,10 @@ export default function BookingsPage() {
   const [baseDate, setBaseDate] = useState<Date>(() => new Date());
   const [stylistFilter, setStylistFilter] = useState("all");
   const [selected, setSelected] = useState<CalAppt | null>(null);
+  const [showBlockModal, setShowBlockModal] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [appts, setAppts] = useState<CalAppt[]>([]);
-  const [stylists, setStylists] = useState<Stylist[]>(MOCK_STYLISTS);
+  const [stylists, setStylists] = useState<Stylist[]>(FALLBACK_STYLISTS);
   const [loading, setLoading] = useState(true);
   const [nowMin, setNowMin] = useState(0);
 
@@ -547,6 +642,9 @@ export default function BookingsPage() {
             <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, textDecoration: "none" }}>
               <I.plus /> New booking
             </Link>
+            <button className="btn btn-sm" onClick={() => setShowBlockModal(true)} style={{ border: "1px solid var(--line-2)", background: "#fff", color: "var(--ink-2)", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, cursor: "pointer" }}>
+              🚫 Block time
+            </button>
           </div>
         </div>
 
@@ -700,6 +798,7 @@ export default function BookingsPage() {
             </div>
           </div>
         )}
+        {showBlockModal && <BlockTimeModal onClose={() => setShowBlockModal(false)} salonId={salonId} stylists={stylists} baseDate={baseDate} />}
       </main>
 
       {/* Flash */}

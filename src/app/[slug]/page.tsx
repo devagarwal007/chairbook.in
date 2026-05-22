@@ -396,7 +396,37 @@ export default function PublicBookingPage() {
         {step < 4 && <StepBar step={step} />}
 
         <div className="book-body">
-          {isLoading && <div className="book-empty">Loading booking page...</div>}
+          {isLoading && (
+            <div className="step-content animate-fade-in">
+              {/* Header skeleton */}
+              <div className="salon-header" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <div className="pulse" style={{ width: 44, height: 44, borderRadius: 12 }} />
+                <div style={{ flex: 1 }}>
+                  <div className="pulse" style={{ width: 120, height: 18, borderRadius: 4 }} />
+                  <div className="pulse" style={{ width: 160, height: 12, borderRadius: 4, marginTop: 6 }} />
+                </div>
+              </div>
+
+              {/* Title skeleton */}
+              <div className="pulse" style={{ width: 220, height: 24, borderRadius: 4, marginBottom: 8 }} />
+              <div className="pulse" style={{ width: 300, height: 14, borderRadius: 4, marginBottom: 24 }} />
+
+              {/* Category skeleton */}
+              <div className="svc-cat">
+                <div className="pulse" style={{ width: 80, height: 16, borderRadius: 4, marginBottom: 12 }} />
+                <div className="svc-list" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="svc-card pulse" style={{ height: 68, borderRadius: "var(--radius)" }}>
+                      <div className="svc-info">
+                        <div style={{ width: 100, height: 16, borderRadius: 4 }} />
+                        <div style={{ width: 60, height: 12, borderRadius: 4, marginTop: 6 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {!isLoading && message && step !== 3 && <div className="book-empty">{message}</div>}
 

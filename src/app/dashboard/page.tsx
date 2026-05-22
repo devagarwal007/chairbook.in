@@ -1,7 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { Icons as I } from "@/components/ui/Icons";
+import { toMin } from "@/lib/utils";
+import Header from "@/components/layout/Header";
+import { useProfile } from "@/context/ProfileContext";
 
 // ===== TYPES =====
 interface Stylist {
@@ -18,7 +23,8 @@ interface Service {
 }
 
 interface Appointment {
-  id: number;
+  id: string | number;
+  customerId?: string | number;
   time: string;
   duration: number;
   customer: string;
@@ -32,77 +38,6 @@ interface Appointment {
   phone: string;
   note: string;
 }
-
-// ===== ICONS =====
-const I = {
-  home: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-      <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/>
-    </svg>
-  ),
-  calendar: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-      <rect x="3" y="5" width="18" height="16" rx="2"/>
-      <path d="M8 3v4M16 3v4M3 10h18"/>
-    </svg>
-  ),
-  users: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/>
-      <circle cx="10" cy="7" r="4"/>
-      <path d="M21 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-    </svg>
-  ),
-  settings: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
-    </svg>
-  ),
-  bell: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>
-    </svg>
-  ),
-  search: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-      <circle cx="11" cy="11" r="7"/>
-      <path d="m21 21-4.3-4.3"/>
-    </svg>
-  ),
-  chev: ({ style }: { style?: React.CSSProperties }) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      <path d="m6 9 6 6 6-6"/>
-    </svg>
-  ),
-  rupee: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-      <path d="M6 3h12M6 8h12M6 13c8 0 8-10 0-10M6 13l8 8"/>
-    </svg>
-  ),
-  cal2: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-      <rect x="3" y="5" width="18" height="16" rx="2"/>
-      <path d="M8 3v4M16 3v4M3 10h18"/>
-    </svg>
-  ),
-  alert: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-      <path d="M12 9v4M12 17h.01"/>
-      <path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0z"/>
-    </svg>
-  ),
-  wa: ({ style }: { style?: React.CSSProperties }) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" style={style}>
-      <path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.8-.7-1.4-1.6-1.6-1.9-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.6-.9-2.2-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1.1 1.1-1.1 2.6 0 1.5 1.1 3 1.2 3.2.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.3c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/>
-    </svg>
-  ),
-  x: ({ style }: { style?: React.CSSProperties }) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      <path d="M18 6 6 18M6 6l12 12"/>
-    </svg>
-  ),
-};
 
 // ===== CONSTANTS =====
 const STYLISTS: Stylist[] = [
@@ -139,21 +74,240 @@ const STATUS_LABEL = { confirmed: "Confirmed", arrived: "Arrived", completed: "C
 const STATUS_ORDER: ("confirmed" | "arrived" | "completed" | "noshow")[] = ["confirmed", "arrived", "completed", "noshow"];
 const NOW_TIME_MIN = 13 * 60 + 14; // 1:14 PM simulated "now"
 
-const toMin = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-};
-
 const stylistById = (id: string) => STYLISTS.find((s) => s.id === id) || STYLISTS[1];
 
 // ===== MAIN DASHBOARD PAGE =====
 export default function DashboardPage() {
-  const [appts, setAppts] = useState<Appointment[]>(INITIAL_APPTS);
-  const [expandedId, setExpandedId] = useState<number | null>(3); // Active one starts expanded
+  const { profile, salonId, loading: profileLoading } = useProfile();
+  const [appts, setAppts] = useState<Appointment[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | number | null>(3); // Active one starts expanded
   const [filter, setFilter] = useState("all");
   const [day, setDay] = useState("today");
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+
+  const [loadingBookings, setLoadingBookings] = useState(false);
+  const [dbStylists, setDbStylists] = useState<Stylist[]>([]);
+  const [dbServices, setDbServices] = useState<Service[]>([]);
+  const [nowTimeMin, setNowTimeMin] = useState(13 * 60 + 14); // 1:14 PM simulated "now"
+  const [dateDisplayStr, setDateDisplayStr] = useState("SUN · 19 MAY 2026 · 01:14 PM");
+
+  useEffect(() => {
+    if (profileLoading) return;
+    if (!salonId) {
+      setAppts(INITIAL_APPTS);
+      setPageLoading(false);
+    }
+  }, [profileLoading, salonId]);
+
+  // Update time and date dynamically if connected
+  useEffect(() => {
+    if (!salonId) return;
+
+    const updateTime = () => {
+      const d = new Date();
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      const dayNum = String(d.getDate()).padStart(2, '0');
+      const monthName = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+      const year = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const timeStr = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+
+      setDateDisplayStr(`${dayName} · ${dayNum} ${monthName} ${year} · ${timeStr}`);
+      setNowTimeMin(d.getHours() * 60 + d.getMinutes());
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, [salonId]);
+
+  // Load stylists and services when salonId changes
+  useEffect(() => {
+    if (!salonId) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    const loadStylistsAndServices = async () => {
+      try {
+        const { data: stylistsData } = await supabase
+          .from("stylists")
+          .select("id, name, tone")
+          .eq("salon_id", salonId)
+          .eq("active", true);
+
+        if (stylistsData) {
+          const cleanTone = (t: string) => t.replace("tone-", "");
+          const mappedStylists: Stylist[] = stylistsData.map((s) => ({
+            id: s.id,
+            name: s.name,
+            tone: cleanTone(s.tone || "tone-a")
+          }));
+          setDbStylists(mappedStylists);
+        }
+
+        const { data: servicesData } = await supabase
+          .from("services")
+          .select("id, name, duration_min, price")
+          .eq("salon_id", salonId)
+          .eq("active", true);
+
+        if (servicesData) {
+          const mappedServices: Service[] = servicesData.map((s) => ({
+            id: s.id,
+            name: s.name,
+            duration: s.duration_min,
+            price: Number(s.price)
+          }));
+          setDbServices(mappedServices);
+        }
+      } catch (err) {
+        console.error("Error loading stylists and services:", err);
+      }
+    };
+
+    loadStylistsAndServices();
+  }, [salonId]);
+
+  const loadDbBookings = async (activeSalonId: string, activeDay: string) => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !activeSalonId) return;
+
+    setLoadingBookings(true);
+    try {
+      const d = new Date();
+      if (activeDay === "tomorrow") {
+        d.setDate(d.getDate() + 1);
+      }
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dateNum = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${dateNum}`;
+
+      const { data, error } = await supabase
+        .from("bookings")
+        .select(`
+          id,
+          customer_id,
+          date,
+          start_time,
+          duration,
+          status,
+          notes,
+          customer:customers (id, name, phone),
+          stylist:stylists (id, name, tone),
+          booking_services (
+            qty,
+            price_at_booking,
+            service:services (id, name)
+          )
+        `)
+        .eq("salon_id", activeSalonId)
+        .eq("date", dateStr)
+        .order("start_time", { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        const customerIds = Array.from(new Set(data.map((b) => b.customer_id).filter(Boolean)));
+        const visitsMap: Record<string, number> = {};
+        
+        if (customerIds.length > 0) {
+          const { data: visitsData } = await supabase
+            .from("bookings")
+            .select("customer_id, status")
+            .in("customer_id", customerIds)
+            .in("status", ["Completed", "Paid"]);
+            
+          if (visitsData) {
+            visitsData.forEach((v) => {
+              visitsMap[v.customer_id] = (visitsMap[v.customer_id] || 0) + 1;
+            });
+          }
+        }
+
+        const cleanTone = (t: string) => t.replace("tone-", "");
+        const mappedAppts: Appointment[] = data.map((b: any) => {
+          const custName = b.customer?.name || "Walk-in Customer";
+          const initials = custName
+            .split(" ")
+            .map((p: string) => p[0])
+            .join("")
+            .toUpperCase()
+            .slice(0, 2) || "WC";
+          
+          const cleanToneVal = b.stylist?.tone ? cleanTone(b.stylist.tone) : "a";
+          const serviceNames = b.booking_services
+            ?.map((bs: any) => bs.service?.name)
+            .filter(Boolean)
+            .join(" + ") || "No service";
+          
+          const price = b.booking_services
+            ?.reduce((total: number, bs: any) => total + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
+
+          const mapDbStatusToUi = (s: string): "confirmed" | "arrived" | "completed" | "noshow" => {
+            const lower = (s || "").toLowerCase();
+            if (lower === "confirmed") return "confirmed";
+            if (lower === "arrived") return "arrived";
+            if (lower === "completed" || lower === "paid") return "completed";
+            if (lower === "no-show") return "noshow";
+            return "confirmed";
+          };
+
+          return {
+            id: b.id,
+            customerId: b.customer_id,
+            time: (b.start_time || "09:00").slice(0, 5),
+            duration: b.duration || 30,
+            customer: custName,
+            initials,
+            tone: cleanToneVal,
+            service: serviceNames,
+            stylist: b.stylist?.id || "unassigned",
+            price,
+            status: mapDbStatusToUi(b.status),
+            visits: visitsMap[b.customer_id] || 0,
+            phone: b.customer?.phone || "",
+            note: b.notes || ""
+          };
+        });
+
+        setAppts(mappedAppts);
+      }
+    } catch (err) {
+      console.error("Error loading bookings from Supabase:", err);
+      setAppts(INITIAL_APPTS);
+    } finally {
+      setLoadingBookings(false);
+      setPageLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (salonId) {
+      loadDbBookings(salonId, day);
+    }
+  }, [salonId, day]);
+
+  // Combine lists depending on connection state
+  const activeStylists = useMemo(() => {
+    if (dbStylists.length > 0) {
+      return [{ id: "all", name: "All stylists", tone: "" }, ...dbStylists];
+    }
+    return STYLISTS;
+  }, [dbStylists]);
+
+  const activeServices = useMemo(() => {
+    if (dbServices.length > 0) {
+      return dbServices;
+    }
+    return SERVICES;
+  }, [dbServices]);
 
   // Layout settings
   const density = "compact";
@@ -170,10 +324,28 @@ export default function DashboardPage() {
   const totalAppts = appts.length;
   const noShows = appts.filter((a) => a.status === "noshow").length;
 
-  const updateStatus = (id: number, status: "confirmed" | "arrived" | "completed" | "noshow") => {
-    setAppts(appts.map((a) => (a.id === id ? { ...a, status } : a)));
+  const updateStatus = async (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => {
+    setAppts(prev => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     setFlash(`Status updated to ${STATUS_LABEL[status]}`);
     setTimeout(() => setFlash(null), 1800);
+
+    const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    if (typeof id === "string" && isUUID(id)) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        const dbStatus = status === "confirmed" ? "Confirmed"
+                       : status === "arrived" ? "Arrived"
+                       : status === "completed" ? "Completed"
+                       : "No-show";
+        const { error } = await supabase
+          .from("bookings")
+          .update({ status: dbStatus })
+          .eq("id", id);
+        if (error) {
+          console.error("Error updating status in Supabase:", error);
+        }
+      }
+    }
   };
 
   const sendWA = (a: Appointment) => {
@@ -181,7 +353,43 @@ export default function DashboardPage() {
     setTimeout(() => setFlash(null), 1800);
   };
 
-  const addWalkIn = ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: Service; stylistId: string }) => {
+  const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: Service; stylistId: string }) => {
+    const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    const supabase = getSupabaseBrowserClient();
+    
+    if (supabase && salonId && isUUID(svc.id) && isUUID(stylistId)) {
+      try {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${d}`;
+        const startTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
+        
+        const { error } = await supabase.rpc("create_public_booking", {
+          p_salon_id: salonId,
+          p_customer_name: name,
+          p_phone: phone || "+91 99999 99999",
+          p_stylist_id: stylistId,
+          p_date: dateStr,
+          p_start_time: startTimeStr,
+          p_duration: svc.duration,
+          p_service_ids: [svc.id]
+        });
+
+        if (error) throw error;
+
+        setFlash(`${name} added to schedule`);
+        setTimeout(() => setFlash(null), 2000);
+        loadDbBookings(salonId, day);
+        return;
+      } catch (err: any) {
+        console.error("Error creating walk-in booking:", err);
+        setFlash(`Error: ${err.message || "Failed to save booking"}`);
+        setTimeout(() => setFlash(null), 3000);
+      }
+    }
+
     const initials = name
       .split(" ")
       .map((p) => p[0])
@@ -192,8 +400,8 @@ export default function DashboardPage() {
     const tone = tones[name.length % tones.length];
 
     const newAppt: Appointment = {
-      id: Math.max(...appts.map((a) => a.id), 0) + 1,
-      time: "13:30", // Walk-in is placed shortly after current simulated time
+      id: Math.max(...appts.map((a) => typeof a.id === "number" ? a.id : 0), 0) + 1,
+      time: "13:30",
       duration: svc.duration,
       customer: name,
       initials,
@@ -212,68 +420,63 @@ export default function DashboardPage() {
     setTimeout(() => setFlash(null), 2000);
   };
 
-  const nowIdx = filtered.findIndex((a) => toMin(a.time) > NOW_TIME_MIN);
+  const nowIdx = filtered.findIndex((a) => toMin(a.time) > nowTimeMin);
+
+  const formatTime = (min: number) => {
+    let h = Math.floor(min / 60);
+    const m = min % 60;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    h = h ? h : 12;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+  };
 
   return (
-    <div className={`app density-${density}`}>
+    <div className={`app density-${density} animate-fade-in`}>
       {/* Top Navbar */}
-      <div className="app-top">
-        <div className="app-top-inner">
-          <div className="brand">
-            <div className="brand-mark">C</div>
-            <span className="brand-text">ChairBook</span>
-            <span className="badge neutral no-dot mono salon-tag" style={{ marginLeft: 12, fontSize: 10, letterSpacing: "0.05em" }}>
-              GLOW SALON · ANDHERI
-            </span>
-          </div>
-          <div className="greeting">
-            <div className="h">Good morning, Ravi 👋</div>
-            <div className="d">SUN · 19 MAY 2026 · 01:14 PM</div>
-          </div>
-          <div className="top-actions">
-            <button className="icon-btn" aria-label="Search">
-              <I.search />
-            </button>
-            <button className="icon-btn" aria-label="Notifications">
-              <I.bell />
-              <span className="ind"></span>
-            </button>
-            <div className="avatar sm tone-b" style={{ marginLeft: 6, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "bold" }}>
-              R
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header
+        title={`Good morning, ${profile.name.split(" ")[0]} 👋`}
+        subtitle={dateDisplayStr}
+        todayRevenue={todayRevenue}
+      />
 
       <main className="app-main">
         {/* Metrics Grid */}
         <div className="metrics">
-          <MetricCard
-            label="Today's revenue"
-            prefix="₹"
-            value={todayRevenue.toLocaleString("en-IN")}
-            delta="22%"
-            deltaTone="up"
-            icon={<I.rupee />}
-            spark={<MiniSpark points={[12, 18, 14, 22, 16, 28, 32]} tone="teal" />}
-          />
-          <MetricCard
-            label="Appointments today"
-            value={totalAppts}
-            suffix=" booked"
-            delta="2 more"
-            deltaTone="up"
-            icon={<I.cal2 />}
-            spark={<MiniSpark points={[5, 7, 6, 8, 9, 7, 8]} tone="teal" />}
-          />
-          <MetricCard
-            label="No-shows"
-            value={noShows}
-            delta={noShows === 0 ? "clean week" : "1 vs. yesterday"}
-            deltaTone={noShows > 0 ? "down" : "up"}
-            icon={<I.alert />}
-            spark={<MiniSpark points={[1, 0, 2, 1, 0, 1, 1]} tone="amber" />}
-          />
+          {pageLoading ? (
+            [1, 2, 3].map(i => (
+              <div key={i} className="metric pulse" style={{ background: "var(--bg-2)", borderRadius: "var(--radius)", minHeight: 90 }} />
+            ))
+          ) : (
+            <>
+              <MetricCard
+                label="Today's revenue"
+                prefix="₹"
+                value={todayRevenue.toLocaleString("en-IN")}
+                delta="22%"
+                deltaTone="up"
+                icon={<I.rupee />}
+                spark={<MiniSpark points={[12, 18, 14, 22, 16, 28, 32]} tone="teal" />}
+              />
+              <MetricCard
+                label="Appointments today"
+                value={totalAppts}
+                suffix=" booked"
+                delta="2 more"
+                deltaTone="up"
+                icon={<I.calendar />}
+                spark={<MiniSpark points={[5, 7, 6, 8, 9, 7, 8]} tone="teal" />}
+              />
+              <MetricCard
+                label="No-shows"
+                value={noShows}
+                delta={noShows === 0 ? "clean week" : "1 vs. yesterday"}
+                deltaTone={noShows > 0 ? "down" : "up"}
+                icon={<I.alert />}
+                spark={<MiniSpark points={[1, 0, 2, 1, 0, 1, 1]} tone="amber" />}
+              />
+            </>
+          )}
         </div>
 
         {/* Schedule Header */}
@@ -282,21 +485,31 @@ export default function DashboardPage() {
             <h2>Today's schedule</h2>
             <span className="count">{filtered.length} appointments</span>
           </div>
-          <div className="r">
-            <div className="toggle">
-              <button className={day === "today" ? "on" : ""} onClick={() => setDay("today")}>
+          <div className="r" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="toggle" style={{ position: "relative" }}>
+              <div
+                className="toggle-slider"
+                style={{
+                  width: "calc(50% - 3px)",
+                  transform: day === "today" ? "translateX(0)" : "translateX(100%)",
+                }}
+              />
+              <button className={day === "today" ? "on" : ""} onClick={() => setDay("today")} style={{ position: "relative", zIndex: 1 }}>
                 Today
               </button>
-              <button className={day === "tomorrow" ? "on" : ""} onClick={() => setDay("tomorrow")}>
+              <button className={day === "tomorrow" ? "on" : ""} onClick={() => setDay("tomorrow")} style={{ position: "relative", zIndex: 1 }}>
                 Tomorrow
               </button>
             </div>
+            <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+              + New booking
+            </Link>
           </div>
         </div>
 
         {/* Stylist Filters */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          {STYLISTS.map((s) => (
+          {activeStylists.map((s) => (
             <button key={s.id} className={`filter-chip ${filter === s.id ? "on" : ""}`} onClick={() => setFilter(s.id)}>
               {s.id !== "all" && (
                 <span className={`avatar sm tone-${s.tone}`} style={{ width: 18, height: 18, fontSize: 9, border: 0, borderRadius: "50%", display: "inline-grid", placeItems: "center", fontWeight: "bold", marginRight: 4 }}>
@@ -314,41 +527,57 @@ export default function DashboardPage() {
         </div>
 
         {/* Appointments Timeline */}
-        <div className="timeline">
+        <div className={`timeline ${loadingBookings ? "is-loading" : ""}`}>
           <div className="tl-rail"></div>
-          {filtered.map((appt, i) => (
-            <React.Fragment key={appt.id}>
-              {showNowLine && nowIdx === i && (
-                <div className="tl-now" style={{ position: "relative", height: 24, marginBottom: 8 }}>
-                  <div className="tl-time" style={{ top: 0, color: "var(--rose)" }}>
-                    01:14
-                    <small>now</small>
+          {pageLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
+                <div style={{ width: 52, flexShrink: 0 }} />
+                <div className="tl-dot" />
+                <div className="pulse" style={{ flex: 1, height: 72, background: "var(--bg-2)", borderRadius: "var(--radius)" }} />
+              </div>
+            ))
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
+              No appointments for this day.
+            </div>
+          ) : (
+            filtered.map((appt, i) => (
+              <React.Fragment key={`${day}-${filter}-${appt.id}`}>
+                {showNowLine && nowIdx === i && (
+                  <div className="tl-now" style={{ position: "relative", height: 24, marginBottom: 8 }}>
+                    <div className="tl-time" style={{ top: 0, color: "var(--rose)" }}>
+                      {formatTime(nowTimeMin).replace(" AM", "").replace(" PM", "")}
+                      <small>now</small>
+                    </div>
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: -16,
+                        top: 8,
+                        width: 11,
+                        height: 11,
+                        borderRadius: "50%",
+                        background: "var(--rose)",
+                        boxShadow: "0 0 0 4px rgba(196,69,43,0.15)",
+                        zIndex: 2,
+                      }}
+                    ></div>
+                    <div style={{ position: "absolute", left: -5, right: 0, top: 13, height: 1, background: "var(--rose)", opacity: 0.35 }}></div>
                   </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: -16,
-                      top: 8,
-                      width: 11,
-                      height: 11,
-                      borderRadius: "50%",
-                      background: "var(--rose)",
-                      boxShadow: "0 0 0 4px rgba(196,69,43,0.15)",
-                      zIndex: 2,
-                    }}
-                  ></div>
-                  <div style={{ position: "absolute", left: -5, right: 0, top: 13, height: 1, background: "var(--rose)", opacity: 0.35 }}></div>
-                </div>
-              )}
-              <ApptRow
-                appt={appt}
-                expanded={expandedId === appt.id}
-                onToggle={() => setExpandedId(expandedId === appt.id ? null : appt.id)}
-                onStatus={updateStatus}
-                onWA={sendWA}
-              />
-            </React.Fragment>
-          ))}
+                )}
+                <ApptRow
+                  appt={appt}
+                  expanded={expandedId === appt.id}
+                  onToggle={() => setExpandedId(expandedId === appt.id ? null : appt.id)}
+                  onStatus={updateStatus}
+                  onWA={sendWA}
+                  stylists={activeStylists}
+                  nowTimeMin={nowTimeMin}
+                />
+              </React.Fragment>
+            ))
+          )}
         </div>
 
         {/* Campaign Callout */}
@@ -383,37 +612,10 @@ export default function DashboardPage() {
         +
       </button>
 
-      {/* Bottom Nav Bar */}
-      <nav className="bottom-nav">
-        <button className="bn-item active">
-          <I.home />
-          <span>Home</span>
-        </button>
-        <button className="bn-item">
-          <I.calendar />
-          <span>Bookings</span>
-        </button>
-        <button className="bn-item">
-          <I.users />
-          <span>Customers</span>
-        </button>
-        <button className="bn-item">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 21V3M21 21H3" />
-            <rect x="7" y="11" width="3" height="6" rx="0.5" />
-            <rect x="12" y="7" width="3" height="10" rx="0.5" />
-            <rect x="17" y="13" width="3" height="4" rx="0.5" />
-          </svg>
-          <span>Insights</span>
-        </button>
-        <button className="bn-item">
-          <I.settings />
-          <span>Settings</span>
-        </button>
-      </nav>
+
 
       {/* Walk-In Modal */}
-      {showWalkIn && <WalkInModal onClose={() => setShowWalkIn(false)} onAdd={addWalkIn} />}
+      {showWalkIn && <WalkInModal onClose={() => setShowWalkIn(false)} onAdd={addWalkIn} services={activeServices} stylists={activeStylists} />}
 
       {/* Flash Messages */}
       {flash && (
@@ -496,21 +698,45 @@ function MiniSpark({ points, tone = "teal", height = 28, width = 80 }: { points:
   );
 }
 
+// Helper to map customer name to ID
+const getCustomerId = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes("priya")) return 1;
+  if (n.includes("meera")) return 2;
+  if (n.includes("kavya")) return 3;
+  if (n.includes("sneha")) return 4;
+  if (n.includes("anita")) return 5;
+  if (n.includes("lakshmi")) return 6;
+  if (n.includes("divya")) return 7;
+  if (n.includes("ravi")) return 8;
+  return 1;
+};
+
+// Helper to format appointment ID to Booking Ref
+const getBookingId = (id: number) => {
+  return `BK-2026-05${String(id).padStart(2, "0")}`;
+};
+
 // Appointment Timeline Row
 interface ApptRowProps {
   appt: Appointment;
   expanded: boolean;
   onToggle: () => void;
-  onStatus: (id: number, status: "confirmed" | "arrived" | "completed" | "noshow") => void;
+  onStatus: (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => void;
   onWA: (a: Appointment) => void;
+  stylists: Stylist[];
+  nowTimeMin: number;
 }
 
-function ApptRow({ appt, expanded, onToggle, onStatus, onWA }: ApptRowProps) {
-  const stylist = stylistById(appt.stylist);
+function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMin }: ApptRowProps) {
+  const stylist = stylists.find((s) => s.id === appt.stylist) || stylists[1] || { id: "unknown", name: appt.stylist, tone: "a" };
   const start = toMin(appt.time);
   const end = start + appt.duration;
   const endTime = `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
-  const isActive = start <= NOW_TIME_MIN && NOW_TIME_MIN < end;
+  const isActive = start <= nowTimeMin && nowTimeMin < end;
+
+  const bookingParam = typeof appt.id === "string" ? appt.id : getBookingId(appt.id as number);
+  const customerParam = appt.customerId ? appt.customerId : getCustomerId(appt.customer);
 
   return (
     <div className={`tl-row ${isActive ? "is-active" : ""} ${appt.status === "completed" ? "is-done" : ""}`}>
@@ -520,9 +746,18 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA }: ApptRowProps) {
       </div>
       <div className="tl-dot"></div>
       <div className={`appt ${expanded ? "is-expanded" : ""}`} onClick={onToggle}>
-        <div className={`avatar md tone-${appt.tone}`} style={{ borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "bold" }}>{appt.initials}</div>
+        <div className={`avatar md tone-${appt.tone}`} style={{ width: 40, height: 40, flexShrink: 0 }}>{appt.initials}</div>
         <div className="who">
-          <div className="name">{appt.customer}</div>
+          <div className="name">
+            <Link
+              href={`/dashboard/customers/${customerParam}`}
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}
+              className="hover-underline"
+            >
+              {appt.customer}
+            </Link>
+          </div>
           <div className="meta">
             <strong>{appt.service}</strong> · with {stylist.name} · {appt.time}–{endTime}
           </div>
@@ -541,7 +776,12 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA }: ApptRowProps) {
           <div className="exp-block">
             <div className="lbl">Customer</div>
             <div className="val">
-              <strong>{appt.customer}</strong>
+              <Link
+                href={`/dashboard/customers/${customerParam}`}
+                style={{ color: "var(--teal)", textDecoration: "none", fontWeight: 600 }}
+              >
+                {appt.customer} ↗
+              </Link>
               <br />
               <span style={{ color: "var(--ink-3)" }}>{appt.phone}</span>
               <br />
@@ -556,6 +796,13 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA }: ApptRowProps) {
               <span style={{ color: "var(--ink-3)" }}>{appt.duration} min · ₹{appt.price.toLocaleString("en-IN")}</span>
               <br />
               <span style={{ color: "var(--ink-3)" }}>Stylist: {stylist.name}</span>
+              <br />
+              <Link
+                href={`/dashboard/bookings/${bookingParam}`}
+                style={{ color: "var(--teal)", textDecoration: "none", fontWeight: 600, fontSize: 12, display: "inline-block", marginTop: 4 }}
+              >
+                View full detail ↗
+              </Link>
             </div>
           </div>
           <div className="exp-block">
@@ -576,6 +823,21 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA }: ApptRowProps) {
                 {STATUS_LABEL[s]}
               </button>
             ))}
+            <Link
+              href={`/dashboard/checkout/${bookingParam}`}
+              className="status-btn"
+              style={{
+                borderColor: "var(--teal)",
+                color: "#fff",
+                background: "var(--teal)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 600
+              }}
+            >
+              Checkout / POS
+            </Link>
             <button className="status-btn" onClick={() => onWA(appt)} style={{ marginLeft: "auto", color: "var(--wa)", borderColor: "var(--wa)", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <I.wa style={{ width: 14, height: 14 }} /> Message on WhatsApp
             </button>
@@ -590,15 +852,21 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA }: ApptRowProps) {
 interface WalkInModalProps {
   onClose: () => void;
   onAdd: (data: { name: string; phone: string; svc: Service; stylistId: string }) => void;
+  services: Service[];
+  stylists: Stylist[];
 }
 
-function WalkInModal({ onClose, onAdd }: WalkInModalProps) {
+function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [svcId, setSvcId] = useState("s1");
-  const [stylistId, setStylistId] = useState("anjali");
+  
+  const defaultSvcId = services[0]?.id || "s1";
+  const defaultStylistId = stylists.filter((s) => s.id !== "all")[0]?.id || "anjali";
 
-  const selectedSvc = SERVICES.find((s) => s.id === svcId) || SERVICES[0];
+  const [svcId, setSvcId] = useState(defaultSvcId);
+  const [stylistId, setStylistId] = useState(defaultStylistId);
+
+  const selectedSvc = services.find((s) => s.id === svcId) || services[0];
   const canSubmit = name.trim().length > 0;
 
   return (
@@ -624,7 +892,7 @@ function WalkInModal({ onClose, onAdd }: WalkInModalProps) {
           <div className="field">
             <label>Service</label>
             <div className="svc-options">
-              {SERVICES.slice(0, 6).map((s) => (
+              {services.slice(0, 6).map((s) => (
                 <button key={s.id} className={`svc-opt ${svcId === s.id ? "on" : ""}`} onClick={() => setSvcId(s.id)}>
                   <span>{s.name}</span>
                   <small>
@@ -637,7 +905,7 @@ function WalkInModal({ onClose, onAdd }: WalkInModalProps) {
           <div className="field">
             <label>Stylist</label>
             <select value={stylistId} onChange={(e) => setStylistId(e.target.value)} style={{ height: 42, background: "#fff", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 10px", outline: 0 }}>
-              {STYLISTS.filter((s) => s.id !== "all").map((s) => (
+              {stylists.filter((s) => s.id !== "all").map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>

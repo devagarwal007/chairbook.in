@@ -373,7 +373,7 @@ function StepTeam({ data, onChange, onNext, onBack }: StepTeamProps) {
         <div className="ob-team-list">
           {data.stylists.map((s) => (
             <div key={s.id} className="ob-team-row">
-              <div className={`avatar md tone-${s.tone}`} style={{ borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "bold" }}>{s.name[0]}</div>
+              <div className={`avatar md tone-${s.tone}`} style={{ width: 40, height: 40, flexShrink: 0 }}>{s.name[0]}</div>
               <div className="ob-team-main">
                 <div className="ob-team-name">{s.name}</div>
                 <div className="ob-team-role">{s.role}</div>

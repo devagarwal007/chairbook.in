@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
+import { useFlash } from "@/hooks";
 import { insertNotification } from "@/lib/notifications";
 import { isUUID } from "@/lib/utils";
 import { Icons as IC } from "@/components/ui/Icons";
@@ -61,7 +62,7 @@ export default function CheckoutPage() {
   const [tip, setTip] = useState<number>(0);
   const [roundOff, setRoundOff] = useState<boolean>(true);
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: triggerFlash } = useFlash(1800);
   const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
 
   // Fetch Booking details if UUID
@@ -247,10 +248,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const triggerFlash = (msg: string) => {
-    setFlash(msg);
-    setTimeout(() => setFlash(null), 1800);
-  };
+
 
   const finishPayment = async (p: PaymentInfo) => {
     if (!baseBooking) return;

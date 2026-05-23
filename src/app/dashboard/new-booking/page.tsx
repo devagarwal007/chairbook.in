@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { initialsOf } from "@/lib/utils";
+import { useFlash } from "@/hooks";
 
 import { Customer, Service, Stylist } from "@/types";
 import { Icons as IN } from "@/components/ui/Icons";
@@ -84,6 +85,16 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
       c.phone.includes(query)
     );
   }, [q, dbCustomers]);
+
+  const duplicateCustomer = useMemo(() => {
+    if (newCust.noPhone || !newCust.phone.trim()) return null;
+    const cleanInput = newCust.phone.replace(/\D/g, "").replace(/^91/, "");
+    if (!cleanInput) return null;
+    return dbCustomers.find(c => {
+      if (!c.phone) return false;
+      return c.phone.replace(/\D/g, "").replace(/^91/, "") === cleanInput;
+    });
+  }, [newCust.phone, newCust.noPhone, dbCustomers]);
 
   return (
     <div className="nb-step-content">
@@ -196,8 +207,43 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
             <input type="checkbox" checked={newCust.noPhone} onChange={e => setNewCust({ ...newCust, noPhone: e.target.checked })} className="accent-teal w-4 h-4 shrink-0" />
             <span>This customer doesn&apos;t want to share a phone number (guest mode — no WhatsApp reminders)</span>
           </label>
+
+          {duplicateCustomer && (
+            <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "var(--amber-soft)", border: "1px solid var(--amber)", color: "var(--ink)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, color: "var(--amber-ink)", fontSize: 13 }}>
+                ⚠️ Phone number already in use
+              </div>
+              <p style={{ margin: "6px 0 0 0", fontSize: 13, color: "var(--ink-2)", lineHeight: "1.4" }}>
+                This number is already linked to <strong>{duplicateCustomer.name}</strong>. Do you want to use the existing profile or change the phone number?
+              </p>
+              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ background: "var(--teal)", color: "#fff", border: 0, height: 28, fontSize: 12, padding: "0 10px", borderRadius: 6, cursor: "pointer" }}
+                  onClick={() => onSelect(duplicateCustomer)}
+                >
+                  Use {duplicateCustomer.name}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  style={{ height: 28, fontSize: 12, padding: "0 10px", borderRadius: 6, cursor: "pointer" }}
+                  onClick={() => setNewCust({ ...newCust, phone: "" })}
+                >
+                  Clear phone
+                </button>
+              </div>
+            </div>
+          )}
+
           {newCust.name.trim() && (
-            <button className="btn btn-primary" style={{ marginTop: 18 }} onClick={() => onAddNew(newCust)}>
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 18, opacity: duplicateCustomer ? 0.5 : 1, cursor: duplicateCustomer ? "not-allowed" : "pointer" }}
+              disabled={!!duplicateCustomer}
+              onClick={() => onAddNew(newCust)}
+            >
               <IN.check /> Use {newCust.name}
             </button>
           )}
@@ -515,7 +561,7 @@ export default function NewBookingPage() {
   const [sendConfirm, setSendConfirm] = useState(true);
   const [takePayment, setTakePayment] = useState(false);
   const [created, setCreated] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: showFlash } = useFlash(2000);
   const [newBookingId, setNewBookingId] = useState<string | null>(null);
 
   // DB-loaded data
@@ -795,15 +841,15 @@ export default function NewBookingPage() {
       // SAVE TO DATABASE (Pillar 2.1)
       const supabase = getSupabaseBrowserClient();
       if (supabase && salonId && customer) {
-        setFlash("Creating booking...");
+        showFlash("Creating booking...", 10000);
         try {
           let customerId = customer.id;
 
           // If new customer, insert into customers table
           if (customer.isNew && typeof customer.id === "string" && customer.id.startsWith("new_")) {
-            const phoneFormatted = customer.phone
+            const phoneFormatted = customer.phone && customer.phone.trim()
               ? customer.phone.replace(/[^+\d]/g, "").replace(/^91/, "")
-              : "9999999999";
+              : null;
 
             const { data: newCustData, error: custErr } = await supabase
               .from("customers")
@@ -822,8 +868,7 @@ export default function NewBookingPage() {
           // Resolve stylist (use first available if "any")
           const finalStylistId = (stylist && stylist !== "any") ? stylist : dbStylists[0]?.id;
           if (!finalStylistId) {
-            setFlash("No stylist available");
-            setTimeout(() => setFlash(null), 2000);
+            showFlash("No stylist available");
             return;
           }
 
@@ -872,17 +917,16 @@ export default function NewBookingPage() {
 
           setNewBookingId(bookingData.id);
           setCreated(true);
-          setFlash(`Booking created · ${customer.name} · ${date} · ${time}`);
+          showFlash(`Booking created · ${customer.name} · ${date} · ${time}`);
         } catch (err: any) {
           console.error("Error creating booking:", err);
-          setFlash(`Error: ${err.message || "Failed to create booking"}`);
-          setTimeout(() => setFlash(null), 3000);
+          showFlash(`Error: ${err.message || "Failed to create booking"}`, 3000);
           return;
         }
       } else {
         // No Supabase — just show success locally
         setCreated(true);
-        setFlash(`Booking created · ${customer?.name} · ${date} · ${time}`);
+        showFlash(`Booking created · ${customer?.name} · ${date} · ${time}`);
       }
     }
   };

@@ -9,7 +9,7 @@ import { toMin, formatTime12h, formatTime12hFromMin, formatDateDisplay, isUUID, 
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
-import { useSalonData } from "@/hooks/useSalonData";
+import { useSalonData, useBookings, useTimeUpdate, useFlash } from "@/hooks";
 import { Appointment, Stylist, Service } from "@/types";
 
 // ===== TYPES =====
@@ -24,179 +24,34 @@ const FALLBACK_SERVICES: Service[] = [];
 const STATUS_LABEL = { confirmed: "Confirmed", arrived: "Arrived", completed: "Completed", noshow: "No-show", cancelled: "Cancelled" };
 const STATUS_ORDER: ("confirmed" | "arrived" | "completed" | "noshow")[] = ["confirmed", "arrived", "completed", "noshow"];
 
+const toneBgMap: Record<string, string> = {
+  a: 'bg-[#F1EAD9] text-[#8C6A1E]',
+  b: 'bg-teal-soft text-teal',
+  c: 'bg-blue-soft text-blue',
+  d: 'bg-[#F4DCE4] text-[#A03364]',
+  e: 'bg-amber-soft text-amber-ink',
+  f: 'bg-rose-soft text-rose',
+};
+
 // ===== MAIN DASHBOARD PAGE =====
 export default function DashboardPage() {
   const { profile, salonId, loading: profileLoading } = useProfile();
   const router = useRouter();
-  const [appts, setAppts] = useState<Appointment[]>([]);
-  const [pageLoading, setPageLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | number | null>(3); // Active one starts expanded
   const [filter, setFilter] = useState<string | number>("all");
   const [day, setDay] = useState("today");
   const [showWalkIn, setShowWalkIn] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
 
-  const [loadingBookings, setLoadingBookings] = useState(false);
+  // Custom Hooks Extraction
+  const { bookings: appts, setBookings: setAppts, loading: loadingBookings, refresh: refreshBookings } = useBookings(salonId, day);
+  const { nowTimeMin, dateDisplayStr } = useTimeUpdate(!!salonId);
+  const { flash, show: showFlash } = useFlash(2000);
 
   const { stylists: dbStylists, services: dbServices, loading: salonDataLoading } = useSalonData(salonId);
-  const d = new Date();
-  const [nowTimeMin, setNowTimeMin] = useState(d.getHours() * 60 + d.getMinutes());
-  const [dateDisplayStr, setDateDisplayStr] = useState(formatDateDisplay(d));
+
+  const pageLoading = profileLoading || salonDataLoading || loadingBookings;
 
 
-
-  useEffect(() => {
-    if (profileLoading) return;
-    if (!salonId) {
-      setAppts([]);
-      setPageLoading(false);
-    }
-  }, [profileLoading, salonId]);
-
-  // Update time and date dynamically if connected
-  useEffect(() => {
-    if (!salonId) return;
-
-    const updateTime = () => {
-      const now = new Date();
-      setDateDisplayStr(formatDateDisplay(now));
-      setNowTimeMin(now.getHours() * 60 + now.getMinutes());
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 60000);
-    return () => clearInterval(interval);
-  }, [salonId]);
-
-  useEffect(() => {
-    if (!salonId) return;
-
-    let cancelled = false;
-
-    const load = async () => {
-      setLoadingBookings(true);
-      const supabase = getSupabaseBrowserClient();
-      if (!supabase) {
-        if (!cancelled) {
-          setLoadingBookings(false);
-          setPageLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const d = new Date();
-        if (day === "tomorrow") {
-          d.setDate(d.getDate() + 1);
-        }
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const dateNum = String(d.getDate()).padStart(2, '0');
-        const dateStr = `${y}-${m}-${dateNum}`;
-
-        const { data, error } = await supabase
-          .from("bookings")
-          .select(`
-            id,
-            customer_id,
-            date,
-            start_time,
-            duration,
-            status,
-            notes,
-            customer:customers (id, name, phone),
-            stylist:stylists (id, name, tone),
-            booking_services (
-              qty,
-              price_at_booking,
-              service:services (id, name)
-            )
-          `)
-          .eq("salon_id", salonId)
-          .eq("date", dateStr)
-          .order("start_time", { ascending: true });
-
-        if (cancelled) return;
-        if (error) throw error;
-
-        if (data) {
-          const customerIds = Array.from(new Set(data.map((b) => b.customer_id).filter(Boolean)));
-          const visitsMap: Record<string, number> = {};
-          
-          if (customerIds.length > 0) {
-            const { data: visitsData } = await supabase
-              .from("bookings")
-              .select("customer_id, status")
-              .in("customer_id", customerIds)
-              .in("status", ["Completed", "Paid"]);
-              
-            if (visitsData && !cancelled) {
-              visitsData.forEach((v) => {
-                visitsMap[v.customer_id] = (visitsMap[v.customer_id] || 0) + 1;
-              });
-            }
-          }
-
-          if (cancelled) return;
-
-          const cleanTone = (t: string) => t.replace("tone-", "");
-          const mappedAppts: Appointment[] = data.map((b: any) => {
-            const custName = b.customer?.name || "Walk-in Customer";
-            const initials = custName
-              .split(" ")
-              .map((p: string) => p[0])
-              .join("")
-              .toUpperCase()
-              .slice(0, 2) || "WC";
-            
-            const cleanToneVal = b.stylist?.tone ? cleanTone(b.stylist.tone) : "a";
-            const serviceNames = b.booking_services
-              ?.map((bs: any) => bs.service?.name)
-              .filter(Boolean)
-              .join(" + ") || "No service";
-            
-            const price = b.booking_services
-              ?.reduce((total: number, bs: any) => total + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
-
-
-
-            return {
-              id: b.id,
-              customerId: b.customer_id,
-              time: (b.start_time || "09:00").slice(0, 5),
-              duration: b.duration || 30,
-              customer: custName,
-              initials,
-              tone: cleanToneVal,
-              service: serviceNames,
-              stylist: b.stylist?.id || "unassigned",
-              price,
-              status: mapDbStatusToUi(b.status),
-              visits: visitsMap[b.customer_id] || 0,
-              phone: b.customer?.phone || "",
-              note: b.notes || ""
-            };
-          });
-
-          setAppts(mappedAppts);
-        }
-      } catch (err) {
-        console.error("Error loading bookings from Supabase:", err);
-        if (!cancelled) setAppts([]);
-      } finally {
-        if (!cancelled) {
-          setLoadingBookings(false);
-          setPageLoading(false);
-        }
-      }
-    };
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [salonId, day]);
 
   // Combine lists depending on connection state
   const activeStylists = useMemo(() => {
@@ -214,7 +69,6 @@ export default function DashboardPage() {
   }, [dbServices]);
 
   // Layout settings
-  const density = "compact";
   const showNowLine = true;
 
   // Filters & Sorting
@@ -239,8 +93,7 @@ export default function DashboardPage() {
 
   const updateStatus = async (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => {
     setAppts(prev => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-    setFlash(`Status updated to ${STATUS_LABEL[status]}`);
-    setTimeout(() => setFlash(null), 1800);
+    showFlash(`Status updated to ${STATUS_LABEL[status]}`, 1800);
 
     if (typeof id === "string" && isUUID(id)) {
       const supabase = getSupabaseBrowserClient();
@@ -273,8 +126,7 @@ export default function DashboardPage() {
   };
 
   const sendWA = (a: Appointment) => {
-    setFlash(`WhatsApp opened for ${a.customer}`);
-    setTimeout(() => setFlash(null), 1800);
+    showFlash(`WhatsApp opened for ${a.customer}`, 1800);
   };
 
   const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: Service; stylistId: string | number }) => {
@@ -310,15 +162,12 @@ export default function DashboardPage() {
           meta: { customer_name: name, service: svc.name },
         });
 
-        setFlash(`${name} added to schedule`);
-        setTimeout(() => setFlash(null), 2000);
-        // Force state reload by updating day state / running inlined fetch
-        setDay(day);
+        showFlash(`${name} added to schedule`, 2000);
+        refreshBookings();
         return;
       } catch (err: any) {
         console.error("Error creating walk-in booking:", err);
-        setFlash(`Error: ${err.message || "Failed to save booking"}`);
-        setTimeout(() => setFlash(null), 3000);
+        showFlash(`Error: ${err.message || "Failed to save booking"}`, 3000);
       }
     }
 
@@ -348,8 +197,7 @@ export default function DashboardPage() {
     };
 
     setAppts([...appts, newAppt]);
-    setFlash(`${name} added to schedule`);
-    setTimeout(() => setFlash(null), 2000);
+    showFlash(`${name} added to schedule`, 2000);
   };
 
   const nowIdx = filtered.findIndex((a) => toMin(a.time) > nowTimeMin);
@@ -363,21 +211,23 @@ export default function DashboardPage() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
   };
 
+  const greeting = nowTimeMin < 12 * 60 ? "Good morning" : nowTimeMin < 17 * 60 ? "Good afternoon" : "Good evening";
+
   return (
-    <div className={`app density-${density} animate-fade-in`}>
+    <div className="min-h-screen pb-[calc(var(--bottom-nav-h)+32px)] animate-[fadeIn_0.22s_cubic-bezier(0.16,1,0.3,1)_forwards]">
       {/* Top Navbar */}
       <Header
-        title={`Good morning, ${profile.name.split(" ")[0]} 👋`}
+        title={`${greeting}, ${profile.name.split(" ")[0]} 👋`}
         subtitle={dateDisplayStr}
         todayRevenue={todayRevenue}
       />
 
-      <main className="app-main">
+      <main className="max-w-[1200px] mx-auto px-8 py-7">
         {/* Metrics Grid */}
-        <div className="metrics">
+        <div className="grid grid-cols-1 min-[521px]:grid-cols-3 gap-2.5 min-[521px]:max-[768px]:gap-2 md:gap-4 mb-[28px]">
           {pageLoading ? (
             [1, 2, 3].map(i => (
-              <div key={i} className="metric pulse" style={{ background: "var(--bg-2)", borderRadius: "var(--radius)", minHeight: 90 }} />
+              <div key={i} className="animate-pulse bg-bg-2 rounded-xl min-h-[90px]" />
             ))
           ) : (
             <>
@@ -412,52 +262,72 @@ export default function DashboardPage() {
         </div>
 
         {/* Schedule Header */}
-        <div className="section-head">
-          <div className="l">
-            <h2>Today's schedule</h2>
-            <span className="count">{filtered.length} appointments</span>
+        <div className="flex flex-row items-center justify-between gap-4 mb-4 max-[768px]:flex-col max-[768px]:items-stretch max-[768px]:gap-3">
+          <div className="flex items-baseline gap-3 max-[768px]:w-full max-[768px]:justify-between">
+            <h2 className="text-lg font-semibold tracking-tight m-0">Today's schedule</h2>
+            <span className="text-[13px] text-ink-3 font-mono">{filtered.length} appointments</span>
           </div>
-          <div className="r" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div className="toggle" style={{ position: "relative" }}>
+          <div className="flex items-center gap-3 max-[768px]:w-full max-[768px]:justify-between">
+            <div className="inline-flex relative items-center w-[180px] p-[3px] bg-bg-2 rounded-[9px] text-[13px]">
               <div
-                className="toggle-slider"
+                className="absolute top-[3px] bottom-[3px] left-[3px] bg-white rounded-[7px] transition-transform duration-220 ease-[cubic-bezier(0.16,1,0.3,1)] z-0 shadow-[0_1px_3px_rgba(0,0,0,0.08),_0_1px_0_var(--line)] will-change-transform"
                 style={{
                   width: "calc(50% - 3px)",
                   transform: day === "today" ? "translateX(0)" : "translateX(100%)",
                 }}
               />
-              <button className={day === "today" ? "on" : ""} onClick={() => setDay("today")} style={{ position: "relative", zIndex: 1 }}>
+              <button
+                className={`flex-1 text-center py-1.5 px-1 border-0 bg-transparent rounded-[7px] cursor-pointer text-[13px] transition-colors duration-150 relative z-10 ${
+                  day === "today" ? "text-ink font-medium" : "text-ink-3"
+                }`}
+                onClick={() => setDay("today")}
+              >
                 Today
               </button>
-              <button className={day === "tomorrow" ? "on" : ""} onClick={() => setDay("tomorrow")} style={{ position: "relative", zIndex: 1 }}>
+              <button
+                className={`flex-1 text-center py-1.5 px-1 border-0 bg-transparent rounded-[7px] cursor-pointer text-[13px] transition-colors duration-150 relative z-10 ${
+                  day === "tomorrow" ? "text-ink font-medium" : "text-ink-3"
+                }`}
+                onClick={() => setDay("tomorrow")}
+              >
                 Tomorrow
               </button>
             </div>
             <button
               onClick={() => setShowWalkIn(true)}
-              className="btn btn-sm btn-outline"
-              style={{ height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg border border-line-2 bg-white text-sm font-semibold text-ink cursor-pointer hover:border-ink-3 hover:bg-bg-2 active:translate-y-[1px] transition-all duration-150"
             >
               Walk-in
             </button>
-            <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+            <Link
+              href="/dashboard/new-booking"
+              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-teal !text-white text-sm font-semibold cursor-pointer hover:bg-teal-ink active:translate-y-[1px] transition-all duration-150 no-underline"
+            >
               + New booking
             </Link>
           </div>
         </div>
 
         {/* Stylist Filters */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <div className="flex gap-2 mb-4 flex-wrap">
           {activeStylists.map((s) => (
-            <button key={s.id} className={`filter-chip ${filter === s.id ? "on" : ""}`} onClick={() => setFilter(s.id)}>
+            <button
+              key={s.id}
+              className={`h-8 px-3 rounded-full border inline-flex items-center gap-2 text-[13px] cursor-pointer transition-all duration-180 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-ink-3 hover:-translate-y-[1px] active:scale-96 will-change-transform ${
+                filter === s.id
+                  ? "bg-ink text-white border-ink"
+                  : "bg-white border-line-2 text-ink-2"
+              }`}
+              onClick={() => setFilter(s.id)}
+            >
               {s.id !== "all" && (
-                <span className={`avatar sm tone-${s.tone}`} style={{ width: 18, height: 18, fontSize: 9, border: 0, borderRadius: "50%", display: "inline-grid", placeItems: "center", fontWeight: "bold", marginRight: 4 }}>
+                <span className={`inline-grid place-items-center font-bold rounded-full w-[18px] h-[18px] text-[9px] mr-1 border-0 shrink-0 ${toneBgMap[(s.tone || "a").replace("tone-", "")] || "bg-bg-2 text-ink-2"}`}>
                   {s.name[0]}
                 </span>
               )}
               {s.name}
               {s.id !== "all" && (
-                <span style={{ color: filter === s.id ? "rgba(255,255,255,0.6)" : "var(--ink-4)", fontSize: 11, marginLeft: 6 }}>
+                <span className={`text-[11px] ml-1.5 ${filter === s.id ? "text-white/60" : "text-ink-4"}`}>
                   {appts.filter((a) => a.stylist === s.id).length}
                 </span>
               )}
@@ -466,14 +336,14 @@ export default function DashboardPage() {
         </div>
 
         {/* Appointments Timeline */}
-        <div className={`timeline ${loadingBookings ? "is-loading" : ""}`}>
-          <div className="tl-rail"></div>
+        <div className="relative pl-[88px] pt-4 transition-opacity duration-220 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-opacity">
+          <div className="absolute left-[76px] top-0 bottom-0 w-[1px] bg-line"></div>
           {pageLoading ? (
             Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
-                <div style={{ width: 52, flexShrink: 0 }} />
-                <div className="tl-dot" />
-                <div className="pulse" style={{ flex: 1, height: 72, background: "var(--bg-2)", borderRadius: "var(--radius)" }} />
+              <div key={i} className="flex gap-3 mb-3 items-start">
+                <div className="w-[52px] shrink-0" />
+                <div className="absolute left-[-16px] top-0 -translate-y-1/2 w-[11px] h-[11px] rounded-full bg-white border-2 border-line-2 z-10" />
+                <div className="flex-1 h-[72px] bg-bg-2 rounded-xl animate-pulse" />
               </div>
             ))
           ) : filtered.length === 0 ? (
@@ -481,7 +351,7 @@ export default function DashboardPage() {
               {showNowLine && day === "today" && (
                 <NowLine nowTimeMin={nowTimeMin} formatTime={formatTime} />
               )}
-              <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
+              <div className="py-8 text-center text-ink-3 text-sm">
                 No appointments for this day.
               </div>
             </div>
@@ -510,32 +380,18 @@ export default function DashboardPage() {
 
         {/* Campaign Callout */}
         {unrepliedCount > 0 && (
-          <div
-            style={{
-              marginTop: 24,
-              padding: "18px 20px",
-              background: "var(--teal-soft)",
-              border: "1px solid var(--teal-soft-2)",
-              borderRadius: "var(--radius)",
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              color: "var(--teal-ink)",
-              fontSize: 13,
-            }}
-          >
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--teal)", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
-              <I.wa style={{ width: 18, height: 18 }} />
+          <div className="mt-6 p-[18px_20px] bg-teal-soft border border-teal-soft-2 rounded-xl flex items-center gap-3.5 text-teal-ink text-[13px]">
+            <div className="w-9 h-9 rounded-[10px] bg-teal text-white grid place-items-center shrink-0">
+              <I.wa className="w-4.5 h-4.5" />
             </div>
-            <div style={{ flex: 1 }}>
-              <strong style={{ fontWeight: 600 }}>
+            <div className="flex-1">
+              <strong className="font-semibold">
                 {unrepliedCount} customer{unrepliedCount > 1 ? "s haven't" : " hasn't"} replied to their reminder.
               </strong>{" "}
               Send a follow-up WhatsApp in one tap.
             </div>
             <button
-              className="btn btn-sm"
-              style={{ background: "var(--teal)", color: "#fff", height: 32 }}
+              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-teal !text-white text-xs font-semibold cursor-pointer hover:bg-teal-ink active:translate-y-[1px] transition-all duration-150"
               onClick={() => router.push("/dashboard/bookings")}
             >
               Review →
@@ -552,22 +408,7 @@ export default function DashboardPage() {
 
       {/* Flash Messages */}
       {flash && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 100,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 10,
-            fontSize: 13,
-            zIndex: 60,
-            boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-            animation: "pop .2s",
-          }}
-        >
+        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white p-[10px_16px] rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)] animate-[pop_0.2s_ease-out]">
           {flash}
         </div>
       )}
@@ -592,25 +433,25 @@ interface MetricCardProps {
 
 function MetricCard({ label, value, prefix, suffix, delta, deltaTone, icon, spark }: MetricCardProps) {
   return (
-    <div className="metric">
-      <div className="lbl">
-        <span className="ico">{icon}</span>
+    <div className="rounded-xl bg-white border border-line flex flex-col gap-1 relative overflow-hidden p-[16px_18px] max-[768px]:p-[14px_12px] max-[520px]:flex-row max-[520px]:items-center max-[520px]:justify-between max-[520px]:p-[12px_16px] max-[520px]:gap-3">
+      <div className="text-xs max-[768px]:text-[10px] max-[520px]:text-[11px] text-ink-3 tracking-wider uppercase font-medium flex items-center gap-2">
+        <span className="grid place-items-center w-4 h-4 text-ink-3">{icon}</span>
         {label}
       </div>
-      <div className="val">
-        {prefix && <small style={{ marginRight: 2 }}>{prefix}</small>}
+      <div className="text-[28px] max-[768px]:text-[20px] font-semibold tracking-tight mt-1.5 max-[520px]:mt-0 flex items-baseline gap-1.5">
+        {prefix && <small className="text-sm font-normal text-ink-3 tracking-normal mr-[2px]">{prefix}</small>}
         {value}
-        {suffix && <small>{suffix}</small>}
+        {suffix && <small className="text-sm font-normal text-ink-3 tracking-normal">{suffix}</small>}
       </div>
       {delta && (
-        <div className="delta">
-          <span className={deltaTone === "down" ? "down" : "up"}>
+        <div className="mt-1.5 text-xs text-ink-3 flex items-center gap-1.5 max-[768px]:hidden">
+          <span className={`${deltaTone === "down" ? "text-rose" : "text-green"} font-medium`}>
             {deltaTone === "down" ? "↓" : "↑"} {delta}
           </span>
           <span>vs. yesterday</span>
         </div>
       )}
-      {spark && <div className="spark">{spark}</div>}
+      {spark && <div className="absolute right-4 top-4 opacity-90 max-[768px]:hidden">{spark}</div>}
     </div>
   );
 }
@@ -655,83 +496,104 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
   const customerParam = appt.customerId ? String(appt.customerId) : String(appt.id);
 
   return (
-    <div className={`tl-row ${isActive ? "is-active" : ""} ${appt.status === "completed" ? "is-done" : ""}`}>
-      <div className="tl-time">
+    <div className="relative grid grid-cols-1 mb-3 animate-[fadeInUp_0.28s_cubic-bezier(0.16,1,0.3,1)_forwards] will-change-[opacity,transform]">
+      <div className="absolute left-[-88px] top-0 -translate-y-1/2 w-16 text-right font-mono text-xs font-medium text-ink-2">
         {startTimeFormatted}
-        <small>{appt.duration} min</small>
+        <small className="block text-[10px] text-ink-4 mt-0.5 font-normal">{appt.duration} min</small>
       </div>
-      <div className="tl-dot"></div>
-      <div className={`appt ${expanded ? "is-expanded" : ""}`} onClick={onToggle}>
-        <div className={`avatar md tone-${appt.tone}`} style={{ width: 40, height: 40, flexShrink: 0 }}>{appt.initials}</div>
-        <div className="who">
-          <div className="name">
+      <div className={`absolute left-[-16px] top-0 -translate-y-1/2 w-[11px] h-[11px] rounded-full border-2 z-10 ${
+        isActive ? "bg-teal border-teal" : appt.status === "completed" ? "bg-ink-4 border-ink-4" : appt.status === "cancelled" ? "bg-bg-2 border-line-2" : "bg-white border-line-2"
+      }`} />
+      <div
+        className={`bg-white border rounded-xl p-[12px_14px] grid grid-cols-[40px_1fr_auto_auto] gap-3.5 items-center cursor-pointer transition-all duration-150 ${
+          expanded ? "border-teal rounded-b-none" : "border-line hover:border-line-2 hover:bg-[#FCFCFA]"
+        }`}
+        onClick={onToggle}
+      >
+        <div className={`w-10 h-10 rounded-full shrink-0 grid place-items-center font-bold text-sm ${toneBgMap[appt.tone] || 'bg-bg-2 text-ink-2'}`}>
+          {appt.initials}
+        </div>
+        <div className="flex flex-col flex-1 min-w-0">
+          <div className={`text-sm font-semibold tracking-tight ${appt.status === "cancelled" ? "line-through opacity-60 text-ink-3" : "text-ink"}`}>
             <Link
               href={`/dashboard/customers/${customerParam}`}
               onClick={(e) => e.stopPropagation()}
-              style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}
-              className="hover-underline"
+              className={`hover:underline font-semibold text-inherit ${appt.status === "cancelled" ? "line-through" : "no-underline"}`}
             >
               {appt.customer}
             </Link>
           </div>
-          <div className="meta">
-            <strong>{appt.service}</strong> · with {stylist.name} · {startTimeFormatted}–{endTimeFormatted}
+          <div className={`text-[13px] text-ink-3 mt-0.5 ${appt.status === "cancelled" ? "line-through opacity-60" : ""}`}>
+            <strong className="text-ink-2 font-medium">{appt.service}</strong> · with {stylist.name} · {startTimeFormatted}–{endTimeFormatted}
           </div>
         </div>
-        <div className="meta-right">
-          <span className={`badge ${appt.status}`}>{STATUS_LABEL[appt.status]}</span>
-          <div className="price">₹{appt.price.toLocaleString("en-IN")}</div>
+        <div className="flex flex-col items-end gap-1">
+          <span className={`inline-flex items-center gap-[4px] text-[9px] font-medium px-[7px] py-[3px] rounded-full tracking-[0.01em] whitespace-nowrap ${
+            appt.status === 'confirmed' ? 'text-[#1957B8] bg-[#E6EEFA]' :
+            appt.status === 'arrived' ? 'text-[#B47A0F] bg-amber-soft' :
+            appt.status === 'completed' ? 'text-[#137A4A] bg-[#DFF1E6]' :
+            appt.status === 'noshow' ? 'text-rose bg-[#FAE2DC]' :
+            appt.status === 'cancelled' ? 'text-ink-3 bg-bg-2' : ''
+          }`}>
+            <span className="w-[5px] h-[5px] rounded-full bg-current inline-block"></span>
+            {STATUS_LABEL[appt.status]}
+          </span>
+          <div className="text-[13px] text-ink-2 font-mono font-medium">₹{appt.price.toLocaleString("en-IN")}</div>
         </div>
-        <div className="chev">
-          <I.chev style={{ width: 18, height: 18 }} />
+        <div className={`grid place-items-center transition-transform duration-150 ${expanded ? "rotate-180 text-ink-2" : "text-ink-4"}`}>
+          <I.chev className="w-[18px] h-[18px]" />
         </div>
       </div>
 
       {expanded && (
-        <div className="appt-expand" onClick={(e) => e.stopPropagation()}>
-          <div className="exp-block">
-            <div className="lbl">Customer</div>
-            <div className="val">
+        <div className="mt-[-1px] border border-t-0 border-teal rounded-b-xl bg-white p-[18px_20px_20px] max-[768px]:p-3.5 grid grid-cols-3 max-[768px]:grid-cols-2 max-[480px]:grid-cols-1 gap-5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[11px] text-ink-3 tracking-wider uppercase font-medium mb-1.5">Customer</div>
+            <div className="text-[13px] text-ink leading-relaxed">
               <Link
                 href={`/dashboard/customers/${customerParam}`}
-                style={{ color: "var(--teal)", textDecoration: "none", fontWeight: 600 }}
+                className="text-teal font-semibold no-underline hover:underline"
               >
                 {appt.customer} ↗
               </Link>
               <br />
-              <span style={{ color: "var(--ink-3)" }}>{appt.phone}</span>
+              <span className="text-ink-3">{appt.phone}</span>
               <br />
-              <span style={{ color: "var(--ink-3)" }}>{appt.visits} previous visits</span>
+              <span className="text-ink-3">{appt.visits} previous visits</span>
             </div>
           </div>
-          <div className="exp-block">
-            <div className="lbl">Service</div>
-            <div className="val">
-              <strong>{appt.service}</strong>
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[11px] text-ink-3 tracking-wider uppercase font-medium mb-1.5">Service</div>
+            <div className="text-[13px] text-ink leading-relaxed">
+              <strong className="font-semibold">{appt.service}</strong>
               <br />
-              <span style={{ color: "var(--ink-3)" }}>{appt.duration} min · ₹{appt.price.toLocaleString("en-IN")}</span>
+              <span className="text-ink-3">{appt.duration} min · ₹{appt.price.toLocaleString("en-IN")}</span>
               <br />
-              <span style={{ color: "var(--ink-3)" }}>Stylist: {stylist.name}</span>
+              <span className="text-ink-3">Stylist: {stylist.name}</span>
               <br />
               <Link
                 href={`/dashboard/bookings/${bookingParam}`}
-                style={{ color: "var(--teal)", textDecoration: "none", fontWeight: 600, fontSize: 12, display: "inline-block", marginTop: 4 }}
+                className="text-teal font-semibold text-xs inline-block mt-1 no-underline hover:underline"
               >
                 View full detail ↗
               </Link>
             </div>
           </div>
-          <div className="exp-block">
-            <div className="lbl">Notes</div>
-            <div className="val" style={{ color: appt.note ? "var(--ink-2)" : "var(--ink-4)" }}>
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[11px] text-ink-3 tracking-wider uppercase font-medium mb-1.5">Notes</div>
+            <div className={`text-[13px] leading-relaxed ${appt.note ? "text-ink-2" : "text-ink-4"}`}>
               {appt.note || "No notes yet — tap to add."}
             </div>
           </div>
-          <div className="exp-actions">
+          <div className="col-span-full flex gap-2 pt-4 border-t border-line flex-wrap">
             {STATUS_ORDER.map((s) => (
               <button
                 key={s}
-                className={`status-btn ${s === "noshow" ? "danger" : ""}`}
+                className={`h-[34px] px-3 rounded-lg border text-[13px] cursor-pointer inline-flex items-center gap-1.5 transition-colors duration-150 ${
+                  appt.status === s
+                    ? "border-teal text-teal bg-teal-soft font-medium"
+                    : "border-line bg-white text-ink-2 hover:border-ink-3 hover:text-ink"
+                } ${s === "noshow" ? "hover:border-rose hover:text-rose" : ""}`}
                 onClick={() => {
                   if (s === "completed") {
                     router.push(`/dashboard/checkout/${bookingParam}`);
@@ -739,7 +601,6 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
                     onStatus(appt.id, s);
                   }
                 }}
-                style={appt.status === s ? { borderColor: "var(--teal)", color: "var(--teal)", background: "var(--teal-soft)" } : {}}
               >
                 {appt.status === s && "✓ "}
                 {STATUS_LABEL[s]}
@@ -747,21 +608,15 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
             ))}
             <Link
               href={`/dashboard/checkout/${bookingParam}`}
-              className="status-btn"
-              style={{
-                borderColor: "var(--teal)",
-                color: "#fff",
-                background: "var(--teal)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontWeight: 600
-              }}
+              className="h-[34px] px-3 rounded-lg border border-teal !text-white bg-teal text-[13px] cursor-pointer inline-flex items-center gap-1.5 font-semibold hover:bg-teal-ink transition-colors duration-150 no-underline"
             >
               Checkout / POS
             </Link>
-            <button className="status-btn" onClick={() => onWA(appt)} style={{ marginLeft: "auto", color: "var(--wa)", borderColor: "var(--wa)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <I.wa style={{ width: 14, height: 14 }} /> Message on WhatsApp
+            <button
+              className="h-[34px] px-3 rounded-lg border border-wa text-wa bg-white text-[13px] cursor-pointer inline-flex items-center gap-1.5 ml-auto hover:bg-wa-soft/10 transition-colors duration-150"
+              onClick={() => onWA(appt)}
+            >
+              <I.wa className="w-3.5 h-3.5" /> Message on WhatsApp
             </button>
           </div>
         </div>
@@ -773,25 +628,13 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
 // "Now" timeline indicator
 function NowLine({ nowTimeMin, formatTime }: { nowTimeMin: number; formatTime: (min: number) => string }) {
   return (
-    <div className="tl-now" style={{ position: "relative", height: 24, marginBottom: 8 }}>
-      <div className="tl-time" style={{ top: 0, color: "var(--rose)" }}>
+    <div className="relative h-6 mb-2 pointer-events-none flex items-center z-20">
+      <div className="absolute left-[-88px] top-0 w-16 text-right font-mono text-xs font-medium text-rose">
         {formatTime(nowTimeMin).replace(" AM", "").replace(" PM", "")}
-        <small>now</small>
+        <small className="block text-[10px] text-rose/70 mt-0.5 font-normal">now</small>
       </div>
-      <div
-        style={{
-          position: "absolute",
-          left: -16,
-          top: 8,
-          width: 11,
-          height: 11,
-          borderRadius: "50%",
-          background: "var(--rose)",
-          boxShadow: "0 0 0 4px rgba(196,69,43,0.15)",
-          zIndex: 2,
-        }}
-      ></div>
-      <div style={{ position: "absolute", left: -5, right: 0, top: 13, height: 1, background: "var(--rose)", opacity: 0.35 }}></div>
+      <div className="absolute left-[-16px] top-2 w-[11px] h-[11px] rounded-full bg-rose shadow-[0_0_0_4px_rgba(196,69,43,0.15)] z-20"></div>
+      <div className="absolute left-[-5px] right-0 top-[13px] h-[1px] bg-rose opacity-35"></div>
     </div>
   );
 }
@@ -818,52 +661,62 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
   const canSubmit = name.trim().length > 0;
 
   return (
-    <div className="modal-back" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>Add walk-in booking</h3>
-          <button className="modal-close" onClick={onClose}>
-            <I.x style={{ width: 16, height: 16 }} />
+    <div className="fixed inset-0 bg-black/45 z-100 grid place-items-center p-6 backdrop-blur-[2px] animate-[fadeIn_0.15s_ease]" onClick={onClose}>
+      <div className="w-[min(440px,100%)] max-w-[calc(100vw-32px)] bg-white rounded-2xl border border-line overflow-hidden animate-[pop_0.18s_cubic-bezier(0.2,0.9,0.3,1.2)]" onClick={(e) => e.stopPropagation()}>
+        <div className="p-[20px_24px] border-b border-line flex items-center justify-between">
+          <h3 className="text-[17px] font-semibold tracking-tight m-0">Add walk-in booking</h3>
+          <button className="w-8 h-8 rounded-lg border-0 bg-bg-2 text-ink-2 cursor-pointer grid place-items-center" onClick={onClose}>
+            <I.x className="w-4 h-4" />
           </button>
         </div>
-        <div className="modal-body">
-          <div className="field-row">
-            <div className="field">
-              <label>Customer name</label>
+        <div className="p-[20px_24px] flex flex-col gap-3.5">
+          <div className="grid grid-cols-2 max-[480px]:grid-cols-1 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-ink-3 font-medium">Customer name</label>
               <input
                 placeholder="e.g. Priya Sharma"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
-                style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
+                className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal min-w-0"
               />
             </div>
-            <div className="field">
-              <label>Phone (optional)</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-ink-3 font-medium">Phone (optional)</label>
               <input
                 placeholder="+91 98xxx"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
+                className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal min-w-0"
               />
             </div>
           </div>
-          <div className="field">
-            <label>Service</label>
-            <div className="svc-options">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-ink-3 font-medium">Service</label>
+            <div className="grid grid-cols-2 gap-2">
               {services.slice(0, 6).map((s) => (
-                <button key={s.id} className={`svc-opt ${svcId === s.id ? "on" : ""}`} onClick={() => setSvcId(s.id)}>
+                <button
+                  key={s.id}
+                  className={`p-[10px_12px] border rounded-[10px] cursor-pointer text-[13px] text-left font-sans flex justify-between items-center transition-all duration-150 ${
+                    svcId === s.id ? "border-teal bg-teal-soft text-teal-ink font-medium" : "border-line bg-white text-ink hover:border-ink-3"
+                  }`}
+                  onClick={() => setSvcId(s.id)}
+                >
                   <span>{s.name}</span>
-                  <small>
+                  <small className={`font-mono text-xs ${svcId === s.id ? "text-teal" : "text-ink-3"}`}>
                     {s.duration}m · ₹{s.price}
                   </small>
                 </button>
               ))}
             </div>
           </div>
-          <div className="field">
-            <label>Stylist</label>
-            <select value={stylistId} onChange={(e) => setStylistId(e.target.value)} style={{ height: 42, background: "#fff", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 10px", outline: 0 }}>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-ink-3 font-medium">Stylist</label>
+            <select
+              value={stylistId}
+              onChange={(e) => setStylistId(e.target.value)}
+              className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal"
+            >
               {stylists.filter((s) => s.id !== "all").map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -872,14 +725,16 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
             </select>
           </div>
         </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>
+        <div className="p-[16px_24px] border-t border-line bg-bg flex gap-2.5 justify-end">
+          <button
+            className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-transparent text-ink-2 hover:text-ink hover:bg-bg-2 transition-all duration-150"
+            onClick={onClose}
+          >
             Cancel
           </button>
           <button
-            className="btn btn-primary"
+            className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-teal !text-white hover:bg-teal-ink transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!canSubmit}
-            style={!canSubmit ? { opacity: 0.5, cursor: "not-allowed" } : {}}
             onClick={() => {
               onAdd({ name, phone, svc: selectedSvc, stylistId });
               onClose();

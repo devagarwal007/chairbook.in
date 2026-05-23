@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
+import { useFlash } from "@/hooks";
 import { initialsOf } from "@/lib/utils";
 
 
@@ -46,7 +46,7 @@ export default function CustomersPage() {
   const [tab, setTab] = useState("all");
   const [sort, setSort] = useState("recent");
   const [selected, setSelected] = useState<string | number | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: showFlash } = useFlash(2000);
   const [sortOpen, setSortOpen] = useState(false);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -168,7 +168,7 @@ export default function CustomersPage() {
 
   const onSelect = (c: Customer) => {
     setSelected(c.id);
-    setFlash(`Opening ${c.name}'s profile…`);
+    showFlash(`Opening ${c.name}'s profile…`, 350);
     setTimeout(() => {
       router.push(`/dashboard/customers/${c.id}`);
     }, 350);
@@ -176,13 +176,12 @@ export default function CustomersPage() {
 
   const onMessage = (c: Customer, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFlash(`Opening WhatsApp chat for ${c.name}...`);
+    showFlash(`Opening WhatsApp chat for ${c.name}...`, 800);
     const displaySalonName = profile.salonName.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     const waText = `Hi ${c.name}, this is ${displaySalonName}. Just checking in! We look forward to seeing you soon.`;
     const cleanPhone = c.phone.replace(/[^0-9+]/g, "");
     setTimeout(() => {
       window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`, "_blank");
-      setFlash(null);
     }, 800);
   };
 
@@ -200,6 +199,16 @@ export default function CustomersPage() {
 
   const currentSort = SORT_OPTIONS.find(s => s.id === sort) || SORT_OPTIONS[0];
 
+  const duplicateCustomer = useMemo(() => {
+    if (!newCustPhone.trim()) return null;
+    const cleanInput = newCustPhone.replace(/\D/g, "").replace(/^91/, "");
+    if (!cleanInput) return null;
+    return customers.find(c => {
+      if (!c.phone) return false;
+      return c.phone.replace(/\D/g, "").replace(/^91/, "") === cleanInput;
+    });
+  }, [newCustPhone, customers]);
+
   return (
     <div className="app animate-fade-in">
       <Header
@@ -208,45 +217,34 @@ export default function CustomersPage() {
         actions={
           <button
             className="icon-btn"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              border: "1px solid var(--line-2)",
-              background: "#fff",
-              cursor: "pointer",
-            }}
-            onClick={() => setFlash("Downloading customer list...")}
+            onClick={() => showFlash("Downloading customer list...")}
           >
-            <I.download style={{ width: 18, height: 18 }} />
+            <I.download />
           </button>
         }
       />
 
       {/* App Main */}
-      <main className="app-main" style={{ paddingBottom: 100 }}>
+      <main className="app-main pb-[100px]">
         {/* Search bar */}
-        <div className="cust-search" style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid var(--line-2)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 16 }}>
+        <div className="flex items-center gap-2.5 bg-white border border-line-2 rounded-[var(--radius)] px-3.5 py-2.5 mb-4">
           <I.search />
           <input
             placeholder="Search by name, phone, service or stylist…"
             value={q}
             onChange={e => setQ(e.target.value)}
-            style={{ flex: 1, border: 0, outline: 0, fontSize: "var(--t-body)", fontFamily: "inherit" }}
+            className="flex-1 border-0 outline-0 text-[var(--t-body)] font-sans"
           />
           {q && (
-            <button className="svc-search-clear" onClick={() => setQ("")} style={{ border: 0, background: "transparent", cursor: "pointer", display: "grid", placeItems: "center" }}>
-              <I.x style={{ width: 14, height: 14 }} />
+            <button className="border-0 bg-transparent cursor-pointer grid place-items-center" onClick={() => setQ("")}>
+              <I.x />
             </button>
           )}
-          <span className="search-key mono" style={{ fontSize: 10, background: "var(--bg-2)", padding: "2px 6px", borderRadius: 4, color: "var(--ink-3)" }}>⌘ K</span>
+          <span className="text-[10px] bg-bg-2 px-1.5 py-0.5 rounded text-ink-3 font-mono">⌘ K</span>
         </div>
 
         {/* Engagement tabs & Sort */}
-        <div className="flex items-center gap-2 pb-1.5 mb-4 max-[720px]:mx-[-16px] max-[720px]:px-4 [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center gap-2 pb-1.5 mb-4 max-[720px]:mx-[-16px] max-[720px]:px-4">
           {FILTER_TABS.map(f => (
             <button
               key={f.id}
@@ -259,12 +257,9 @@ export default function CustomersPage() {
             >
               {f.id !== "all" && (
                 <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: f.id === "active" ? "var(--green)" : f.id === "cooling" ? "var(--amber)" : "var(--rose)"
-                  }}
+                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    f.id === "active" ? "bg-green" : f.id === "cooling" ? "bg-amber" : "bg-rose"
+                  }`}
                 />
               )}
               {f.label}
@@ -272,74 +267,34 @@ export default function CustomersPage() {
             </button>
           ))}
 
-          <div style={{ flex: 1 }}></div>
+          <div className="flex-1" />
 
           {/* Sort Menu Component */}
-          <div className="sort-menu" style={{ position: "relative" }}>
+          <div className="sort-menu relative">
             <button
-              className="filter-chip"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-sm border border-line bg-white text-[13px] font-medium text-ink cursor-pointer whitespace-nowrap"
               onClick={() => setSortOpen(!sortOpen)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 12px",
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--line)",
-                background: "#fff",
-                fontSize: "var(--t-body-sm)",
-                fontWeight: 500,
-                color: "var(--ink)",
-                cursor: "pointer",
-                whiteSpace: "nowrap"
-              }}
             >
-              <I.sort style={{ width: 14, height: 14 }} />
-              <span style={{ color: "var(--ink-3)" }}>Sort:</span>
+              <I.sort />
+              <span className="text-ink-3">Sort:</span>
               <span>{currentSort.label}</span>
-              <I.chev style={{ width: 14, height: 14, color: "var(--ink-3)" }} />
+              <I.chev className="text-ink-3" />
             </button>
             {sortOpen && (
-              <div
-                className="sort-pop"
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: 6,
-                  background: "#fff",
-                  border: "1px solid var(--line)",
-                  borderRadius: "var(--radius)",
-                  boxShadow: "0 8px 16px -4px rgba(0,0,0,0.1)",
-                  zIndex: 50,
-                  minWidth: 180,
-                  overflow: "hidden"
-                }}
-              >
+              <div className="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-[var(--radius)] shadow-[0_8px_16px_-4px_rgba(0,0,0,0.1)] z-50 min-w-[180px] overflow-hidden">
                 {SORT_OPTIONS.map(s => (
                   <button
                     key={s.id}
-                    className={`sort-opt ${sort === s.id ? "on" : ""}`}
+                    className={`flex items-center justify-between w-full px-3.5 py-2.5 border-0 text-[13px] text-left cursor-pointer ${
+                      sort === s.id ? "bg-teal-soft text-teal" : "bg-transparent text-ink"
+                    }`}
                     onClick={() => {
                       setSort(s.id);
                       setSortOpen(false);
                     }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      width: "100%",
-                      padding: "10px 14px",
-                      border: 0,
-                      background: sort === s.id ? "var(--teal-soft)" : "transparent",
-                      color: sort === s.id ? "var(--teal)" : "var(--ink)",
-                      fontSize: "var(--t-body-sm)",
-                      textAlign: "left",
-                      cursor: "pointer"
-                    }}
                   >
                     {s.label}
-                    {sort === s.id && <span style={{ color: "var(--teal)" }}>✓</span>}
+                    {sort === s.id && <span className="text-teal">✓</span>}
                   </button>
                 ))}
               </div>
@@ -350,9 +305,8 @@ export default function CustomersPage() {
           <button
             onClick={() => setShowCreateCust(true)}
             className="h-[34px] rounded-[10px] border border-line-2 bg-teal text-white inline-flex items-center gap-1.5 px-3 cursor-pointer flex-shrink-0 hover:bg-[var(--teal-ink)] transition-all duration-150 text-[13px] font-medium"
-            style={{ transform: "translateY(0)" }}
           >
-            <I.plus style={{ width: 16, height: 16 }} />
+            <I.plus />
             Add Customer
           </button>
         </div>
@@ -365,125 +319,80 @@ export default function CustomersPage() {
           </div>
           {tab === "cooling" && filtered.length > 0 && (
             <button
-              className="btn btn-sm"
-              onClick={() => setFlash("Win-back WhatsApp broadcast prepared!")}
-              style={{
-                background: "var(--teal)",
-                color: "#fff",
-                height: 30,
-                fontSize: 12,
-                borderRadius: 8,
-                padding: "0 10px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                border: 0,
-                cursor: "pointer"
-              }}
+              className="btn btn-sm !bg-teal !text-white h-[30px] text-[12px] rounded-[8px] px-2.5 inline-flex items-center gap-1.5 border-0 cursor-pointer"
+              onClick={() => showFlash("Win-back WhatsApp broadcast prepared!")}
             >
-              <I.wa style={{ width: 12, height: 12 }} /> Win back all {filtered.length} →
+              <I.wa /> Win back all {filtered.length} →
             </button>
           )}
           {tab === "lost" && filtered.length > 0 && (
             <button
-              className="btn btn-sm"
-              onClick={() => setFlash("Last-chance offer broadcast prepared!")}
-              style={{
-                background: "var(--rose)",
-                color: "#fff",
-                height: 30,
-                fontSize: 12,
-                borderRadius: 8,
-                padding: "0 10px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                border: 0,
-                cursor: "pointer"
-              }}
+              className="btn btn-sm !bg-rose !text-white h-[30px] text-[12px] rounded-[8px] px-2.5 inline-flex items-center gap-1.5 border-0 cursor-pointer"
+              onClick={() => showFlash("Last-chance offer broadcast prepared!")}
             >
-              <I.wa style={{ width: 12, height: 12 }} /> Last-chance offer to {filtered.length}
+              <I.wa /> Last-chance offer to {filtered.length}
             </button>
           )}
         </div>
 
         {/* Customer List */}
         {loadingCustomers ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="flex flex-col gap-2.5">
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="pulse" style={{ height: 72, background: "var(--bg-2)", borderRadius: "var(--radius)", border: "1px solid var(--line)" }} />
+              <div key={i} className="pulse h-[72px] bg-bg-2 rounded-[var(--radius)] border border-line" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-12 px-6 text-center bg-white border border-line rounded-xl flex flex-col items-center justify-center gap-3">
             <div className="w-11 h-11 rounded-full bg-bg-2 grid place-items-center">
-              <I.search style={{ color: "var(--ink-3)", width: 20, height: 20 }} />
+              <I.search className="text-ink-3" />
             </div>
             <div>
-              <strong style={{ display: "block", fontSize: 15, fontWeight: 600 }}>No customers match search</strong>
-              <span style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 4 }}>
+              <strong className="block text-[15px] font-semibold">No customers match search</strong>
+              <span className="text-[13px] text-ink-3 mt-1">
                 {q ? "Try searching by phone or service." : "Select another engagement filter."}
               </span>
             </div>
           </div>
         ) : (
-          <div className="cust-list" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="flex flex-col gap-2.5">
             {filtered.map(c => {
               const eng = engagementOf(c.lastDays ?? 999);
               return (
                 <div
                   key={c.id}
                   onClick={() => onSelect(c)}
-                  className={`cust-row ${selected === c.id ? "is-selected" : ""}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "14px 16px",
-                    background: "#fff",
-                    border: selected === c.id ? "1px solid var(--teal)" : "1px solid var(--line)",
-                    borderRadius: "var(--radius)",
-                    cursor: "pointer",
-                    transition: "border-color 0.2s, background 0.2s"
-                  }}
+                  className={`flex items-center p-3.5 bg-white border cursor-pointer rounded-[var(--radius)] transition-all duration-200 ${
+                    selected === c.id ? "border-teal" : "border-line"
+                  }`}
                 >
                   {/* Status Indicator */}
                   <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: eng === "active" ? "var(--green)" : eng === "cooling" ? "var(--amber)" : "var(--rose)",
-                      marginRight: 12,
-                      flexShrink: 0
-                    }}
+                    className={`w-2 h-2 rounded-full mr-3 flex-shrink-0 ${
+                      eng === "active" ? "bg-green" : eng === "cooling" ? "bg-amber" : "bg-rose"
+                    }`}
                   />
 
                   {/* Avatar */}
                   <div
-                    className={`avatar md tone-${c.tone}`}
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      marginRight: 12,
-                      display: "grid",
-                      placeItems: "center",
-                      fontWeight: 600,
-                      fontSize: 14,
-                      flexShrink: 0,
-                      background: c.tone === "a" ? "var(--teal-soft)" : c.tone === "b" ? "var(--amber-soft)" : c.tone === "c" ? "var(--blue-soft)" : c.tone === "d" ? "var(--green-soft)" : c.tone === "e" ? "var(--rose-soft)" : "var(--bg-2)",
-                      color: c.tone === "a" ? "var(--teal)" : c.tone === "b" ? "var(--amber-ink)" : c.tone === "c" ? "var(--blue)" : c.tone === "d" ? "var(--green)" : c.tone === "e" ? "var(--rose)" : "var(--ink-2)"
-                    }}
+                    className={`avatar md tone-${c.tone} w-10 h-10 rounded-full mr-3 grid place-items-center font-semibold text-[14px] flex-shrink-0 ${
+                      c.tone === "a" ? "bg-teal-soft text-teal" :
+                      c.tone === "b" ? "bg-amber-soft text-amber-ink" :
+                      c.tone === "c" ? "bg-blue-soft text-blue" :
+                      c.tone === "d" ? "bg-green-soft text-green" :
+                      c.tone === "e" ? "bg-rose-soft text-rose" :
+                      "bg-bg-2 text-ink-2"
+                    }`}
                   >
                     {initialsOf(c.name)}
                   </div>
 
                   {/* Name and Meta */}
-                  <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div className="flex-1 min-w-0 mr-3">
+                    <div className="font-semibold text-[15px] text-ink truncate">
                       {c.name}
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                    <div className="flex items-center gap-1.5 text-[12px] text-ink-3 mt-0.5">
                       <span>{c.phone}</span>
                       <span>·</span>
                       <span>Seen {formatLast(c.lastDays ?? 999)}</span>
@@ -491,37 +400,27 @@ export default function CustomersPage() {
                   </div>
 
                   {/* Stats */}
-                  <div style={{ textAlign: "right", marginRight: 16, flexShrink: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>{c.visits ?? 0} visits</div>
-                    <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>Likes {c.fav ?? "—"}</div>
+                  <div className="text-right mr-4 flex-shrink-0">
+                    <div className="text-[13px] font-semibold text-ink-2">{c.visits ?? 0} visits</div>
+                    <div className="text-[11px] text-ink-3 mt-0.5">Likes {c.fav ?? "—"}</div>
                   </div>
 
                   {/* Spend */}
-                  <div style={{ textAlign: "right", marginRight: 16, flexShrink: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--teal)" }}>₹{(c.spend ?? 0).toLocaleString("en-IN")}</div>
-                    <div style={{ fontSize: 10, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.02em", marginTop: 2 }}>Lifetime</div>
+                  <div className="text-right mr-4 flex-shrink-0">
+                    <div className="text-[14px] font-semibold text-teal">₹{(c.spend ?? 0).toLocaleString("en-IN")}</div>
+                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.02em] mt-0.5">Lifetime</div>
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={e => onMessage(c, e)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        border: 0,
-                        background: "var(--wa-soft)",
-                        color: "var(--wa)",
-                        display: "grid",
-                        placeItems: "center",
-                        cursor: "pointer"
-                      }}
+                      className="w-8 h-8 rounded-[8px] border-0 bg-wa-soft text-wa grid place-items-center cursor-pointer"
                       aria-label="WhatsApp"
                     >
-                      <I.wa style={{ width: 14, height: 14 }} />
+                      <I.wa />
                     </button>
-                    <I.chev style={{ width: 16, height: 16, color: "var(--ink-4)" }} />
+                    <I.chev className="text-ink-4" />
                   </div>
                 </div>
               );
@@ -537,7 +436,7 @@ export default function CustomersPage() {
             <div className="modal-head">
               <h3>Add new customer</h3>
               <button className="modal-close" onClick={() => setShowCreateCust(false)}>
-                <I.x style={{ width: 16, height: 16 }} />
+                <I.x />
               </button>
             </div>
             <div className="modal-body">
@@ -548,38 +447,66 @@ export default function CustomersPage() {
                   value={newCustName}
                   onChange={e => setNewCustName(e.target.value)}
                   autoFocus
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+                  className="p-2.5 border border-line-2 rounded-[8px] outline-0 text-[14px] w-full"
                 />
               </div>
-              <div className="field" style={{ marginTop: 12 }}>
+              <div className="field mt-3">
                 <label>Phone number</label>
                 <input
                   type="tel"
                   placeholder="+91 98xxx xxxxx"
                   value={newCustPhone}
                   onChange={e => setNewCustPhone(e.target.value.replace(/[^\d+]/g, ""))}
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+                  className="p-2.5 border border-line-2 rounded-[8px] outline-0 text-[14px] w-full"
                 />
               </div>
+
+              {duplicateCustomer && (
+                <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "var(--amber-soft)", border: "1px solid var(--amber)", color: "var(--ink)", fontSize: 13 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, color: "var(--amber-ink)" }}>
+                    ⚠️ Phone number already in use
+                  </div>
+                  <p style={{ margin: "6px 0 0 0", fontSize: 13, color: "var(--ink-2)", lineHeight: "1.4" }}>
+                    This number is already linked to <strong>{duplicateCustomer.name}</strong>. You cannot create a duplicate customer profile with this number.
+                  </p>
+                  <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ background: "var(--teal)", color: "#fff", border: 0, height: 28, fontSize: 12, padding: "0 10px", borderRadius: 6, cursor: "pointer" }}
+                      onClick={() => {
+                        setShowCreateCust(false);
+                        router.push(`/dashboard/customers/${duplicateCustomer.id}`);
+                      }}
+                    >
+                      View {duplicateCustomer.name}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setShowCreateCust(false)}>Cancel</button>
               <button
                 className="btn btn-primary"
-                disabled={!newCustName.trim() || saving}
-                style={{ opacity: !newCustName.trim() || saving ? 0.5 : 1 }}
+                disabled={!newCustName.trim() || saving || !!duplicateCustomer}
+                style={{ opacity: !newCustName.trim() || saving || !!duplicateCustomer ? 0.5 : 1 }}
                 onClick={async () => {
                   if (!newCustName.trim()) return;
                   setSaving(true);
                   const supabase = getSupabaseBrowserClient();
                   if (supabase && salonId) {
                     try {
+                      const phoneFormatted = newCustPhone && newCustPhone.trim()
+                        ? newCustPhone.trim()
+                        : null;
+
                       const { data: newCust, error } = await supabase
                         .from("customers")
                         .insert({
                           salon_id: salonId,
                           name: newCustName.trim(),
-                          phone: newCustPhone || "+91 99999 99999",
+                          phone: phoneFormatted,
                         })
                         .select("id, name, phone, created_at")
                         .single();
@@ -600,15 +527,13 @@ export default function CustomersPage() {
                           stylist: "—",
                         };
                         setCustomers(prev => [newEntry, ...prev]);
-                        setFlash("Customer added!");
-                        setTimeout(() => setFlash(null), 1800);
+                        showFlash("Customer added!", 1800);
                       }
                     } catch (err: any) {
-                      setFlash(`Error: ${err.message || "Failed to add customer"}`);
-                      setTimeout(() => setFlash(null), 3000);
+                      showFlash(`Error: ${err.message || "Failed to add customer"}`, 3000);
                     }
                   } else {
-                    setFlash("Customer added (local preview)");
+                    showFlash("Customer added (local preview)", 1800);
                     const tone = ["a", "b", "c", "d", "e", "f"][Math.floor(Math.random() * 6)];
                     const newEntry: Customer = {
                       id: Date.now(),
@@ -622,7 +547,6 @@ export default function CustomersPage() {
                       stylist: "—",
                     };
                     setCustomers(prev => [newEntry, ...prev]);
-                    setTimeout(() => setFlash(null), 1800);
                   }
                   setNewCustName("");
                   setNewCustPhone("");

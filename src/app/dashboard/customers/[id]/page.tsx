@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
+import { useFlash } from "@/hooks";
 import { isUUID, initialsOf } from "@/lib/utils";
 
 import { Customer } from "@/types";
@@ -49,8 +50,6 @@ interface CustomerProfile extends Customer {
   notes: Note[];
   visitHistory: Visit[];
 }
-
-
 
 // ===== DATA =====
 const MOCK_PROFILE: CustomerProfile = {
@@ -107,82 +106,51 @@ function MessageModal({ customer, onClose, onSend }: MessageModalProps) {
   };
 
   return (
-    <div className="modal-back" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "grid", placeItems: "center" }}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(500px, 92%)", background: "#fff", borderRadius: "var(--radius-lg)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <div className="modal-head" style={{ padding: 18, borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+    <div className="fixed inset-0 bg-black/40 z-[100] grid place-items-center" onClick={onClose}>
+      <div className="w-[min(500px,92%)] bg-white rounded-[var(--radius-lg)] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()} style={{animation: "pop .2s ease"}}>
+        <div className="flex justify-between items-start p-[18px] border-b border-line">
           <div>
-            <h3 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>WhatsApp {customer.name}</h3>
-            <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{customer.phone}</div>
+            <h3 className="text-[17px] font-semibold m-0">WhatsApp {customer.name}</h3>
+            <div className="text-[12px] text-ink-3 mt-0.5">{customer.phone}</div>
           </div>
-          <button className="modal-close" onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", display: "grid", placeItems: "center" }}><I.x /></button>
+          <button className="border-0 bg-transparent cursor-pointer grid place-items-center" onClick={onClose}><I.x /></button>
         </div>
-        <div className="modal-body" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div className="field">
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--ink-3)", marginBottom: 6, display: "block" }}>Pick a template</label>
-            <div className="tpl-list" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div className="flex flex-col gap-3.5 p-[18px]">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[12px] font-medium text-ink-3">Pick a template</label>
+            <div className="flex flex-col gap-1.5">
               {TEMPLATES.map(t => (
                 <button
                   key={t.id}
-                  className={`tpl-opt ${tpl === t.id ? "on" : ""}`}
+                  className={`text-left p-[10px_14px] rounded-[10px] border font-inherit text-[13px] text-ink-2 cursor-pointer font-medium transition-[border-color,background,color] duration-150 ${
+                    tpl === t.id ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white hover:border-line-2"
+                  }`}
                   onClick={() => select(t.id)}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    border: tpl === t.id ? "1px solid var(--teal)" : "1px solid var(--line-2)",
-                    background: tpl === t.id ? "var(--teal-soft)" : "transparent",
-                    color: tpl === t.id ? "var(--teal)" : "var(--ink-2)",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: "pointer"
-                  }}
                 >
                   {t.title}
                 </button>
               ))}
             </div>
           </div>
-          <div className="field">
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--ink-3)", marginBottom: 6, display: "block" }}>Message preview</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[12px] font-medium text-ink-3">Message preview</label>
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
               placeholder="Type your message…"
-              style={{
-                width: "100%",
-                height: 110,
-                borderRadius: 8,
-                border: "1px solid var(--line-2)",
-                padding: 10,
-                fontSize: 14,
-                fontFamily: "inherit",
-                resize: "none",
-                outline: 0
-              }}
+              className="w-full h-[110px] rounded-[8px] border border-line-2 p-[12px_14px] text-[14px] font-sans resize-y outline-0 focus:border-teal"
             />
-            <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 4 }}>{body.length} characters</div>
+            <div className="text-[11px] text-ink-3 mt-1">{body.length} characters</div>
           </div>
         </div>
-        <div className="modal-foot" style={{ padding: "12px 18px", borderTop: "1px solid var(--line)", background: "var(--bg)", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <div className="flex justify-end gap-2.5 p-[12px_18px] border-t border-line bg-bg">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button
-            className="btn btn-wa"
+            className="bg-wa text-[#052B11] border-0 rounded-[10px] px-4 h-10 font-medium inline-flex items-center gap-2 cursor-pointer hover:bg-[#1FBA5A]"
             onClick={() => { onSend(body); onClose(); }}
             disabled={!body.trim()}
-            style={{
-              background: "var(--wa)",
-              color: "#fff",
-              border: 0,
-              borderRadius: 10,
-              padding: "0 16px",
-              height: 40,
-              fontWeight: 500,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              cursor: "pointer"
-            }}
           >
-            <I.wa style={{ width: 16, height: 16 }} /> Send on WhatsApp
+            <I.wa /> Send on WhatsApp
           </button>
         </div>
       </div>
@@ -202,7 +170,7 @@ export default function CustomerProfilePage() {
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [showMsg, setShowMsg] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: showFlash } = useFlash(2000);
   const [ownerName, setOwnerName] = useState("Owner");
 
   useEffect(() => {
@@ -210,7 +178,6 @@ export default function CustomerProfilePage() {
     const isUuid = isUUID(customerId);
 
     if (!isUuid || !supabase) {
-      // Fall back to mock — pick by numeric ID if possible
       setProfile(MOCK_PROFILE);
       setNotes(MOCK_PROFILE.notes);
       setLoading(false);
@@ -221,7 +188,6 @@ export default function CustomerProfilePage() {
       try {
         setLoading(true);
 
-        // Load owner name from cache
         const cachedProfile = localStorage.getItem("cb_profile");
         if (cachedProfile) {
           try { const p = JSON.parse(cachedProfile); setOwnerName(p.name || "Owner"); } catch {}
@@ -240,7 +206,6 @@ export default function CustomerProfilePage() {
           return;
         }
 
-        // Load all bookings for this customer
         const { data: bookings } = await supabase
           .from("bookings")
           .select(`id, date, start_time, status, notes,
@@ -260,14 +225,12 @@ export default function CustomerProfilePage() {
           return sum + t;
         }, 0);
 
-        // Last visit days
         const dates = completedBks.map((b: any) => new Date(b.date).getTime()).filter(Boolean);
         const lastMs = dates.length > 0 ? Math.max(...dates) : null;
         const lastDays = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
         const engagement: "active" | "cooling" | "lost" =
           lastDays <= 30 ? "active" : lastDays <= 60 ? "cooling" : "lost";
 
-        // Favourite service
         const svcCount: Record<string, number> = {};
         (bookings || []).forEach((b: any) =>
           (b.booking_services || []).forEach((bs: any) => {
@@ -276,14 +239,11 @@ export default function CustomerProfilePage() {
         );
         const fav = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
-        // Preferred stylist from most recent booking
         const prefStylist = (bookings as any)?.[0]?.stylist?.name || (cust.stylists as any)?.name || "—";
 
-        // Member since
         const msDt = cust.member_since ? new Date(cust.member_since) : new Date(cust.created_at || Date.now());
         const memberSince = msDt.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
-        // Upcoming booking
         const futureBks = (bookings || []).filter((b: any) => new Date(b.date) >= today && b.status !== "Cancelled");
         let upcoming: CustomerProfile["upcoming"] = undefined;
         if (futureBks.length > 0) {
@@ -297,7 +257,6 @@ export default function CustomerProfilePage() {
           upcoming = { date: fbDate, time: fbTime, service: fbSvc, stylist: fbStylist };
         }
 
-        // Visit history
         const visitHistory: Visit[] = completedBks.map((b: any) => ({
           id: b.id,
           date: new Date(b.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
@@ -355,9 +314,8 @@ export default function CustomerProfilePage() {
     setNotes(updatedNotes);
     setNewNote("");
     setAddingNote(false);
-    setFlash("Note saved successfully!");
+    showFlash("Note saved successfully!", 1500);
 
-    // Save to DB
     const supabase = getSupabaseBrowserClient();
     if (supabase) {
       const isUuid = isUUID(customerId);
@@ -372,125 +330,123 @@ export default function CustomerProfilePage() {
         }
       }
     }
-
-    setTimeout(() => setFlash(null), 1500);
   };
 
   const sendMsg = (body: string) => {
-    setFlash(`WhatsApp opened for ${c.name}`);
+    showFlash(`WhatsApp opened for ${c.name}`, 800);
     const cleanPhone = c.phone.replace(/[^0-9+]/g, "");
     setTimeout(() => {
       window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(body)}`, "_blank");
-      setFlash(null);
     }, 800);
   };
 
+  const engPillBg = engColor === "green" ? "bg-[#DFF1E6] text-[#137A4A]" : engColor === "amber" ? "bg-amber-soft text-amber-ink" : "bg-rose-soft text-rose";
+  const engDotBg = engColor === "green" ? "bg-[#2DA76C]" : engColor === "amber" ? "bg-amber" : "bg-rose";
   return (
-    <div className="pb-[120px] max-[640px]:pb-[100px]">
-      {/* Top Bar */}
-      <div className="sticky top-0 z-[100] bg-bg/85 backdrop-blur-md border-b border-line">
+    <div className="pb-[calc(72px+120px)] bg-bg">
+      {/* Sticky Top Bar */}
+      <div className="sticky top-0 z-10 bg-bg/85 backdrop-blur-md border-b border-line">
         <div className="max-w-[760px] mx-auto flex items-center h-14 px-6 max-[640px]:px-4 max-[640px]:h-[52px]">
           <button
-            className="grid place-items-center w-9 h-9 rounded-full text-ink-2 transition-colors duration-150 no-underline hover:bg-bg-2 hover:text-ink"
+            className="grid place-items-center w-9 h-9 rounded-[10px] text-ink cursor-pointer border-0 hover:bg-bg-2"
             onClick={() => router.push("/dashboard/customers")}
             aria-label="Back"
           >
             <I.back />
           </button>
-          <div style={{ flex: 1, fontSize: 14, fontWeight: 600, letterSpacing: "-0.005em" }}>Customer profile</div>
+          <div className="flex-1 text-[14px] font-semibold tracking-[-0.005em]">Customer profile</div>
           <button className="icon-btn"><I.more /></button>
         </div>
       </div>
 
       {/* Loading skeleton */}
       {loading && (
-        <main className="max-w-[760px] mx-auto p-[22px_24px_32px] flex flex-col gap-4.5 max-[640px]:p-[18px_16px_28px] max-[640px]:gap-3.5">
+        <main className="max-w-[760px] mx-auto p-[22px_24px_32px] flex flex-col gap-[18px] max-[640px]:p-[18px_16px_28px] max-[640px]:gap-3.5">
           {[160, 100, 200, 180].map((h, i) => (
-            <div key={i} className="pulse" style={{ height: h, borderRadius: "var(--radius)", background: "var(--bg-2)" }} />
+            <div key={i} className="pulse rounded-radius bg-bg-2" style={{ height: h }} />
           ))}
         </main>
       )}
 
-      {/* Main Container */}
-      {!loading && <main className="max-w-[760px] mx-auto p-[22px_24px_32px] flex flex-col gap-4.5 max-[640px]:p-[18px_16px_28px] max-[640px]:gap-3.5">
-        {/* Profile Card */}
-        <div className="grid grid-cols-[80px_1fr] gap-5 p-6 bg-white border border-line rounded-xl items-start max-[640px]:grid-cols-1 max-[640px]:text-center max-[640px]:justify-items-center max-[640px]:p-[20px_18px] max-[640px]:gap-4">
-          <div className={`avatar xl tone-${c.tone} w-20 h-20 text-[28px] max-[640px]:w-[72px] max-[640px]:h-[72px] max-[640px]:text-2xl`}>
+      {/* Main Content */}
+      {!loading && <main className="max-w-[760px] mx-auto p-[22px_24px_32px] flex flex-col gap-[18px] max-[640px]:p-[18px_16px_28px] max-[640px]:gap-[14px]">
+        {/* ─── PROFILE HERO CARD ─── */}
+        <div className="bg-white border border-line rounded-[var(--radius)] p-6 grid grid-cols-[80px_1fr_auto] gap-5 items-center max-[640px]:grid-cols-[64px_1fr] max-[640px]:p-[18px] max-[640px]:gap-4">
+          <div className={`avatar xl tone-${c.tone} w-20 h-20 text-[26px] font-semibold max-[640px]:w-[64px] max-[640px]:h-[64px] max-[640px]:text-[22px]`}>
             {initialsOf(c.name)}
           </div>
-          <div className="min-w-0 flex flex-col gap-2 max-[640px]:items-center max-[640px]:gap-1.5">
-            <div className="text-xl font-bold tracking-[-0.01em] text-ink flex items-center flex-wrap gap-2.5 max-[640px]:text-xl max-[640px]:flex-col max-[640px]:gap-2">
+          <div className="min-w-0">
+            <div className="text-[24px] font-semibold tracking-[-0.025em] flex items-center flex-wrap gap-3 mb-1.5 max-[640px]:text-[20px]">
               {c.name}
-              <span className={`inline-flex items-center gap-1.25 text-[11px] font-medium py-0.75 px-2.5 rounded-full ${
-                engColor === "green" ? "bg-green-soft text-green" : engColor === "amber" ? "bg-amber-soft text-amber-ink" : "bg-rose-soft text-rose"
-              }`}>
-                <span className={`w-1.25 h-1.25 rounded-full ${
-                  engColor === "green" ? "bg-[#2DA76C]" : engColor === "amber" ? "bg-amber" : "bg-rose"
-                }`} />
+              <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-[10px] py-[4px] rounded-[999px] ${engPillBg}`}>
+                <span className={`w-[5px] h-[5px] rounded-full ${engDotBg}`} />
                 {engLabel}
               </span>
             </div>
-            <div className="text-sm text-ink-3 flex items-center flex-wrap gap-1.5 max-[640px]:text-sm max-[640px]:flex-wrap max-[640px]:justify-center">
-              <I.phone className="align-[-2px]" /> {c.phone}
-              <span className="text-ink-4 mx-0.5" /> Member since {c.memberSince}
-              <span className="text-ink-4 mx-0.5" />
-              <I.cal />
+            <div className="text-[13px] text-ink-3 flex items-center flex-wrap gap-1.5">
+              <I.phone style={{verticalAlign: -2}} /> {c.phone}
+              <span className="text-ink-4">·</span>
+              <I.cal style={{verticalAlign: -2}} /> Member since {c.memberSince}
             </div>
-            <div className="text-sm text-ink-2 flex gap-4 max-[640px]:text-xs max-[640px]:gap-3 max-[640px]:justify-center">
+            <div className="flex gap-6 mt-2.5 text-[12px] text-ink-3 max-[640px]:text-xs max-[640px]:gap-3">
               <span><strong className="text-ink font-semibold mr-1">Prefers</strong> {c.prefStylist}</span>
               <span><strong className="text-ink font-semibold mr-1">Birthday</strong> {c.birthday}</span>
             </div>
           </div>
-          <div className="flex flex-col gap-2 items-start max-[640px]:flex-row max-[640px]:w-full max-[640px]:justify-center">
-            <button className="btn btn-outline btn-sm flex-1 max-[640px]:flex-1 max-[640px]:max-w-[160px]" onClick={() => setFlash("Edit details form coming soon!")}><I.edit /> Edit</button>
-            <button className="btn btn-wa btn-sm flex-1 max-[640px]:flex-1 max-[640px]:max-w-[160px]" onClick={() => setShowMsg(true)}><I.wa style={{ width: 14, height: 14 }} /> Message</button>
+          <div className="flex flex-col gap-2 max-[640px]:col-span-2 max-[640px]:flex-row max-[640px]:border-t max-[640px]:border-line max-[640px]:pt-[14px] max-[640px]:mt-1">
+            <button className="btn btn-outline btn-sm" onClick={() => showFlash("Edit details form coming soon!")}><I.edit /> Edit</button>
+            <button
+              className={`btn btn-sm ${c.engagement === "lost" ? "!bg-rose text-white" : "btn-wa"}`}
+              onClick={() => setShowMsg(true)}
+            >
+              <I.wa /> Send re-engagement
+            </button>
           </div>
         </div>
 
-        {/* Upcoming Booking */}
+        {/* ─── UPCOMING BOOKING ─── */}
         {c.upcoming && (
-          <div className="flex items-center justify-between gap-4 p-[16px_20px] bg-teal-soft border border-teal-soft-2 rounded-xl max-[640px]:flex-col max-[640px]:items-start max-[640px]:gap-3 max-[640px]:p-4">
+          <div className="flex items-center justify-between gap-4 p-[16px_20px] bg-teal-soft border border-teal-soft-2 rounded-[var(--radius)] max-[640px]:flex-col max-[640px]:items-start max-[640px]:gap-3 max-[640px]:p-4">
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-bold tracking-[0.06em] uppercase text-teal-ink mb-1.5">UPCOMING</div>
-              <div className="text-base font-semibold tracking-[-0.01em] text-teal-ink">{c.upcoming.service}</div>
-              <div className="text-sm text-teal-ink opacity-80 mt-1">{c.upcoming.date} · {c.upcoming.time} · with {c.upcoming.stylist}</div>
+              <div className="font-mono text-[11px] font-semibold tracking-[0.04em] uppercase text-teal-ink mb-1">{c.upcoming.service === "No show" ? "CANCELLED" : "UPCOMING"}</div>
+              <div className="text-[16px] font-semibold tracking-[-0.01em] text-ink">{c.upcoming.service}</div>
+              <div className="text-[13px] text-teal-ink mt-0.5">{c.upcoming.date} · {c.upcoming.time} · with {c.upcoming.stylist}</div>
             </div>
-            <button className="btn btn-outline btn-sm shrink-0 max-[640px]:w-full max-[640px]:justify-center" onClick={() => router.push("/dashboard/bookings/BK-2026-0517")}>View booking</button>
+            <button className="btn btn-outline btn-sm shrink-0 max-[640px]:w-full max-[640px]:justify-center" onClick={() => router.push("/dashboard/bookings/BK-2026-0517")}>View booking →</button>
           </div>
         )}
 
-        {/* 3 Metrics Chips */}
-        <div className="grid grid-cols-3 gap-3 max-[640px]:grid-cols-1 max-[640px]:gap-2.5">
-          <div className="bg-surface border border-line rounded-xl p-4 text-left max-[640px]:p-4 max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:grid-rows-[auto_auto] max-[640px]:gap-y-1 max-[640px]:items-center">
-            <div className="text-xs text-ink-3 font-medium mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Total visits</div>
-            <div className="text-2xl font-bold text-ink tracking-[-0.02em] max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-[22px]">{c.visits}</div>
-            <div className="text-[11px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Last on 13 May</div>
+        {/* ─── STAT CHIPS ─── */}
+        <div className="grid grid-cols-3 gap-3 max-[640px]:grid-cols-1 max-[640px]:gap-[10px]">
+          <div className="bg-surface border border-line rounded-[var(--radius)] p-[18px_20px] max-[640px]:p-[14px_16px] max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:items-center max-[640px]:gap-y-1">
+            <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Total visits</div>
+            <div className="text-[30px] font-semibold tracking-[-0.025em] text-ink flex items-baseline max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-[22px]">{c.visits}</div>
+            <div className="text-[12px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Last on 13 May</div>
           </div>
-          <div className="bg-surface border border-line rounded-xl p-4 text-left max-[640px]:p-4 max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:grid-rows-[auto_auto] max-[640px]:gap-y-1 max-[640px]:items-center">
-            <div className="text-xs text-ink-3 font-medium mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Lifetime spend</div>
-            <div className="text-2xl font-bold text-ink tracking-[-0.02em] max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-[22px]"><small className="text-base font-medium">₹</small>{c.spend.toLocaleString("en-IN")}</div>
-            <div className="text-[11px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Avg ₹{Math.round(c.spend/c.visits).toLocaleString("en-IN")}/visit</div>
+          <div className="bg-surface border border-line rounded-[var(--radius)] p-[18px_20px] max-[640px]:p-[14px_16px] max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:items-center max-[640px]:gap-y-1">
+            <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Lifetime spend</div>
+            <div className="text-[30px] font-semibold tracking-[-0.025em] text-ink flex items-baseline max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-[22px]">
+              <small className="text-[16px] font-normal text-ink-3">₹</small>{c.spend.toLocaleString("en-IN")}
+            </div>
+            <div className="text-[12px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Avg ₹{Math.round(c.spend/c.visits).toLocaleString("en-IN")} per visit</div>
           </div>
-          <div className="bg-surface border border-line rounded-xl p-4 text-left max-[640px]:p-4 max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:grid-rows-[auto_auto] max-[640px]:gap-y-1 max-[640px]:items-center">
-            <div className="text-xs text-ink-3 font-medium mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Fav service</div>
-            <div className="text-base overflow-hidden text-ellipsis whitespace-nowrap mt-1 max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-lg">{c.fav}</div>
-            <div className="text-[11px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">5 of last {c.visits} visits</div>
+          <div className="bg-surface border border-line rounded-[var(--radius)] p-[18px_20px] max-[640px]:p-[14px_16px] max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:items-center max-[640px]:gap-y-1">
+            <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Favourite service</div>
+            <div className="text-[20px] font-semibold tracking-[-0.015em] text-ink leading-[1.2] max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-lg">{c.fav}</div>
+            <div className="text-[12px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">5 of last {c.visits} visits</div>
           </div>
         </div>
 
-        {/* Notes Log */}
-        <section className="bg-white rounded-xl border border-line p-[20px_22px] flex flex-col gap-3">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-base font-semibold m-0">Notes</h2>
-              <span className="text-xs bg-bg-2 py-0.5 px-2 rounded-full text-ink-3">{notes.length}</span>
+        {/* ─── NOTES ─── */}
+        <section className="bg-white border border-line rounded-[var(--radius)] p-[20px_22px]">
+          <div className="flex items-center justify-between mb-[14px]">
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-[18px] font-semibold tracking-[-0.01em] m-0">Notes</h2>
+              <span className="font-mono text-[13px] text-ink-3">{notes.length}</span>
             </div>
             <div className="flex items-center gap-2">
               {!addingNote && (
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() => setAddingNote(true)}
-                >
+                <button className="btn btn-sm btn-outline" onClick={() => setAddingNote(true)}>
                   <I.plus /> Add note
                 </button>
               )}
@@ -498,71 +454,73 @@ export default function CustomerProfilePage() {
           </div>
 
           {addingNote && (
-            <div className="bg-surface border border-line rounded-xl p-[14px_16px] border-teal bg-teal-soft">
+            <div className="border border-teal bg-teal-soft rounded-[10px] p-[14px_16px]">
               <textarea
                 placeholder="Anything you want to remember about Priya — preferences, allergies, conversations…"
                 value={newNote}
                 onChange={e => setNewNote(e.target.value)}
                 autoFocus
-                className="border-0 bg-transparent w-full h-20 font-inherit text-[13px] resize-none outline-none text-ink"
+                className="border-0 bg-transparent w-full min-h-[64px] outline-0 font-inherit text-[14px] text-ink resize-y leading-[1.5]"
               />
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 mt-2 pt-[10px] border-t border-[rgba(15,110,86,0.18)]">
                 <button className="btn btn-ghost btn-sm" onClick={() => { setAddingNote(false); setNewNote(""); }}>Cancel</button>
                 <button className="btn btn-primary btn-sm" onClick={saveNote} disabled={!newNote.trim()}>Save note</button>
               </div>
             </div>
           )}
 
-          <div className="notes-list">
+          <div className="flex flex-col gap-[10px]">
             {notes.map(n => (
-              <div key={n.id} className="bg-surface border border-line rounded-xl p-[14px_16px] mb-3 last:mb-0">
-                <div className="mb-2">
-                  <div className="flex items-center gap-2 text-xs text-ink-2 font-medium">
-                    <div className="avatar sm tone-b w-5.5 h-5.5 text-[10px]">{n.author[0]}</div>
+              <div key={n.id} className="border border-line rounded-[10px] p-[14px_16px]">
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center gap-2 text-[12px] text-ink-2 font-medium">
+                    <div className={`avatar sm tone-b w-[22px] h-[22px] text-[10px]`}>{n.author[0]}</div>
                     <span>{n.author}</span>
-                    <span className="text-ink-4 mx-0.5" />
-                    <span style={{ color: "var(--ink-3)" }}>{n.date}</span>
+                    <span className="text-ink-4">·</span>
+                    <span className="text-ink-3">{n.date}</span>
                   </div>
                 </div>
-                <div className="text-[13px] text-ink-2 leading-[1.5]">{n.text}</div>
+                <div className="text-[14px] text-ink-2 leading-[1.5]">{n.text}</div>
               </div>
             ))}
             {notes.length === 0 && (
-              <div className="p-5 italic text-[13px] text-ink-3 text-center">No notes yet. Tap "Add note" to remember anything about Priya.</div>
+              <div className="p-6 text-center text-[13px] text-ink-3 bg-bg-2 rounded-[10px]">No notes yet. Tap "Add note" to remember anything about Priya.</div>
             )}
           </div>
         </section>
 
-        {/* Visit History */}
-        <section className="bg-white rounded-xl border border-line p-[20px_22px] flex flex-col gap-3">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-base font-semibold m-0">Visit history</h2>
-              <span className="text-xs bg-bg-2 py-0.5 px-2 rounded-full text-ink-3">{c.visitHistory.length} visits</span>
+        {/* ─── VISIT HISTORY ─── */}
+        <section className="bg-white border border-line rounded-[var(--radius)] p-[20px_22px]">
+          <div className="flex items-center justify-between mb-[14px]">
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-[18px] font-semibold tracking-[-0.01em] m-0">Visit history</h2>
+              <span className="font-mono text-[13px] text-ink-3">{c.visitHistory.length} visits</span>
             </div>
             <div className="flex items-center gap-2">
-              <button className="btn btn-ghost btn-sm" onClick={() => setFlash("Exporting customer history...")}>Export CSV</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => showFlash("Exporting customer history...")}>Export CSV</button>
             </div>
           </div>
 
-          <div className="visits-list flex flex-col gap-3">
+          <div className="flex flex-col">
             {c.visitHistory.map((v, i) => (
-              <div key={v.id} className="grid grid-cols-[52px_1fr_auto] gap-3.5 items-center p-[14px_16px] bg-surface border border-line rounded-xl max-[640px]:grid-cols-[48px_1fr_auto] max-[640px]:gap-3 max-[640px]:p-[12px_14px]">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-ink tracking-[-0.02em] max-[640px]:text-base">{v.date.split(" ")[0]}</div>
-                  <div className="text-[10px] text-ink-3 uppercase tracking-[0.04em] mt-0.5">{v.date.split(" ").slice(1).join(" ")}</div>
+              <div key={v.id} className={`grid grid-cols-[56px_1fr_auto] gap-4 items-center py-[14px] ${i > 0 ? "border-t border-line" : ""} max-[640px]:grid-cols-[48px_1fr_auto] max-[640px]:gap-3`}>
+                <div className="text-center bg-bg-2 rounded-[8px] py-2 min-w-[56px] font-mono">
+                  <div className="text-[16px] font-bold text-ink leading-none tracking-[-0.02em] max-[640px]:text-base">{v.date.split(" ")[0]}</div>
+                  <div className="text-[9px] text-ink-3 mt-1 tracking-[0.04em] uppercase">{v.date.split(" ").slice(1).join(" ")}</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="flex flex-wrap gap-x-2.5 gap-y-1.5">
+                  <div className="flex flex-wrap gap-x-[10px] gap-y-1.5">
                     {v.services.map((s, j) => (
-                      <span key={j} className="text-[13px] font-medium text-ink">
-                        {s.name} <small className="text-ink-3 font-normal">₹{s.amt.toLocaleString("en-IN")}</small>
+                      <span key={j} className="text-[13px] font-medium text-ink inline-flex items-baseline gap-1.5">
+                        {s.name}
+                        <small className="font-mono text-[11px] font-normal text-ink-3">₹{s.amt.toLocaleString("en-IN")}</small>
+                        {j < v.services.length - 1 && <span className="text-ink-4 ml-1">·</span>}
                       </span>
                     ))}
                   </div>
-                  <div className="text-xs text-ink-3 mt-1">with {v.stylist} · paid via {v.payment}</div>
+                  <div className="text-[12px] text-ink-3 mt-1">with {v.stylist} · paid via {v.payment}</div>
                 </div>
-                <div className="text-[15px] font-semibold text-ink-2 whitespace-nowrap">
+                <div className="text-[15px] font-semibold text-ink tracking-[-0.01em] whitespace-nowrap">
                   ₹{v.amount.toLocaleString("en-IN")}
                 </div>
               </div>
@@ -571,25 +529,7 @@ export default function CustomerProfilePage() {
         </section>
       </main>}
 
-      {/* Sticky Bottom Actions */}
-      <div className="fixed bottom-[calc(var(--bottom-nav-h)+24px)] left-1/2 -translate-x-1/2 max-w-[712px] w-[calc(100%-48px)] bg-white/92 backdrop-blur-md border border-line rounded-2xl p-2.5 flex gap-2.5 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.1)] z-40 max-[640px]:left-4 max-[640px]:right-4 max-[640px]:transform-none max-[640px]:max-w-none max-[640px]:w-auto max-[640px]:bottom-[calc(var(--bottom-nav-h)+16px)]">
-        <button
-          className="btn btn-outline h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5"
-          onClick={() => setAddingNote(true)}
-          style={{ flex: 1 }}
-        >
-          <I.plus /> Add note
-        </button>
-        <button
-          className="btn btn-primary h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5"
-          onClick={() => setShowMsg(true)}
-          style={{ flex: 2, background: c.engagement === "lost" ? "var(--rose)" : undefined }}
-        >
-          <I.wa style={{ width: 16, height: 16 }} /> Send re-engagement message
-        </button>
-      </div>
-
-      {/* Navigation */}
+      {/* ─── BOTTOM NAV ─── */}
       <nav className="bottom-nav">
         <Link href="/dashboard" className="bn-item">
           <I.home />
@@ -613,26 +553,12 @@ export default function CustomerProfilePage() {
         </Link>
       </nav>
 
-      {/* Message Modal */}
+      {/* ─── MESSAGE MODAL ─── */}
       {showMsg && <MessageModal customer={c} onClose={() => setShowMsg(false)} onSend={sendMsg} />}
 
-      {/* Flash Messages */}
+      {/* ─── FLASH MESSAGE ─── */}
       {flash && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 120,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 10,
-            fontSize: 13,
-            zIndex: 60,
-            boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-          }}
-        >
+        <div className="fixed bottom-[120px] left-1/2 -translate-x-1/2 bg-ink text-white px-4 py-[10px] rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
           {flash}
         </div>
       )}

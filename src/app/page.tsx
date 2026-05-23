@@ -1,85 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
-
-interface LandingAuthState {
-  isChecking: boolean;
-  isSignedIn: boolean;
-  displayName: string | null;
-  nextPath: "/dashboard" | "/onboarding" | "/auth";
-  nextLabel: string;
-}
+import { useState } from "react";
+import { useAuthState } from "@/hooks/useAuth";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"Today" | "Week" | "Month">("Week");
-  const [authState, setAuthState] = useState<LandingAuthState>({
-    isChecking: true,
-    isSignedIn: false,
-    displayName: null,
-    nextPath: "/auth",
-    nextLabel: "Start free",
-  });
-
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setAuthState((current) => ({ ...current, isChecking: false }));
-      return;
-    }
-
-    let mounted = true;
-
-    const syncSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!mounted) {
-        return;
-      }
-
-      if (!session?.user) {
-        setAuthState({
-          isChecking: false,
-          isSignedIn: false,
-          displayName: null,
-          nextPath: "/auth",
-          nextLabel: "Start free",
-        });
-        return;
-      }
-
-      const { data: profile } = await supabase.from("users").select("name, org_id").eq("id", session.user.id).maybeSingle();
-      const name =
-        typeof profile?.name === "string" && profile.name.trim()
-          ? profile.name.trim()
-          : typeof session.user.user_metadata?.name === "string"
-            ? session.user.user_metadata.name
-            : session.user.email?.split("@")[0] ?? "Owner";
-
-      setAuthState({
-        isChecking: false,
-        isSignedIn: true,
-        displayName: name,
-        nextPath: profile?.org_id ? "/dashboard" : "/onboarding",
-        nextLabel: profile?.org_id ? "Dashboard" : "Finish setup",
-      });
-    };
-
-    syncSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      syncSession();
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+  const authState = useAuthState();
   
   // Custom heights for the weekly revenue bar chart depending on toggle state
   const chartData = {

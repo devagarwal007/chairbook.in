@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
 import { Icons as I } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
+import { useFlash } from "@/hooks";
 
 import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates } from "@/types";
 
@@ -132,7 +133,7 @@ export default function SettingsPage() {
   const [data, setData] = useState<SettingsData>(INITIAL_DATA);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: showFlash } = useFlash(1800);
   const [loading, setLoading] = useState(true);
 
   // Supabase states
@@ -348,7 +349,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     const supabase = getSupabaseBrowserClient();
     if (supabase && supabaseUserId) {
-      setFlash("Saving changes...");
+      showFlash("Saving changes...", 10000);
       try {
         if (data.account) {
           const { error: userError } = await supabase
@@ -495,18 +496,17 @@ export default function SettingsPage() {
           });
         }
 
-        setFlash("Changes saved successfully!");
+        showFlash("Changes saved successfully!");
         setDirty(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       } catch (err) {
         console.error("Error saving settings to Supabase:", err);
-        setFlash("Failed to save changes.");
-        setTimeout(() => setFlash(null), 2500);
+        showFlash("Failed to save changes.", 2500);
       }
     } else {
       // Local preview mode save
-      setFlash("Changes saved (local preview)");
+      showFlash("Changes saved (local preview)");
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -548,7 +548,7 @@ export default function SettingsPage() {
         price: svcPrice
       } : s);
       update({ ...data, services: list });
-      setFlash("Service updated");
+      showFlash("Service updated");
     } else {
       // Add mode
       const newSvc: Service = {
@@ -560,10 +560,9 @@ export default function SettingsPage() {
         active: true
       };
       update({ ...data, services: [...data.services, newSvc] });
-      setFlash("Service added");
+      showFlash("Service added");
     }
     setShowServiceModal(false);
-    setTimeout(() => setFlash(null), 1800);
   };
 
   const openAddStylist = () => {
@@ -595,7 +594,7 @@ export default function SettingsPage() {
         commission: stylistCommission
       } : t);
       update({ ...data, team: list });
-      setFlash("Stylist updated");
+      showFlash("Stylist updated");
     } else {
       const newStylist: Stylist = {
         id: "temp-" + Date.now(),
@@ -605,10 +604,9 @@ export default function SettingsPage() {
         commission: stylistCommission
       };
       update({ ...data, team: [...data.team, newStylist] });
-      setFlash("Stylist added");
+      showFlash("Stylist added");
     }
     setShowStylistModal(false);
-    setTimeout(() => setFlash(null), 1800);
   };
 
   const openWaChange = () => {
@@ -625,8 +623,7 @@ export default function SettingsPage() {
       }
     });
     setShowWaModal(false);
-    setFlash("WhatsApp number updated locally");
-    setTimeout(() => setFlash(null), 1800);
+    showFlash("WhatsApp number updated locally");
   };
 
   const openEditTemplate = (key: keyof WhatsAppTemplates) => {
@@ -647,8 +644,7 @@ export default function SettingsPage() {
       }
     });
     setEditingTemplateKey(null);
-    setFlash("Message template updated");
-    setTimeout(() => setFlash(null), 1800);
+    showFlash("Message template updated");
   };
 
   // ----- RENDER TAB CONTENT -----
@@ -719,7 +715,7 @@ export default function SettingsPage() {
                     <div className="absolute bottom-1.5 left-2 font-mono text-[10px] text-teal-ink bg-white/80 py-0.5 px-1.5 rounded">photo {i}</div>
                   </div>
                 ))}
-                <button className="aspect-[3/2] rounded-lg bg-bg-2 border border-dashed border-line-2 flex flex-col items-center justify-center gap-1.5 font-inherit text-xs text-ink-3 cursor-pointer transition-colors duration-150 hover:bg-bg hover:border-ink-3 hover:text-ink" onClick={() => setFlash("Photo upload is a mockup")}>
+                <button className="aspect-[3/2] rounded-lg bg-bg-2 border border-dashed border-line-2 flex flex-col items-center justify-center gap-1.5 font-inherit text-xs text-ink-3 cursor-pointer transition-colors duration-150 hover:bg-bg hover:border-ink-3 hover:text-ink" onClick={() => showFlash("Photo upload is a mockup")}>
                   <span className="w-7 h-7 rounded-full bg-white grid place-items-center text-lg font-light border border-line">+</span>
                   Add photo
                 </button>
@@ -1002,8 +998,8 @@ export default function SettingsPage() {
                 <div className="text-[13px] text-ink-2 mt-1">{current.desc} · Next charge on 1 June 2026</div>
               </div>
               <div className="flex flex-col gap-2 items-end max-[720px]:flex-row max-[720px]:self-stretch">
-                <button className="btn btn-outline btn-sm" onClick={() => setFlash("Plan management is a mockup")}>Manage payment</button>
-                <button className="btn btn-ghost btn-sm" style={{ color: "var(--rose)" }} onClick={() => setFlash("Plan cancellation is a mockup")}>Cancel plan</button>
+                <button className="btn btn-outline btn-sm" onClick={() => showFlash("Plan management is a mockup")}>Manage payment</button>
+                <button className="btn btn-ghost btn-sm" style={{ color: "var(--rose)" }} onClick={() => showFlash("Plan cancellation is a mockup")}>Cancel plan</button>
               </div>
             </div>
 
@@ -1045,7 +1041,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="text-xs text-ink-3 max-[720px]:col-span-full">{b.method}</div>
                   <div className="text-sm font-semibold font-mono">₹{b.amount.toLocaleString("en-IN")}</div>
-                  <button className="btn btn-ghost btn-sm max-[720px]:col-start-2" onClick={() => setFlash("Downloading receipt...")}>Receipt</button>
+                  <button className="btn btn-ghost btn-sm max-[720px]:col-start-2" onClick={() => showFlash("Downloading receipt...")}>Receipt</button>
                 </div>
               ))}
             </div>
@@ -1143,9 +1139,9 @@ export default function SettingsPage() {
 
             <SectionHead title="Preferences" />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
-              <RowField label="Language" value="English" action={<button className="btn btn-ghost btn-sm" onClick={() => setFlash("Language preferences is a mockup")}>Edit</button>} />
-              <RowField label="Timezone" value="Asia/Kolkata (IST)" hint="Used for booking times and reports." action={<button className="btn btn-ghost btn-sm" onClick={() => setFlash("Timezone settings is a mockup")}>Edit</button>} />
-              <RowField label="Currency" value="Indian Rupee · ₹" action={<button className="btn btn-ghost btn-sm" onClick={() => setFlash("Currency settings is a mockup")}>Edit</button>} />
+              <RowField label="Language" value="English" action={<button className="btn btn-ghost btn-sm" onClick={() => showFlash("Language preferences is a mockup")}>Edit</button>} />
+              <RowField label="Timezone" value="Asia/Kolkata (IST)" hint="Used for booking times and reports." action={<button className="btn btn-ghost btn-sm" onClick={() => showFlash("Timezone settings is a mockup")}>Edit</button>} />
+              <RowField label="Currency" value="Indian Rupee · ₹" action={<button className="btn btn-ghost btn-sm" onClick={() => showFlash("Currency settings is a mockup")}>Edit</button>} />
             </div>
 
             <SectionHead title="Danger zone" desc="Be careful here." />
@@ -1153,7 +1149,7 @@ export default function SettingsPage() {
               <RowField
                 label="Export all data"
                 value="Get a ZIP with customers, bookings, and reports."
-                action={<button className="btn btn-outline btn-sm" onClick={() => setFlash("Exporting data ZIP...")}>Request export</button>}
+                action={<button className="btn btn-outline btn-sm" onClick={() => showFlash("Exporting data ZIP...")}>Request export</button>}
               />
               <RowField
                 label="Pause salon"
@@ -1162,7 +1158,7 @@ export default function SettingsPage() {
                   <button
                     className="btn btn-outline btn-sm"
                     style={{ color: "var(--amber-ink)", borderColor: "var(--amber-soft)" }}
-                    onClick={() => setFlash("Salon paused")}
+                    onClick={() => showFlash("Salon paused")}
                   >
                     Pause
                   </button>
@@ -1175,7 +1171,7 @@ export default function SettingsPage() {
                   <button
                     className="btn btn-outline btn-sm"
                     style={{ color: "var(--rose)", borderColor: "var(--rose-soft)" }}
-                    onClick={() => setFlash("Account deletion requested")}
+                    onClick={() => showFlash("Account deletion requested")}
                   >
                     Delete
                   </button>
@@ -1187,7 +1183,7 @@ export default function SettingsPage() {
             <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={async () => {
-                  setFlash("Signing out...");
+                  showFlash("Signing out...");
                   const supabase = getSupabaseBrowserClient();
                   if (supabase) {
                     await supabase.auth.signOut();

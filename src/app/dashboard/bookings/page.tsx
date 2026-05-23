@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
+import { useFlash } from "@/hooks";
 import { toMinHours, initialsOf, formatDateKey } from "@/lib/utils";
 
 import { Stylist, CalAppt } from "@/types";
@@ -23,6 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
   arrived: "Arrived",
   completed: "Done",
   noshow: "No-show",
+  cancelled: "Cancelled",
 };
 
 // Time labels: 9 AM – 9 PM
@@ -138,8 +140,7 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
       <div className="flex items-center justify-between gap-1.5">
         {!narrow && (
           <div
-            className={`inline-grid place-items-center font-semibold rounded-full shrink-0 ${toneBgMap[a.tone] || 'bg-bg-2 text-ink-2'}`}
-            style={{ width: 20, height: 20, fontSize: 9 }}
+            className={`inline-grid place-items-center font-semibold rounded-full shrink-0 w-5 h-5 text-[9px] ${toneBgMap[a.tone] || 'bg-bg-2 text-ink-2'}`}
           >
             {a.initials}
           </div>
@@ -245,7 +246,7 @@ function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () 
         </div>
         <div className="flex gap-[10px] justify-end px-6 py-4 border-t border-line bg-bg">
           <button className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-transparent text-ink-2 hover:text-ink hover:bg-bg-2 transition-all duration-150" onClick={onClose}>Cancel</button>
-          <button className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-teal text-white hover:bg-teal-ink transition-all duration-150" onClick={handleBlock} disabled={saving}>
+          <button className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-teal !text-white hover:bg-teal-ink transition-all duration-150" onClick={handleBlock} disabled={saving}>
             {saving ? "Saving..." : "Block time"}
           </button>
         </div>
@@ -266,9 +267,9 @@ interface WeekViewProps {
 
 function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }: WeekViewProps) {
   return (
-    <div className="overflow-hidden">
+    <div className="w-full">
       {/* Header */}
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-line bg-white sticky top-0 z-10 max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]">
+      <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] border-b border-line bg-white sticky top-0 z-10">
         <div className="bg-bg border-r border-line relative"></div>
         {weekDays.map((day) => {
           const key = formatDateKey(day);
@@ -285,10 +286,10 @@ function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] relative max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]">
+      <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] relative">
         <div className="bg-bg border-r border-line relative">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} className="border-b border-dashed border-line relative first:border-t-0" style={{ height: SLOT_HEIGHT * 2 }}>
+            <div key={i} className="border-b border-dashed border-line relative first:border-t-0 h-[56px]">
               <span className="font-mono text-[10px] text-ink-3 absolute left-2 -top-[7px] bg-white px-1 max-[720px]:text-[9px] first:top-0">{label}</span>
             </div>
           ))}
@@ -308,7 +309,7 @@ function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }
             <div key={key} className={`relative border-r border-line ${isToday ? "bg-[rgba(15,110,86,0.025)]" : ""}`}>
               {/* hour lines */}
               {TIME_LABELS.map((_, hi) => (
-                <div key={hi} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005]" style={{ height: SLOT_HEIGHT * 2 }} />
+                <div key={hi} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005] h-[56px]" />
               ))}
 
               {/* now line */}
@@ -349,9 +350,9 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
   const nowStr = `${String(nowHours).padStart(2, "0")}:${String(nowMins).padStart(2, "0")}`;
 
   return (
-    <div className="overflow-hidden">
+    <div className="w-full">
       {/* Header */}
-      <div className="grid border-b border-line bg-white sticky top-0 z-10 max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
+      <div className="grid border-b border-line bg-white sticky top-0 z-10" style={{ gridTemplateColumns: `56px repeat(${visibleStylists.length}, minmax(130px, 1fr))` }}>
         <div className="bg-bg border-r border-line relative"></div>
         {visibleStylists.map(s => {
           const cnt = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id).length;
@@ -376,10 +377,10 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
       </div>
 
       {/* Grid */}
-      <div className="grid relative max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
+      <div className="grid relative" style={{ gridTemplateColumns: `56px repeat(${visibleStylists.length}, minmax(130px, 1fr))` }}>
         <div className="bg-bg border-r border-line relative">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} className="border-b border-dashed border-line relative first:border-t-0" style={{ height: SLOT_HEIGHT * 2 }}>
+            <div key={i} className="border-b border-dashed border-line relative first:border-t-0 h-[56px]">
               <span className="font-mono text-[10px] text-ink-3 absolute left-2 -top-[7px] bg-white px-1 max-[720px]:text-[9px] first:top-0">{label}</span>
             </div>
           ))}
@@ -392,7 +393,7 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
             <div key={s.id} className={`relative border-r border-line ${isToday ? "bg-[rgba(15,110,86,0.025)]" : ""}`}>
               {/* hour lines */}
               {TIME_LABELS.map((_, hi) => (
-                <div key={hi} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005]" style={{ height: SLOT_HEIGHT * 2 }} />
+                <div key={hi} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005] h-[56px]" />
               ))}
 
               {/* now line */}
@@ -423,7 +424,7 @@ export default function BookingsPage() {
   const [stylistFilter, setStylistFilter] = useState<string | number>("all");
   const [selected, setSelected] = useState<CalAppt | null>(null);
   const [showBlockModal, setShowBlockModal] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash } = useFlash(2000);
   const [appts, setAppts] = useState<CalAppt[]>([]);
   const [stylists, setStylists] = useState<Stylist[]>(FALLBACK_STYLISTS);
   const [loading, setLoading] = useState(true);
@@ -480,6 +481,7 @@ export default function BookingsPage() {
           stylist:stylists(id, name, tone),
           booking_services(service:services(name))`)
         .eq("salon_id", sid)
+        .neq("status", "Cancelled")
         .gte("date", fromDate)
         .lte("date", toDate)
         .order("start_time", { ascending: true });
@@ -495,11 +497,12 @@ export default function BookingsPage() {
           const startM = parseInt(timeParts[1]) || 0;
           const tone = (b.stylist?.tone || "tone-a").replace("tone-", "");
           const serviceNames = b.booking_services?.map((bs: any) => bs.service?.name).filter(Boolean).join(" + ") || "Service";
-          const mapStatus = (s: string): "confirmed" | "arrived" | "completed" | "noshow" => {
+          const mapStatus = (s: string): "confirmed" | "arrived" | "completed" | "noshow" | "cancelled" => {
             const l = (s || "").toLowerCase();
             if (l === "arrived") return "arrived";
             if (l === "completed" || l === "paid") return "completed";
             if (l === "no-show") return "noshow";
+            if (l === "cancelled") return "cancelled";
             return "confirmed";
           };
           return {
@@ -620,8 +623,8 @@ export default function BookingsPage() {
             <Link href="/dashboard/block-time" className="inline-flex items-center justify-center gap-2 h-8 px-3 rounded-lg border border-transparent font-sans text-sm font-medium text-ink-2 cursor-pointer hover:text-ink hover:bg-bg-2 transition-all duration-150">
               Block time
             </Link>
-            <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, height: 32, textDecoration: "none" }}>
-              <I.plus style={{ width: 14, height: 14 }} /> New booking
+            <Link href="/dashboard/new-booking" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg font-sans text-sm font-semibold bg-teal !text-white hover:bg-teal-ink transition-all duration-150 no-underline">
+              <I.plus className="w-3.5 h-3.5" /> New booking
             </Link>
           </div>
         </div>
@@ -637,7 +640,7 @@ export default function BookingsPage() {
             onClick={() => setStylistFilter("all")}
           >
             All stylists
-            <span style={{ color: stylistFilter === "all" ? "rgba(255,255,255,0.6)" : "var(--ink-4)", fontSize: 11 }}>
+            <span className={`text-[11px] ${stylistFilter === "all" ? "text-white/60" : "text-ink-4"}`}>
               {apptCountForFilter("all")}
             </span>
           </button>
@@ -660,26 +663,26 @@ export default function BookingsPage() {
               }`}
               onClick={() => setStylistFilter(s.id)}
             >
-              <span className={`inline-grid place-items-center font-semibold rounded-full shrink-0 ${toneBgMap[s.tone || 'b'] || 'bg-bg-2 text-ink-2'}`} style={{ width: 18, height: 18, fontSize: 9 }}>
+              <span className={`inline-grid place-items-center font-semibold rounded-full shrink-0 w-[18px] h-[18px] text-[9px] ${toneBgMap[s.tone || 'b'] || 'bg-bg-2 text-ink-2'}`}>
                 {s.short}
               </span>
               {s.name}
-              <span style={{ color: stylistFilter === s.id ? "rgba(255,255,255,0.6)" : "var(--ink-4)", fontSize: 11 }}>
+              <span className={`text-[11px] ${stylistFilter === s.id ? "text-white/60" : "text-ink-4"}`}>
                 {apptCountForFilter(s.id)}
               </span>
             </button>
             );
           })}
-          <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "var(--ink-3)" }}>
+          <div className="flex-1" />
+          <div className="flex items-center gap-2.5 text-[11px] text-ink-3">
             {[
               { label: "Confirmed", color: "var(--blue)" },
               { label: "Arrived", color: "var(--amber)" },
               { label: "Done", color: "var(--green)" },
               { label: "No-show", color: "var(--rose)" },
             ].map(({ label, color }) => (
-              <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" }} />
+              <span key={label} className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
                 {label}
               </span>
             ))}
@@ -687,11 +690,11 @@ export default function BookingsPage() {
         </div>
 
         {/* Calendar card */}
-        <div className="overflow-hidden p-0 max-[720px]:overflow-x-auto bg-surface border border-line rounded-xl">
+        <div className="overflow-x-auto overflow-y-hidden p-0 bg-surface border border-line rounded-xl [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-bg-2 [&::-webkit-scrollbar-thumb]:bg-ink-4 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-ink-3">
           {loading ? (
-            <div style={{ padding: "40px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="p-[40px_24px] flex flex-col gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="animate-pulse" style={{ height: 36, background: "var(--bg-2)", borderRadius: 8 }} />
+                <div key={i} className="animate-pulse h-[36px] bg-bg-2 rounded-lg" />
               ))}
             </div>
           ) : view === "week" ? (
@@ -719,17 +722,18 @@ export default function BookingsPage() {
         {/* Selected booking quick view */}
         {selected && (
           <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
             onClick={() => setSelected(null)}
           >
             <div
-              style={{ width: "min(560px, 100%)", background: "#fff", borderRadius: 16, padding: 20, animation: "pop 0.2s ease-out", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}
+              className="w-[min(560px,100%)] bg-white rounded-2xl p-5 max-h-[calc(100vh-32px)] overflow-y-auto"
+              style={{ animation: "pop 0.2s ease-out" }}
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <div className="flex items-center gap-3 mb-4">
                 <div
-                  className={`inline-grid place-items-center font-semibold rounded-full shrink-0 ${
+                  className={`inline-grid place-items-center font-semibold rounded-full shrink-0 w-12 h-12 text-[18px] ${
                     selected.tone === 'a' ? 'bg-[#F1EAD9] text-[#8C6A1E]' :
                     selected.tone === 'b' ? 'bg-teal-soft text-teal' :
                     selected.tone === 'c' ? 'bg-blue-soft text-blue' :
@@ -737,13 +741,12 @@ export default function BookingsPage() {
                     selected.tone === 'e' ? 'bg-amber-soft text-amber-ink' :
                     selected.tone === 'f' ? 'bg-rose-soft text-rose' : 'bg-bg-2 text-ink-2'
                   }`}
-                  style={{ width: 48, height: 48, fontSize: 18 }}
                 >
                   {selected.initials}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)" }}>{selected.customer}</div>
-                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                <div className="flex-1">
+                  <div className="text-base font-bold text-ink">{selected.customer}</div>
+                  <div className="text-xs text-ink-3 mt-0.5">
                      {selected.service} · {String(selected.startH).padStart(2,"0")}:{String(selected.startM).padStart(2,"0")} · {selected.duration} min
                   </div>
                 </div>
@@ -751,49 +754,50 @@ export default function BookingsPage() {
                   selected.status === 'confirmed' ? 'text-blue bg-blue-soft' :
                   selected.status === 'arrived' ? 'text-amber-ink bg-amber-soft' :
                   selected.status === 'completed' ? 'text-green bg-green-soft' :
-                  selected.status === 'noshow' ? 'text-rose bg-rose-soft' : ''
+                  selected.status === 'noshow' ? 'text-rose bg-rose-soft' :
+                  selected.status === 'cancelled' ? 'text-ink-3 bg-bg-2' : ''
                 }`}>
                   <span className="w-[5px] h-[5px] rounded-full bg-current inline-block"></span>
                   {STATUS_LABEL[selected.status]}
                 </span>
-                <button onClick={() => setSelected(null)} style={{ border: 0, background: "var(--bg-2)", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <button onClick={() => setSelected(null)} className="border-0 bg-bg-2 rounded-full w-8 h-8 cursor-pointer grid place-items-center">
                   <I.x />
                 </button>
               </div>
 
               {/* Stylist */}
-              <div style={{ display: "flex", gap: 12, marginBottom: 16, padding: "12px 14px", background: "var(--bg-2)", borderRadius: "var(--radius-sm)" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: "var(--ink-4)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Stylist</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>
+              <div className="flex gap-3 mb-4 p-[12px_14px] bg-bg-2 rounded-[8px]">
+                <div className="flex-1">
+                  <div className="text-[10px] text-ink-4 font-semibold uppercase tracking-wider">Stylist</div>
+                  <div className="text-xs font-semibold text-ink mt-0.5">
                     {stylists.find(s => s.id === selected.stylistId)?.name || selected.stylistId}
                   </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: "var(--ink-4)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Date</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>
+                <div className="flex-1">
+                  <div className="text-[10px] text-ink-4 font-semibold uppercase tracking-wider">Date</div>
+                  <div className="text-xs font-semibold text-ink mt-0.5">
                     {(() => { const d = new Date(selected.dayKey); return `${DOW_FULL[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`; })()}
                   </div>
                 </div>
                 {selected.phone && (
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, color: "var(--ink-4)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Phone</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>{selected.phone}</div>
+                  <div className="flex-1">
+                    <div className="text-[10px] text-ink-4 font-semibold uppercase tracking-wider">Phone</div>
+                    <div className="text-xs font-semibold text-ink mt-0.5">{selected.phone}</div>
                   </div>
                 )}
               </div>
 
               {/* Actions */}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className="flex gap-2 flex-wrap">
                 <Link
                   href={`/dashboard/bookings/${selected.id}`}
-                  style={{ flex: 1, height: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--teal)", color: "#fff", borderRadius: "var(--radius-sm)", fontWeight: 600, fontSize: 13, textDecoration: "none" }}
+                  className="flex-1 h-10 flex items-center justify-center bg-teal !text-white rounded-[8px] font-semibold text-[13px] no-underline hover:bg-teal-ink transition-colors duration-150"
                 >
                   View details
                 </Link>
                 <Link
                   href={`/dashboard/checkout/${selected.id}`}
-                  style={{ flex: 1, height: 40, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--line-2)", color: "var(--ink-2)", borderRadius: "var(--radius-sm)", fontWeight: 500, fontSize: 13, textDecoration: "none" }}
+                  className="flex-1 h-10 flex items-center justify-center border border-line-2 text-ink-2 rounded-[8px] font-medium text-[13px] no-underline hover:border-ink-3 hover:bg-bg-2 transition-all duration-150"
                 >
                   Checkout / POS
                 </Link>
@@ -803,7 +807,7 @@ export default function BookingsPage() {
                       const msg = `Hi ${selected.customer}, reminder for your ${selected.service} appointment.`;
                       window.open(`https://wa.me/${selected.phone?.replace(/[^0-9+]/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
                     }}
-                    style={{ height: 40, padding: "0 14px", display: "flex", alignItems: "center", gap: 6, border: "1px solid #25D366", color: "#25D366", borderRadius: "var(--radius-sm)", fontWeight: 500, fontSize: 13, background: "transparent", cursor: "pointer" }}
+                    className="h-10 px-3.5 flex items-center gap-1.5 border border-[#25D366] text-[#25D366] rounded-[8px] font-medium text-[13px] bg-transparent cursor-pointer hover:bg-[#25D366]/5 transition-colors duration-150"
                   >
                     <I.wa /> WhatsApp
                   </button>
@@ -817,7 +821,7 @@ export default function BookingsPage() {
 
       {/* Flash */}
       {flash && (
-        <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", background: "var(--ink)", color: "#fff", padding: "10px 16px", borderRadius: 10, fontSize: 13, zIndex: 60 }}>
+        <div className="fixed bottom-[90px] left-1/2 -translate-x-1/2 bg-ink text-white p-[10px_16px] rounded-[10px] text-[13px] z-[60]">
           {flash}
         </div>
       )}

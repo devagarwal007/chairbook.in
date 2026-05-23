@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
+import { useFlash } from "@/hooks";
 import { insertNotification } from "@/lib/notifications";
 import { BookingData } from "@/types";
 import { isUUID } from "@/lib/utils";
@@ -319,7 +320,7 @@ export default function BookingDetailPage() {
   const [status, setStatus] = useState<"confirmed" | "arrived" | "completed" | "noshow" | "cancelled">("confirmed");
   const [showResch, setShowResch] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: showFlash } = useFlash(2000);
   const [activity, setActivity] = useState(BOOKING.activity);
   const [rescheduled, setRescheduled] = useState<{ date: string; time: string } | null>(null);
   const [salonInfo, setSalonInfo] = useState({
@@ -639,8 +640,7 @@ export default function BookingDetailPage() {
       meta: "You",
       tone: "neutral"
     }, ...activity]);
-    setFlash(`Marked as ${STATUS_LABEL[s]}`);
-    setTimeout(() => setFlash(null), 1800);
+    showFlash(`Marked as ${STATUS_LABEL[s]}`, 1800);
   };
 
   const handleReschedule = async ({ date, time, note }: { date: string; time: string; note: string }) => {
@@ -688,8 +688,7 @@ export default function BookingDetailPage() {
         tone: "amber"
       }, ...activity]);
       setShowResch(false);
-      setFlash(`Rescheduled — WhatsApp sent to ${b.customer.name}`);
-      setTimeout(() => setFlash(null), 2000);
+      showFlash(`Rescheduled — WhatsApp sent to ${b.customer.name}`, 2000);
     }
   };
 
@@ -736,8 +735,7 @@ export default function BookingDetailPage() {
       tone: "rose"
     }, ...activity]);
     setShowCancel(false);
-    setFlash(`Booking cancelled${notify ? " — customer notified" : ""}`);
-    setTimeout(() => setFlash(null), 2000);
+    showFlash(`Booking cancelled${notify ? " — customer notified" : ""}`, 2000);
   };
 
   const handleRestore = async () => {
@@ -868,7 +866,7 @@ export default function BookingDetailPage() {
   }
 
   return (
-    <div className="app pb-[120px] max-[640px]:pb-[100px]">
+    <div className="app pb-[calc(72px+24px)] max-[640px]:pb-[calc(72px+16px)]">
       {/* Top bar */}
       <div className="bg-surface border-b border-line sticky top-0 z-30">
         <div className="max-w-[760px] mx-auto flex items-center h-14 px-6 max-[640px]:px-4 max-[640px]:h-[52px]">
@@ -900,6 +898,13 @@ export default function BookingDetailPage() {
                 <IBD.cal /> Rescheduled from {b.date} · {b.time}
               </div>
             )}
+            <div className="flex gap-2 mt-3">
+              {!isCancelled && (
+                <button className="btn btn-outline btn-sm" onClick={() => setShowResch(true)}>
+                  <IBD.edit /> Reschedule
+                </button>
+              )}
+            </div>
           </div>
           <div className="bd-hero-r">
             <div className="bd-stylist-card">
@@ -1021,6 +1026,25 @@ export default function BookingDetailPage() {
                 <span className="dot status-noshow-bg"></span> No-show
               </button>
             </div>
+            <div className="flex gap-2 mt-4 pt-3 border-t border-line">
+              <button className="btn btn-outline btn-sm flex-1" style={{ color: "var(--rose)", borderColor: "var(--rose-soft)" }} onClick={() => setShowCancel(true)}>
+                <IBD.trash /> Cancel booking
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Cancelled restore */}
+        {isCancelled && (
+          <div className="card bd-quick-status">
+            <div className="flex items-center justify-between gap-3">
+              <div style={{ fontSize: 13, color: "var(--ink-3)" }}>
+                This booking was cancelled.
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={handleRestore}>
+                Restore booking
+              </button>
+            </div>
           </div>
         )}
 
@@ -1045,31 +1069,6 @@ export default function BookingDetailPage() {
           </div>
         </div>
       </main>
-
-      {/* Sticky bottom CTAs */}
-      {!isCancelled && (
-        <div className="fixed bottom-[calc(var(--bottom-nav-h)+24px)] left-1/2 -translate-x-1/2 max-w-[712px] w-[calc(100%-48px)] bg-white/92 backdrop-blur border border-line rounded-2xl p-2.5 flex gap-2.5 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.1)] z-40 max-[640px]:left-4 max-[640px]:right-4 max-[640px]:transform-none max-[640px]:max-w-none max-[640px]:w-auto max-[640px]:bottom-[calc(var(--bottom-nav-h)+16px)]">
-          <button className="btn btn-outline h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5" style={{ flex: 1 }} onClick={() => setShowResch(true)}>
-            <IBD.edit /> Reschedule
-          </button>
-          <button className="btn btn-outline h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5" style={{ flex: 1, color: "var(--rose)", borderColor: "var(--rose-soft)" }} onClick={() => setShowCancel(true)}>
-            <IBD.trash /> Cancel
-          </button>
-          <a href={`https://wa.me/${b.customer.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="btn btn-wa h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5" style={{ flex: 1.5 }}>
-            <IBD.wa /> Message {b.customer.name.split(" ")[0]}
-          </a>
-        </div>
-      )}
-      {isCancelled && (
-        <div className="fixed bottom-[calc(var(--bottom-nav-h)+24px)] left-1/2 -translate-x-1/2 max-w-[712px] w-[calc(100%-48px)] bg-white/92 backdrop-blur border border-line rounded-2xl p-2.5 flex gap-2.5 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.1)] z-40 max-[640px]:left-4 max-[640px]:right-4 max-[640px]:transform-none max-[640px]:max-w-none max-[640px]:w-auto max-[640px]:bottom-[calc(var(--bottom-nav-h)+16px)]">
-          <div style={{ flex: 1, padding: "12px 16px", fontSize: 13, color: "var(--ink-3)" }}>
-            This booking was cancelled.
-          </div>
-          <button className="btn btn-primary h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5" onClick={handleRestore}>
-            Restore booking
-          </button>
-        </div>
-      )}
 
       {flash && (
         <div style={{

@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     salon_id UUID NOT NULL REFERENCES public.salons(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
+    phone VARCHAR(20),
     pref_stylist_id UUID REFERENCES public.stylists(id) ON DELETE SET NULL,
     birthday DATE,
     member_since DATE NOT NULL DEFAULT CURRENT_DATE,

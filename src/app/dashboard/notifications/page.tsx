@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
+import { useFlash } from "@/hooks";
 
 import { Icons as I } from "@/components/ui/Icons";
 import type { Actor, NotificationItem } from "@/types";
@@ -51,7 +52,7 @@ export default function NotificationsPage() {
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: flashMsg } = useFlash(1600);
 
   // Load notifications from DB
   useEffect(() => {
@@ -117,10 +118,7 @@ export default function NotificationsPage() {
     loadNotifs();
   }, [salonId]);
 
-  const flashMsg = (m: string) => {
-    setFlash(m);
-    setTimeout(() => setFlash(null), 1600);
-  };
+
 
   const filtered = useMemo(() => {
     if (filter === 'all') return notifs;

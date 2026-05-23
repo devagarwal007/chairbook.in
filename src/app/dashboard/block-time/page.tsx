@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
+import { useFlash } from "@/hooks";
 
 import { Icons as IBT } from "@/components/ui/Icons";
 
@@ -331,7 +332,7 @@ export default function BlockTimePage() {
   const [filter, setFilter] = useState<"upcoming" | "recurring" | "past" | "all">("upcoming");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<UIBlock | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
+  const { flash, show: flashMsg } = useFlash(1800);
   const [loading, setLoading] = useState(true);
 
   // Load block items from Supabase
@@ -447,11 +448,6 @@ export default function BlockTimePage() {
       return () => clearTimeout(t);
     }
   }, [salonId, loadBlocks]);
-
-  const flashMsg = (m: string) => {
-    setFlash(m);
-    setTimeout(() => setFlash(null), 1800);
-  };
 
   const filtered = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);

@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 
 import { Icons as I } from "@/components/ui/Icons";
+import type { Actor, NotificationItem } from "@/types";
 
 
 const KINDS: Record<string, { icon: keyof typeof I; tone: string; label: string }> = {
@@ -20,25 +21,6 @@ const KINDS: Record<string, { icon: keyof typeof I; tone: string; label: string 
   wa_reply:       { icon: 'wa',      tone: 'wa',    label: 'WhatsApp reply' },
   daily:          { icon: 'summary', tone: 'neutral', label: 'Daily summary' },
 };
-
-interface Actor {
-  name: string;
-  initials: string;
-  tone: string;
-}
-
-interface NotificationItem {
-  id: number;
-  dbId?: string;
-  kind: string;
-  ts: string;
-  day: string;
-  unread: boolean;
-  title: string;
-  meta: string;
-  actor: Actor | null;
-  link: string;
-}
 
 const INITIAL_NOTIFS: NotificationItem[] = [
   { id: 1,  kind: 'new_booking', ts: '01:08 PM', day: 'Today',     unread: true,  title: 'Aisha Khan booked Keratin',      meta: 'Saturday 24 May · 11:00 AM · with Anjali · ₹4,500',                actor: { name: 'Aisha Khan', initials: 'AK', tone: 'd' }, link: '/dashboard/bookings' },

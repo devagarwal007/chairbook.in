@@ -4,16 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icons } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
-
-interface HeaderProps {
-  title: React.ReactNode;
-  subtitle?: React.ReactNode;
-  brandMark?: string;
-  todayRevenue?: number;
-  dailyTarget?: number;
-  showSearch?: boolean;
-  actions?: React.ReactNode;
-}
+import type { HeaderProps } from "@/types";
 
 export default function Header({
   title,
@@ -54,34 +45,34 @@ export default function Header({
 
   return (
     <>
-      <div className="app-top">
-        <div className="app-top-inner">
-          <Link href="/dashboard" className="brand" style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}>
-            <div className="brand-mark">{brandMark}</div>
-            <span className="brand-text">ChairBook</span>
-            <span className="badge neutral no-dot mono salon-tag" style={{ marginLeft: 12, fontSize: 10, letterSpacing: "0.05em" }}>
+      <div className="bg-bg border-b border-line">
+        <div className="max-w-[1200px] mx-auto px-8 py-[22px] flex items-center justify-between gap-6">
+          <Link href="/dashboard" className="flex items-center gap-[10px] font-semibold tracking-[-0.01em] text-base" style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}>
+            <div className="w-7 h-7 rounded-lg bg-teal grid place-items-center text-white font-bold text-sm">{brandMark}</div>
+            <span className="font-semibold tracking-[-0.01em] text-base">ChairBook</span>
+            <span className="inline-flex items-center gap-[5px] text-[10px] font-medium px-[9px] py-[3px] rounded-full tracking-[0.05em] leading-[1.4] whitespace-nowrap font-mono text-ink-2 bg-bg-2 no-underline">
+              <span className="hidden"></span>
               {profile.salonName}{profile.salonArea ? ` · ${profile.salonArea}` : ""}
             </span>
           </Link>
-          <div className="greeting">
-            <div className="h">{title}</div>
-            {subtitle && <div className="d">{subtitle}</div>}
+          <div className="flex flex-col gap-[2px]">
+            <div className="text-[22px] font-semibold tracking-[-0.015em]">{title}</div>
+            {subtitle && <div className="text-[13px] text-ink-3 font-mono">{subtitle}</div>}
           </div>
-          <div className="top-actions">
+          <div className="flex items-center gap-[10px]">
             {actions}
             {showSearch && (
-              <button className="icon-btn" aria-label="Search">
+              <button className="w-10 h-10 rounded-[10px] border border-line bg-white grid place-items-center text-ink-2 cursor-pointer hover:bg-bg-2 transition-all duration-150" aria-label="Search">
                 <Icons.search />
               </button>
             )}
-            <Link href="/dashboard/notifications" className="icon-btn" aria-label="Notifications" style={{ position: "relative", display: "inline-grid", placeItems: "center", textDecoration: "none", color: "inherit" }}>
+            <Link href="/dashboard/notifications" aria-label="Notifications" className="w-10 h-10 rounded-[10px] border border-line bg-white grid place-items-center text-ink-2 cursor-pointer hover:bg-bg-2 transition-all duration-150" style={{ position: "relative", display: "inline-grid", placeItems: "center", textDecoration: "none", color: "inherit" }}>
               <Icons.bell />
-              <span className="ind"></span>
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber border-2 border-white box-content"></span>
             </Link>
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="avatar sm tone-b"
                 style={{
                   marginLeft: 6,
                   borderRadius: "50%",
@@ -95,9 +86,8 @@ export default function Header({
                   width: 30,
                   height: 30,
                   fontSize: 12,
-                  background: "var(--teal-soft)",
-                  color: "var(--teal)",
                 }}
+                className="bg-teal-soft text-teal"
               >
                 {profile.initials}
               </button>

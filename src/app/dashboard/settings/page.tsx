@@ -8,56 +8,7 @@ import Header from "@/components/layout/Header";
 import { Icons as I } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
 
-import { HoursData, Service, Stylist } from "@/types";
-
-// ===== TYPES =====
-interface SalonInfo {
-  name: string;
-  area: string;
-  type: string;
-  city: string;
-}
-
-interface WhatsAppTemplates {
-  confirmation: string;
-  reminder: string;
-  reengagement: string;
-}
-
-interface WhatsAppInfo {
-  number: string;
-  verified: boolean;
-  reminder: number;
-  autoConfirm: boolean;
-  sendOffers: boolean;
-  templates: WhatsAppTemplates;
-}
-
-interface NotificationChannel {
-  push: boolean;
-  sms: boolean;
-  wa: boolean;
-}
-
-interface Notifications {
-  [key: string]: NotificationChannel;
-}
-
-interface AccountInfo {
-  name: string;
-  email: string;
-}
-
-interface SettingsData {
-  salon: SalonInfo;
-  hours: HoursData;
-  services: Service[];
-  team: Stylist[];
-  wa: WhatsAppInfo;
-  plan: string;
-  notifs: Notifications;
-  account: AccountInfo;
-}
+import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates } from "@/types";
 
 // ===== CONSTANTS =====
 const DAYS = [
@@ -1281,27 +1232,7 @@ export default function SettingsPage() {
 
   return (
     <div className="app settings-app animate-fade-in">
-      <div className="app-top">
-        <div className="app-top-inner">
-          <Link href="/dashboard" className="brand" style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}>
-            <span className="brand-text">ChairBook</span>
-            <span className="badge neutral no-dot mono salon-tag" style={{ marginLeft: 12, fontSize: 10, letterSpacing: "0.05em" }}>
-              {(data.salon.name || "GLOW SALON").toUpperCase()} · {(data.salon.area || "ANDHERI").toUpperCase()}
-            </span>
-          </Link>
-          <div className="greeting">
-            <div className="h">Settings</div>
-            <div className="d">CONFIGURE YOUR SALON</div>
-          </div>
-          <div className="top-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Link href="/dashboard/notifications" className="icon-btn" aria-label="Notifications" style={{ display: "flex" }}>
-              <I.bell style={{ width: 18, height: 18 }} />
-              <span className="ind"></span>
-            </Link>
-            <div className="avatar sm tone-b">{data.account?.name ? data.account.name[0].toUpperCase() : "R"}</div>
-          </div>
-        </div>
-      </div>
+      <Header title="Settings" subtitle="CONFIGURE YOUR SALON" />
 
       <main className="app-main set-main">
         <div className="grid grid-cols-[240px_1fr] gap-7 items-start max-[860px]:grid-cols-1">

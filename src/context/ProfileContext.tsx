@@ -3,14 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { initialsOf } from "@/lib/utils";
-
-interface Profile {
-  name: string;
-  role: string;
-  salonName: string;
-  salonArea: string;
-  initials: string;
-}
+import type { Profile } from "@/types";
 
 interface ProfileContextType {
   profile: Profile;

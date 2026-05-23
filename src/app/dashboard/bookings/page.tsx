@@ -114,6 +114,15 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
   const endMin = toMinHours(a.startH, a.startM) + a.duration;
   const endStr = `${String(Math.floor(endMin / 60)).padStart(2,"0")}:${String(endMin % 60).padStart(2,"0")}`;
 
+  const toneBgMap: Record<string, string> = {
+    a: 'bg-[#F1EAD9] text-[#8C6A1E]',
+    b: 'bg-teal-soft text-teal',
+    c: 'bg-blue-soft text-blue',
+    d: 'bg-[#F4DCE4] text-[#A03364]',
+    e: 'bg-amber-soft text-amber-ink',
+    f: 'bg-rose-soft text-rose',
+  };
+
   return (
     <div
       onClick={onClick}
@@ -129,8 +138,8 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
       <div className="flex items-center justify-between gap-1.5">
         {!narrow && (
           <div
-            className={`avatar sm tone-${a.tone}`}
-            style={{ width: 20, height: 20, fontSize: 9, border: 0 }}
+            className={`inline-grid place-items-center font-semibold rounded-full shrink-0 ${toneBgMap[a.tone] || 'bg-bg-2 text-ink-2'}`}
+            style={{ width: 20, height: 20, fontSize: 9 }}
           >
             {a.initials}
           </div>
@@ -179,31 +188,33 @@ function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () 
     onClose();
   };
 
+  const inputCls = "w-full h-[42px] px-[14px] rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-0 transition-[border-color] duration-150 focus:border-teal";
+
   return (
-    <div className="modal-back" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(420px, 100%)" }}>
-        <div className="modal-head">
-          <h3>Block time</h3>
-          <button className="modal-close" onClick={onClose}>✕</button>
+    <div className="fixed inset-0 bg-[rgba(14,21,18,0.45)] z-100 grid place-items-center p-6 backdrop-blur-[2px] animate-[fadeIn_.15s_ease]" onClick={onClose}>
+      <div className="w-[min(420px,100%)] max-w-[calc(100vw-32px)] bg-white rounded-lg border border-line overflow-hidden animate-[pop_.18s_cubic-bezier(0.2,0.9,0.3,1.2)]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-line">
+          <h3 className="text-[17px] font-semibold tracking-[-0.01em] m-0">Block time</h3>
+          <button className="w-8 h-8 rounded-lg border-0 bg-bg-2 text-ink-2 cursor-pointer grid place-items-center" onClick={onClose}>✕</button>
         </div>
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div className="field">
-            <label>Stylist</label>
-            <select value={blockStylist} onChange={e => setBlockStylist(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14, background: "#fff" }}>
+        <div className="flex flex-col gap-[14px] px-6 py-5">
+          <div className="flex flex-col gap-[6px]">
+            <label className="text-xs text-ink-3 font-medium">Stylist</label>
+            <select value={blockStylist} onChange={e => setBlockStylist(e.target.value)} className={inputCls}>
               <option value="all">All stylists (whole salon)</option>
               {stylists.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div className="field">
-              <label>From date</label>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+          <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
+            <div className="flex flex-col gap-[6px]">
+              <label className="text-xs text-ink-3 font-medium">From date</label>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={inputCls} />
             </div>
-            <div className="field">
-              <label>To date (optional)</label>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+            <div className="flex flex-col gap-[6px]">
+              <label className="text-xs text-ink-3 font-medium">To date (optional)</label>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={inputCls} />
             </div>
           </div>
           <label className="flex items-center gap-2 text-[13px] cursor-pointer">
@@ -211,20 +222,20 @@ function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () 
             <span>All-day block</span>
           </label>
           {!allDay && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div className="field">
-                <label>From</label>
-                <input type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+            <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
+              <div className="flex flex-col gap-[6px]">
+                <label className="text-xs text-ink-3 font-medium">From</label>
+                <input type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} className={inputCls} />
               </div>
-              <div className="field">
-                <label>To</label>
-                <input type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
+              <div className="flex flex-col gap-[6px]">
+                <label className="text-xs text-ink-3 font-medium">To</label>
+                <input type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} className={inputCls} />
               </div>
             </div>
           )}
-          <div className="field">
-            <label>Reason</label>
-            <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14, background: "#fff" }}>
+          <div className="flex flex-col gap-[6px]">
+            <label className="text-xs text-ink-3 font-medium">Reason</label>
+            <select value={reason} onChange={e => setReason(e.target.value)} className={inputCls}>
               <option>Lunch</option>
               <option>Holiday</option>
               <option>Vacation</option>
@@ -232,9 +243,9 @@ function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () 
             </select>
           </div>
         </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleBlock} disabled={saving}>
+        <div className="flex gap-[10px] justify-end px-6 py-4 border-t border-line bg-bg">
+          <button className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-transparent text-ink-2 hover:text-ink hover:bg-bg-2 transition-all duration-150" onClick={onClose}>Cancel</button>
+          <button className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-teal text-white hover:bg-teal-ink transition-all duration-150" onClick={handleBlock} disabled={saving}>
             {saving ? "Saving..." : "Block time"}
           </button>
         </div>
@@ -264,10 +275,10 @@ function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }
           const isToday = key === todayKey;
           const cnt = appts.filter(a => a.dayKey === key && (stylistFilter === "all" || a.stylistId === stylistFilter)).length;
           return (
-            <div key={key} className={`p-3 text-center border-r border-line flex flex-col items-center justify-center max-[720px]:p-[8px_6px] ${isToday ? "bg-teal-soft" : ""}`}>
-              <div className={`text-[10px] font-bold tracking-[0.05em] ${isToday ? "text-teal" : "text-ink-3"}`}>{DOW_FULL[day.getDay()]}</div>
-              <div className={`font-bold mt-1 leading-none max-[720px]:text-base text-lg ${isToday ? "text-teal-ink" : "text-ink-2"}`}>{day.getDate()}</div>
-              <div className={`text-[11px] mt-1.5 max-[720px]:text-[10px] ${isToday ? "text-teal-ink" : "text-ink-3"}`}>{cnt} booking{cnt === 1 ? "" : "s"}</div>
+            <div key={key} className={`p-3 border-r border-line flex flex-col items-start gap-[2px] max-[720px]:p-[8px_6px] ${isToday ? "bg-teal-soft" : ""}`}>
+              <div className={`font-mono text-[10px] font-medium tracking-[0.06em] ${isToday ? "text-teal" : "text-ink-3"}`}>{DOW_FULL[day.getDay()]}</div>
+              <div className={`font-semibold leading-none mt-0.5 max-[720px]:text-base text-[22px] tracking-[-0.02em] ${isToday ? "text-teal-ink" : "text-ink-2"}`}>{day.getDate()}</div>
+              <div className={`text-[11px] mt-1 max-[720px]:text-[10px] ${isToday ? "text-teal-ink" : "text-ink-3"}`}>{cnt} booking{cnt === 1 ? "" : "s"}</div>
             </div>
           );
         })}
@@ -277,8 +288,8 @@ function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }
       <div className="grid grid-cols-[60px_repeat(7,1fr)] relative max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]">
         <div className="bg-bg border-r border-line relative">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} className="border-b border-dashed border-line relative first:border-t-0 group" style={{ height: SLOT_HEIGHT * 2 }}>
-              <span className="font-mono text-xs text-ink-3 absolute right-2 -top-1.75 bg-bg px-1 max-[720px]:text-[9px] group-first:top-1">{label}</span>
+            <div key={i} className="border-b border-dashed border-line relative first:border-t-0" style={{ height: SLOT_HEIGHT * 2 }}>
+              <span className="font-mono text-[10px] text-ink-3 absolute left-2 -top-[7px] bg-white px-1 max-[720px]:text-[9px] first:top-0">{label}</span>
             </div>
           ))}
         </div>
@@ -344,9 +355,17 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
         <div className="bg-bg border-r border-line relative"></div>
         {visibleStylists.map(s => {
           const cnt = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id).length;
+          const toneBgMap: Record<string, string> = {
+            a: 'bg-[#F1EAD9] text-[#8C6A1E]',
+            b: 'bg-teal-soft text-teal',
+            c: 'bg-blue-soft text-blue',
+            d: 'bg-[#F4DCE4] text-[#A03364]',
+            e: 'bg-amber-soft text-amber-ink',
+            f: 'bg-rose-soft text-rose',
+          };
           return (
             <div key={s.id} className="p-[10px_8px] text-left border-r border-line flex items-center gap-2.5">
-              <div className={`avatar md tone-${s.tone}`}>{s.short}</div>
+              <div className={`w-10 h-10 rounded-full inline-grid place-items-center font-semibold text-sm shrink-0 ${toneBgMap[s.tone || 'b'] || 'bg-bg-2 text-ink-2'}`}>{s.short}</div>
               <div>
                 <div className="text-sm font-semibold">{s.name}</div>
                 <div className="text-[11px] text-ink-3 mt-0.5">{cnt} appointment{cnt !== 1 ? "" : "s"}</div>
@@ -360,8 +379,8 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
       <div className="grid relative max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
         <div className="bg-bg border-r border-line relative">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} className="border-b border-dashed border-line relative first:border-t-0 group" style={{ height: SLOT_HEIGHT * 2 }}>
-              <span className="font-mono text-xs text-ink-3 absolute right-2 -top-1.75 bg-bg px-1 max-[720px]:text-[9px] group-first:top-1">{label}</span>
+            <div key={i} className="border-b border-dashed border-line relative first:border-t-0" style={{ height: SLOT_HEIGHT * 2 }}>
+              <span className="font-mono text-[10px] text-ink-3 absolute left-2 -top-[7px] bg-white px-1 max-[720px]:text-[9px] first:top-0">{label}</span>
             </div>
           ))}
         </div>
@@ -563,18 +582,18 @@ export default function BookingsPage() {
   };
 
   return (
-    <div className="app animate-fade-in">
+    <div className="min-h-screen pb-[calc(var(--bottom-nav-h)+32px)] animate-[fadeIn_0.22s_cubic-bezier(0.16,1,0.3,1)_forwards]">
       {/* Reusable Header */}
       <Header title="Bookings" subtitle={dateRangeStr} />
 
-      <main className="pb-[80px]">
+      <main className="max-w-[1200px] mx-auto px-8 py-7 pb-20">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 mb-3.5 flex-wrap max-[980px]:flex-col max-[980px]:items-stretch">
           <div className="flex items-center gap-4 max-[980px]:justify-between">
             <div className="flex gap-1.5 items-center">
-              <button className="icon-btn" onClick={goBack} aria-label="Previous"><I.chevL /></button>
-              <button className="btn btn-outline btn-sm" onClick={goToday}>Today</button>
-              <button className="icon-btn" onClick={goForward} aria-label="Next"><I.chevR /></button>
+              <button className="w-8 h-8 rounded-lg border border-line bg-white grid place-items-center text-ink-2 cursor-pointer hover:bg-bg-2 transition-all duration-150" onClick={goBack} aria-label="Previous"><I.chevL /></button>
+              <button className="inline-flex items-center justify-center gap-2 h-8 px-3 rounded-lg border border-line-2 bg-white font-sans text-sm font-medium text-ink cursor-pointer hover:border-ink-3 hover:bg-bg-2 transition-all duration-150" onClick={goToday}>Today</button>
+              <button className="w-8 h-8 rounded-lg border border-line bg-white grid place-items-center text-ink-2 cursor-pointer hover:bg-bg-2 transition-all duration-150" onClick={goForward} aria-label="Next"><I.chevR /></button>
             </div>
             <div className="flex flex-col gap-0.5">
               <strong className="text-[15px] font-semibold tracking-[-0.005em]">
@@ -586,21 +605,22 @@ export default function BookingsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2.5 max-[980px]:justify-between">
-            <div className="relative flex p-0.5 bg-bg-2 rounded-lg border border-line">
-              <div
-                className="absolute top-0.5 bottom-0.5 bg-white rounded shadow-sm transition-transform duration-200"
-                style={{
-                  width: "calc(50% - 3px)",
-                  transform: view === "day" ? "translateX(0)" : "translateX(100%)",
-                }}
-              />
-              <button className={`px-4 py-1.5 text-sm font-medium transition-colors ${view === "day" ? "text-ink" : "text-ink-3"}`} onClick={() => setView("day")} style={{ position: "relative", zIndex: 1 }}>Day</button>
-              <button className={`px-4 py-1.5 text-sm font-medium transition-colors ${view === "week" ? "text-ink" : "text-ink-3"}`} onClick={() => setView("week")} style={{ position: "relative", zIndex: 1 }}>Week</button>
+            <div className="inline-flex p-[3px] bg-bg-2 rounded-[9px] text-[13px]">
+              <button className={`border-0 bg-transparent px-3 py-[6px] rounded-[7px] text-[13px] font-sans cursor-pointer transition-all duration-150 ${
+                view === "day"
+                  ? "bg-white text-ink font-medium shadow-[0_1px_0_var(--line)]"
+                  : "text-ink-3"
+              }`} onClick={() => setView("day")}>Day</button>
+              <button className={`border-0 bg-transparent px-3 py-[6px] rounded-[7px] text-[13px] font-sans cursor-pointer transition-all duration-150 ${
+                view === "week"
+                  ? "bg-white text-ink font-medium shadow-[0_1px_0_var(--line)]"
+                  : "text-ink-3"
+              }`} onClick={() => setView("week")}>Week</button>
             </div>
-            <Link href="/dashboard/block-time" className="btn btn-ghost btn-sm">
+            <Link href="/dashboard/block-time" className="inline-flex items-center justify-center gap-2 h-8 px-3 rounded-lg border border-transparent font-sans text-sm font-medium text-ink-2 cursor-pointer hover:text-ink hover:bg-bg-2 transition-all duration-150">
               Block time
             </Link>
-            <Link href="/dashboard/new-booking" className="btn btn-primary btn-sm">
+            <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, height: 32, textDecoration: "none" }}>
               <I.plus style={{ width: 14, height: 14 }} /> New booking
             </Link>
           </div>
@@ -609,35 +629,53 @@ export default function BookingsPage() {
         {/* Stylist filter chips + legend */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button
-            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${stylistFilter === "all" ? "bg-teal text-white border-teal" : "bg-bg-1 text-ink-2 border-line hover:border-teal/30"}`}
+            className={`h-8 px-3 rounded-full text-sm font-medium border cursor-pointer inline-flex items-center gap-2 transition-all duration-180 ${
+              stylistFilter === "all"
+                ? "bg-ink text-white border-ink"
+                : "bg-white text-ink-2 border-line-2 hover:border-ink-3 hover:-translate-y-0.5 active:scale-96"
+            }`}
             onClick={() => setStylistFilter("all")}
           >
             All stylists
-            <span style={{ color: stylistFilter === "all" ? "rgba(255,255,255,0.6)" : "var(--ink-4)", fontSize: 11, marginLeft: 6 }}>
+            <span style={{ color: stylistFilter === "all" ? "rgba(255,255,255,0.6)" : "var(--ink-4)", fontSize: 11 }}>
               {apptCountForFilter("all")}
             </span>
           </button>
-          {stylists.map(s => (
+          {stylists.map(s => {
+            const toneBgMap: Record<string, string> = {
+              a: 'bg-[#F1EAD9] text-[#8C6A1E]',
+              b: 'bg-teal-soft text-teal',
+              c: 'bg-blue-soft text-blue',
+              d: 'bg-[#F4DCE4] text-[#A03364]',
+              e: 'bg-amber-soft text-amber-ink',
+              f: 'bg-rose-soft text-rose',
+            };
+            return (
             <button
               key={s.id}
-              className={`filter-chip ${stylistFilter === s.id ? "on" : ""}`}
+              className={`h-8 px-3 rounded-full border cursor-pointer inline-flex items-center gap-2 text-sm transition-all duration-180 hover:border-ink-3 hover:-translate-y-0.5 active:scale-96 ${
+                stylistFilter === s.id
+                  ? "bg-ink text-white border-ink"
+                  : "bg-white text-ink-2 border-line-2"
+              }`}
               onClick={() => setStylistFilter(s.id)}
             >
-              <span className={`avatar sm tone-${s.tone}`} style={{ width: 18, height: 18, fontSize: 9, border: 0, borderRadius: "50%", display: "inline-grid", placeItems: "center", fontWeight: "bold", marginRight: 4 }}>
+              <span className={`inline-grid place-items-center font-semibold rounded-full shrink-0 ${toneBgMap[s.tone || 'b'] || 'bg-bg-2 text-ink-2'}`} style={{ width: 18, height: 18, fontSize: 9 }}>
                 {s.short}
               </span>
               {s.name}
-              <span style={{ color: stylistFilter === s.id ? "rgba(255,255,255,0.6)" : "var(--ink-4)", fontSize: 11, marginLeft: 6 }}>
+              <span style={{ color: stylistFilter === s.id ? "rgba(255,255,255,0.6)" : "var(--ink-4)", fontSize: 11 }}>
                 {apptCountForFilter(s.id)}
               </span>
             </button>
-          ))}
+            );
+          })}
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "var(--ink-3)" }}>
             {[
-              { label: "Confirmed", color: "var(--teal)" },
+              { label: "Confirmed", color: "var(--blue)" },
               { label: "Arrived", color: "var(--amber)" },
-              { label: "Done", color: "#ccc" },
+              { label: "Done", color: "var(--green)" },
               { label: "No-show", color: "var(--rose)" },
             ].map(({ label, color }) => (
               <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -649,11 +687,11 @@ export default function BookingsPage() {
         </div>
 
         {/* Calendar card */}
-        <div className="overflow-hidden p-0 max-[720px]:overflow-x-auto card">
+        <div className="overflow-hidden p-0 max-[720px]:overflow-x-auto bg-surface border border-line rounded-xl">
           {loading ? (
             <div style={{ padding: "40px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="pulse" style={{ height: 36, background: "var(--bg-2)", borderRadius: 8 }} />
+                <div key={i} className="animate-pulse" style={{ height: 36, background: "var(--bg-2)", borderRadius: 8 }} />
               ))}
             </div>
           ) : view === "week" ? (
@@ -690,7 +728,17 @@ export default function BookingsPage() {
             >
               {/* Header */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                <div className={`avatar md tone-${selected.tone}`} style={{ width: 48, height: 48, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "bold", fontSize: 18 }}>
+                <div
+                  className={`inline-grid place-items-center font-semibold rounded-full shrink-0 ${
+                    selected.tone === 'a' ? 'bg-[#F1EAD9] text-[#8C6A1E]' :
+                    selected.tone === 'b' ? 'bg-teal-soft text-teal' :
+                    selected.tone === 'c' ? 'bg-blue-soft text-blue' :
+                    selected.tone === 'd' ? 'bg-[#F4DCE4] text-[#A03364]' :
+                    selected.tone === 'e' ? 'bg-amber-soft text-amber-ink' :
+                    selected.tone === 'f' ? 'bg-rose-soft text-rose' : 'bg-bg-2 text-ink-2'
+                  }`}
+                  style={{ width: 48, height: 48, fontSize: 18 }}
+                >
                   {selected.initials}
                 </div>
                 <div style={{ flex: 1 }}>
@@ -699,7 +747,15 @@ export default function BookingsPage() {
                      {selected.service} · {String(selected.startH).padStart(2,"0")}:{String(selected.startM).padStart(2,"0")} · {selected.duration} min
                   </div>
                 </div>
-                <span className={`badge ${selected.status}`}>{STATUS_LABEL[selected.status]}</span>
+                <span className={`inline-flex items-center gap-[5px] text-[11px] font-medium px-[9px] py-[3px] rounded-full tracking-[0.005em] leading-[1.4] whitespace-nowrap ${
+                  selected.status === 'confirmed' ? 'text-blue bg-blue-soft' :
+                  selected.status === 'arrived' ? 'text-amber-ink bg-amber-soft' :
+                  selected.status === 'completed' ? 'text-green bg-green-soft' :
+                  selected.status === 'noshow' ? 'text-rose bg-rose-soft' : ''
+                }`}>
+                  <span className="w-[5px] h-[5px] rounded-full bg-current inline-block"></span>
+                  {STATUS_LABEL[selected.status]}
+                </span>
                 <button onClick={() => setSelected(null)} style={{ border: 0, background: "var(--bg-2)", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "grid", placeItems: "center" }}>
                   <I.x />
                 </button>

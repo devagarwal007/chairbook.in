@@ -477,33 +477,19 @@ export default function DashboardPage() {
               </div>
             ))
           ) : filtered.length === 0 ? (
-            <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
-              No appointments for this day.
+            <div>
+              {showNowLine && day === "today" && (
+                <NowLine nowTimeMin={nowTimeMin} formatTime={formatTime} />
+              )}
+              <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
+                No appointments for this day.
+              </div>
             </div>
           ) : (
             filtered.map((appt, i) => (
               <React.Fragment key={`${day}-${filter}-${appt.id}`}>
-                {showNowLine && nowIdx === i && (
-                  <div className="tl-now" style={{ position: "relative", height: 24, marginBottom: 8 }}>
-                    <div className="tl-time" style={{ top: 0, color: "var(--rose)" }}>
-                      {formatTime(nowTimeMin).replace(" AM", "").replace(" PM", "")}
-                      <small>now</small>
-                    </div>
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: -16,
-                        top: 8,
-                        width: 11,
-                        height: 11,
-                        borderRadius: "50%",
-                        background: "var(--rose)",
-                        boxShadow: "0 0 0 4px rgba(196,69,43,0.15)",
-                        zIndex: 2,
-                      }}
-                    ></div>
-                    <div style={{ position: "absolute", left: -5, right: 0, top: 13, height: 1, background: "var(--rose)", opacity: 0.35 }}></div>
-                  </div>
+                {showNowLine && nowIdx === i && day === "today" && (
+                  <NowLine nowTimeMin={nowTimeMin} formatTime={formatTime} />
                 )}
                 <ApptRow
                   appt={appt}
@@ -516,6 +502,9 @@ export default function DashboardPage() {
                 />
               </React.Fragment>
             ))
+          )}
+          {showNowLine && nowIdx === -1 && day === "today" && filtered.length > 0 && (
+            <NowLine nowTimeMin={nowTimeMin} formatTime={formatTime} />
           )}
         </div>
 
@@ -777,6 +766,32 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// "Now" timeline indicator
+function NowLine({ nowTimeMin, formatTime }: { nowTimeMin: number; formatTime: (min: number) => string }) {
+  return (
+    <div className="tl-now" style={{ position: "relative", height: 24, marginBottom: 8 }}>
+      <div className="tl-time" style={{ top: 0, color: "var(--rose)" }}>
+        {formatTime(nowTimeMin).replace(" AM", "").replace(" PM", "")}
+        <small>now</small>
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          left: -16,
+          top: 8,
+          width: 11,
+          height: 11,
+          borderRadius: "50%",
+          background: "var(--rose)",
+          boxShadow: "0 0 0 4px rgba(196,69,43,0.15)",
+          zIndex: 2,
+        }}
+      ></div>
+      <div style={{ position: "absolute", left: -5, right: 0, top: 13, height: 1, background: "var(--rose)", opacity: 0.35 }}></div>
     </div>
   );
 }

@@ -10,6 +10,26 @@ import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { useSalonData, DbStylist, DbService } from "@/lib/useSalonData";
 
+// ===== HELPERS =====
+const formatTime12h = (timeStr: string) => {
+  const min = toMin(timeStr);
+  let h = Math.floor(min / 60);
+  const m = min % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  h = h ? h : 12;
+  return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+const formatTime12hFromMin = (min: number) => {
+  let h = Math.floor(min / 60);
+  const m = min % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  h = h ? h : 12;
+  return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
 // ===== TYPES =====
 interface Appointment {
   id: string | number;
@@ -242,6 +262,15 @@ export default function DashboardPage() {
   const totalAppts = appts.length;
   const noShows = appts.filter((a) => a.status === "noshow").length;
 
+  const unrepliedCount = useMemo(() => {
+    if (day !== "today") return 0;
+    return appts.filter((a) => {
+      if (a.status !== "confirmed") return false;
+      const apptMin = toMin(a.time);
+      return apptMin >= nowTimeMin && apptMin <= nowTimeMin + 120;
+    }).length;
+  }, [appts, nowTimeMin, day]);
+
   const updateStatus = async (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => {
     setAppts(prev => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     setFlash(`Status updated to ${STATUS_LABEL[status]}`);
@@ -439,6 +468,13 @@ export default function DashboardPage() {
                 Tomorrow
               </button>
             </div>
+            <button
+              onClick={() => setShowWalkIn(true)}
+              className="btn btn-sm btn-outline"
+              style={{ height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+            >
+              Walk-in
+            </button>
             <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
               + New booking
             </Link>
@@ -519,36 +555,37 @@ export default function DashboardPage() {
         </div>
 
         {/* Campaign Callout */}
-        <div
-          style={{
-            marginTop: 24,
-            padding: "18px 20px",
-            background: "var(--teal-soft)",
-            border: "1px solid var(--teal-soft-2)",
-            borderRadius: "var(--radius)",
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            color: "var(--teal-ink)",
-            fontSize: 13,
-          }}
-        >
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--teal)", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
-            <I.wa style={{ width: 18, height: 18 }} />
+        {unrepliedCount > 0 && (
+          <div
+            style={{
+              marginTop: 24,
+              padding: "18px 20px",
+              background: "var(--teal-soft)",
+              border: "1px solid var(--teal-soft-2)",
+              borderRadius: "var(--radius)",
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              color: "var(--teal-ink)",
+              fontSize: 13,
+            }}
+          >
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--teal)", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+              <I.wa style={{ width: 18, height: 18 }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <strong style={{ fontWeight: 600 }}>
+                {unrepliedCount} customer{unrepliedCount > 1 ? "s haven't" : " hasn't"} replied to their reminder.
+              </strong>{" "}
+              Send a follow-up WhatsApp in one tap.
+            </div>
+            <button className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32 }}>
+              Review →
+            </button>
           </div>
-          <div style={{ flex: 1 }}>
-            <strong style={{ fontWeight: 600 }}>3 customers haven't replied to their reminder.</strong> Send a follow-up WhatsApp in one tap.
-          </div>
-          <button className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32 }}>
-            Review →
-          </button>
-        </div>
+        )}
       </main>
 
-      {/* Floating Action Button */}
-      <button className="fab" onClick={() => setShowWalkIn(true)} aria-label="Add walk-in booking">
-        +
-      </button>
 
 
 
@@ -651,7 +688,8 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
   const stylist = stylists.find((s) => s.id === appt.stylist) || stylists[1] || { id: "unknown", name: appt.stylist, tone: "a" };
   const start = toMin(appt.time);
   const end = start + appt.duration;
-  const endTime = `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
+  const startTimeFormatted = formatTime12hFromMin(start);
+  const endTimeFormatted = formatTime12hFromMin(end);
   const isActive = start <= nowTimeMin && nowTimeMin < end;
 
   const bookingParam = typeof appt.id === "string" ? appt.id : String(appt.id);
@@ -660,7 +698,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
   return (
     <div className={`tl-row ${isActive ? "is-active" : ""} ${appt.status === "completed" ? "is-done" : ""}`}>
       <div className="tl-time">
-        {appt.time}
+        {startTimeFormatted}
         <small>{appt.duration} min</small>
       </div>
       <div className="tl-dot"></div>
@@ -678,7 +716,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
             </Link>
           </div>
           <div className="meta">
-            <strong>{appt.service}</strong> · with {stylist.name} · {appt.time}–{endTime}
+            <strong>{appt.service}</strong> · with {stylist.name} · {startTimeFormatted}–{endTimeFormatted}
           </div>
         </div>
         <div className="meta-right">

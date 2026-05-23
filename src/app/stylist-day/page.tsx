@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-export default function StylistDayPage() {
+function StylistDayContent() {
   const searchParams = useSearchParams();
   const stylistId = searchParams.get("stylist");
   const salonId = searchParams.get("salon");
@@ -96,5 +96,13 @@ export default function StylistDayPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function StylistDayPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>Loading...</div>}>
+      <StylistDayContent />
+    </Suspense>
   );
 }

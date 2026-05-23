@@ -298,7 +298,7 @@ interface WeekViewProps {
 function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }: WeekViewProps) {
   const TOTAL_HEIGHT = TIME_LABELS.length * SLOT_HEIGHT * 2;
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto", overflowY: "hidden" }}>
       {/* Day headers */}
       <div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, borderBottom: "1px solid var(--line)" }}>
         <div />
@@ -381,7 +381,7 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
   const nowTop = isToday ? ((nowMin - START_HOUR * 60) / 30) * SLOT_HEIGHT : -1;
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto", overflowY: "hidden" }}>
       {/* Stylist headers */}
       <div style={{ display: "grid", gridTemplateColumns: `52px repeat(${visibleStylists.length}, 1fr)`, borderBottom: "1px solid var(--line)" }}>
         <div />
@@ -586,12 +586,12 @@ export default function BookingsPage() {
       const s = weekDays[0];
       const e = weekDays[6];
       if (s.getMonth() === e.getMonth()) {
-        return `${s.getDate()} – ${e.getDate()} ${MONTH_NAMES[s.getMonth()]} ${s.getFullYear()} · Week ${getWeekNumber(s)}`;
+        return `${s.getDate()} – ${e.getDate()} ${MONTH_NAMES[s.getMonth()].toUpperCase()} ${s.getFullYear()} · WEEK ${getWeekNumber(s)}`;
       }
-      return `${s.getDate()} ${MONTH_NAMES[s.getMonth()]} – ${e.getDate()} ${MONTH_NAMES[e.getMonth()]} ${e.getFullYear()}`;
+      return `${s.getDate()} ${MONTH_NAMES[s.getMonth()].toUpperCase()} – ${e.getDate()} ${MONTH_NAMES[e.getMonth()].toUpperCase()} ${e.getFullYear()}`;
     } else {
       const d = baseDate;
-      return `${DOW_FULL[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+      return `${DOW_FULL[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()].toUpperCase()} ${d.getFullYear()}`;
     }
   }, [view, weekDays, baseDate]);
 
@@ -619,10 +619,10 @@ export default function BookingsPage() {
               <button className="icon-btn" onClick={goForward} aria-label="Next"><I.chevR /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <strong style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.3 }}>
+              <strong style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.3, fontFamily: "var(--font-mono)", letterSpacing: "0.02em" }}>
                 {view === "week"
                   ? `${weekDays[0].getDate()} – ${weekDays[6].getDate()} ${MONTH_NAMES[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`
-                  : `${weekDays[0].getDate()} – ${weekDays[6].getDate()} ${MONTH_NAMES[weekDays[0].getMonth()]}`}
+                  : `${baseDate.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
               </strong>
               {view === "week" && <span style={{ fontSize: 10, color: "var(--ink-3)" }}>Week {getWeekNumber(weekDays[0])}</span>}
             </div>
@@ -642,9 +642,9 @@ export default function BookingsPage() {
             <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, textDecoration: "none" }}>
               <I.plus /> New booking
             </Link>
-            <button className="btn btn-sm" onClick={() => setShowBlockModal(true)} style={{ border: "1px solid var(--line-2)", background: "#fff", color: "var(--ink-2)", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, cursor: "pointer" }}>
+            <Link href="/dashboard/block-time" className="btn btn-sm" style={{ border: "1px solid var(--line-2)", background: "#fff", color: "var(--ink-2)", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, textDecoration: "none" }}>
               🚫 Block time
-            </button>
+            </Link>
           </div>
         </div>
 

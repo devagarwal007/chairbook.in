@@ -19,9 +19,11 @@ export default function BottomNav() {
   const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
 
-  const activeIndex = navItems.findIndex((item) =>
-    item.exact ? pathname === item.href : pathname?.startsWith(item.href)
-  );
+  const activeIndex = pathname === "/dashboard/block-time"
+    ? 1
+    : navItems.findIndex((item) =>
+        item.exact ? pathname === item.href : pathname?.startsWith(item.href)
+      );
 
   const updatePill = useCallback(() => {
     const el = itemRefs.current[activeIndex];

@@ -700,13 +700,39 @@ export default function InsightsPage() {
 
   const m = p.metrics;
 
+  const handleDownload = () => {
+    const rows = [
+      ["Metric", "Value", "Change"],
+      ["Revenue", `₹${fmt(m.revenue.value)}`, m.revenue.delta],
+      ["Bookings", String(m.bookings.value), m.bookings.delta],
+      ["New Customers", String(m.newCust.value), m.newCust.delta],
+      ["No-Show Rate", `${m.noShow.value.toFixed(1)}%`, m.noShow.delta],
+      [],
+      ["Top Services"],
+      ["Name", "Revenue", "Bookings", "Share"],
+      ...p.topServices.map((s: any) => [s.name, `₹${fmt(s.revenue)}`, String(s.bookings), `${s.share}%`]),
+      [],
+      ["Top Stylists"],
+      ["Name", "Bookings", "Revenue", "Share"],
+      ...p.topStylists.map((s: any) => [s.name, String(s.bookings), `₹${fmt(s.revenue)}`, `${s.share}%`]),
+    ];
+    const csv = rows.map(r => (r as string[]).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `insights-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="app animate-fade-in">
       <Header
         title="Insights"
         subtitle={p.dateRange.toUpperCase()}
         actions={
-          <button className="icon-btn" aria-label="Download analytics">
+          <button className="icon-btn" aria-label="Download analytics" onClick={handleDownload}>
             <IR.download />
           </button>
         }

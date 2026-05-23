@@ -12,6 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const mainTabRoutes = [
     "/dashboard",
     "/dashboard/bookings",
+    "/dashboard/block-time",
     "/dashboard/customers",
     "/dashboard/revenue",
     "/dashboard/settings",

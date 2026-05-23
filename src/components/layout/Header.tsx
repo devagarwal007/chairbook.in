@@ -10,6 +10,7 @@ interface HeaderProps {
   subtitle?: React.ReactNode;
   brandMark?: string;
   todayRevenue?: number;
+  dailyTarget?: number;
   showSearch?: boolean;
   actions?: React.ReactNode;
 }
@@ -19,6 +20,7 @@ export default function Header({
   subtitle,
   brandMark = "C",
   todayRevenue = 4200,
+  dailyTarget = 6000,
   showSearch = false,
   actions,
 }: HeaderProps) {
@@ -54,13 +56,13 @@ export default function Header({
     <>
       <div className="app-top">
         <div className="app-top-inner">
-          <div className="brand">
+          <Link href="/dashboard" className="brand" style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}>
             <div className="brand-mark">{brandMark}</div>
             <span className="brand-text">ChairBook</span>
             <span className="badge neutral no-dot mono salon-tag" style={{ marginLeft: 12, fontSize: 10, letterSpacing: "0.05em" }}>
               {profile.salonName}{profile.salonArea ? ` · ${profile.salonArea}` : ""}
             </span>
-          </div>
+          </Link>
           <div className="greeting">
             <div className="h">{title}</div>
             {subtitle && <div className="d">{subtitle}</div>}
@@ -167,10 +169,10 @@ export default function Header({
                     <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-2)" }}>
                         <span style={{ fontWeight: 500 }}>Today's target</span>
-                        <span style={{ fontWeight: 600 }}>₹{todayRevenue.toLocaleString("en-IN")} / ₹6,000</span>
+                        <span style={{ fontWeight: 600 }}>₹{todayRevenue.toLocaleString("en-IN")} / ₹{dailyTarget.toLocaleString("en-IN")}</span>
                       </div>
                       <div style={{ width: "100%", height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${Math.min((todayRevenue / 6000) * 100, 100)}%`, height: "100%", background: "var(--teal)", borderRadius: 3 }} />
+                        <div style={{ width: `${Math.min((todayRevenue / dailyTarget) * 100, 100)}%`, height: "100%", background: "var(--teal)", borderRadius: 3 }} />
                       </div>
                     </div>
 

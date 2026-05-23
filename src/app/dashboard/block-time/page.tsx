@@ -1,0 +1,783 @@
+"use client";
+
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { useProfile } from "@/context/ProfileContext";
+
+// ===== CUSTOM SVG ICONS FOR DESIGN MATCH =====
+const IBT = {
+  home: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>,
+  cal: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>,
+  users: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/></svg>,
+  chart: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 21V3M21 21H3"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/></svg>,
+  settings: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>,
+  back: (p: any) => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m15 18-6-6 6-6"/></svg>,
+  plus: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 5v14M5 12h14"/></svg>,
+  trash: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>,
+  edit: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>,
+  coffee: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M17 8h1a4 4 0 0 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3"/></svg>,
+  plane: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M17.8 19.2 16 11l3.5-3.5a2.12 2.12 0 1 0-3-3L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>,
+  lock: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  party: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 21h18l-7-14a2 2 0 0 0-3 0z"/><path d="M9 17h6M11 13h2M12 9V5"/></svg>,
+  check: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M20 6 9 17l-5-5"/></svg>,
+  x: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M18 6 6 18M6 6l12 12"/></svg>,
+  wa: (p: any) => <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" {...p}><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.8-.7-1.4-1.6-1.6-1.9-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.6-.9-2.2-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1.1 1.1-1.1 2.6 0 1.5 1.1 3 1.2 3.2.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.3c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>,
+};
+
+// ===== TYPES =====
+interface UIStylist {
+  id: string;
+  name: string;
+  short: string;
+  tone: string;
+}
+
+interface UIBlock {
+  id: string | number;
+  reason: string;
+  reasonLabel: string;
+  stylists: string[];
+  date: string;
+  dateTo?: string;
+  allDay: boolean;
+  from?: string;
+  to?: string;
+  recurring: "once" | "daily" | "weekly";
+  note: string;
+}
+
+// ===== CONSTANTS =====
+const REASONS = [
+  { id: "lunch",    label: "Lunch break",     icon: "coffee", tone: "amber" },
+  { id: "leave",    label: "On leave",        icon: "plane",  tone: "rose"  },
+  { id: "personal", label: "Personal",        icon: "lock",   tone: "rose"  },
+  { id: "closed",   label: "Salon closed",    icon: "lock",   tone: "rose"  },
+  { id: "holiday",  label: "Public holiday",  icon: "party",  tone: "amber" },
+  { id: "custom",   label: "Other",           icon: "edit",   tone: "amber" },
+];
+
+const TIME_OPTS = [
+  "09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30",
+  "13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30",
+  "17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00"
+];
+
+const fallbackStylists: UIStylist[] = [
+  { id: "anjali", name: "Anjali",        short: "A", tone: "b" },
+  { id: "pooja",  name: "Pooja",         short: "P", tone: "d" },
+  { id: "kiran",  name: "Kiran",         short: "K", tone: "c" },
+  { id: "rekha",  name: "Rekha",         short: "R", tone: "e" },
+];
+
+const INITIAL_BLOCKS: UIBlock[] = [
+  { id: 1, reason: "lunch",   reasonLabel: "Lunch break",    stylists: ["anjali"],         date: "2026-05-19", allDay: false, from: "13:00", to: "14:00", recurring: "daily",  note: "" },
+  { id: 2, reason: "leave",   reasonLabel: "On leave",       stylists: ["pooja"],          date: "2026-05-20", dateTo: "2026-05-22", allDay: true, recurring: "once", note: "Cousin's wedding" },
+  { id: 3, reason: "closed",  reasonLabel: "Salon closed",   stylists: ["all"],            date: "2026-05-25", allDay: true, recurring: "once", note: "Cleaning + AC maintenance" },
+  { id: 4, reason: "lunch",   reasonLabel: "Lunch break",    stylists: ["pooja","kiran"],  date: "2026-05-19", allDay: false, from: "13:30", to: "14:30", recurring: "daily", note: "" },
+  { id: 5, reason: "holiday", reasonLabel: "Public holiday", stylists: ["all"],            date: "2026-06-29", allDay: true, recurring: "once", note: "Bakrid" },
+];
+
+const formatDate = (key: string) => {
+  if (!key) return "";
+  const d = new Date(key + "T12:00:00");
+  return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+};
+
+// ===== BLOCK ROW COMPONENT =====
+interface BlockRowProps {
+  block: UIBlock;
+  onEdit: (block: UIBlock) => void;
+  onDelete: (id: string | number) => Promise<void>;
+  stylists: UIStylist[];
+}
+
+function BlockRow({ block, onEdit, onDelete, stylists }: BlockRowProps) {
+  const reason = REASONS.find(r => r.id === block.reason);
+  const stylistNamesOf = (ids: string[]) => {
+    if (ids.includes("all")) return "All stylists";
+    return ids.map(id => stylists.find(s => s.id === id)?.name).filter(Boolean).join(" + ");
+  };
+
+  return (
+    <div className={`bt-row bt-tone-${reason?.tone || "amber"}`}>
+      <div className={`bt-ic`}>
+        {reason && IBT[reason.icon as keyof typeof IBT]({})}
+      </div>
+      <div className="bt-main">
+        <div className="bt-name">
+          {block.reasonLabel}
+          {block.recurring === "daily" && <span className="badge neutral no-dot" style={{ fontSize: 10, padding: "2px 7px", marginLeft: 8 }}>DAILY</span>}
+          {block.recurring === "weekly" && <span className="badge neutral no-dot" style={{ fontSize: 10, padding: "2px 7px", marginLeft: 8 }}>WEEKLY</span>}
+        </div>
+        <div className="bt-meta">
+          {formatDate(block.date)}
+          {block.dateTo && block.dateTo !== block.date && <> – {formatDate(block.dateTo)}</>}
+          {" · "}
+          {block.allDay ? "All day" : `${block.from} – ${block.to}`}
+          {" · "}
+          <strong>{stylistNamesOf(block.stylists)}</strong>
+        </div>
+        {block.note && <div className="bt-note">"{block.note}"</div>}
+      </div>
+      <div className="bt-actions">
+        <button className="cust-action wa" style={{ opacity: 1, background: "transparent", borderColor: "var(--line)" }} onClick={() => onEdit(block)}>
+          <IBT.edit />
+        </button>
+        <button className="cust-action" style={{ opacity: 1, background: "transparent", borderColor: "var(--line)", color: "var(--rose)" }} onClick={() => onDelete(block.id)}>
+          <IBT.trash />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ===== CREATE/EDIT MODAL =====
+interface BlockModalProps {
+  block: UIBlock | null;
+  onClose: () => void;
+  onSave: (block: Omit<UIBlock, "id"> & { id?: string | number }) => Promise<void>;
+  stylists: UIStylist[];
+}
+
+function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModalProps) {
+  const isEdit = !!block?.id;
+  const [reason, setReason] = useState(block?.reason || "lunch");
+  const [stylists, setStylists] = useState<string[]>(() => {
+    if (block?.stylists) return block.stylists;
+    return ["all"];
+  });
+  const [date, setDate] = useState(block?.date || new Date().toISOString().slice(0, 10));
+  const [dateTo, setDateTo] = useState(block?.dateTo || "");
+  const [allDay, setAllDay] = useState(block?.allDay || false);
+  const [from, setFrom] = useState(block?.from || "13:00");
+  const [to, setTo] = useState(block?.to || "14:00");
+  const [recurring, setRecurring] = useState<"once" | "daily" | "weekly">(block?.recurring || "once");
+  const [note, setNote] = useState(block?.note || "");
+  const [notify, setNotify] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const toggleStylist = (id: string) => {
+    if (id === "all") {
+      setStylists(["all"]);
+    } else {
+      setStylists(prev => {
+        const next = prev.includes(id)
+          ? prev.filter(s => s !== id)
+          : [...prev.filter(s => s !== "all"), id];
+        return next.length === 0 ? ["all"] : next;
+      });
+    }
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    const reasonObj = REASONS.find(r => r.id === reason);
+    const reasonLabel = reason === "custom"
+      ? (note.split("\n")[0] || "Custom block")
+      : (reasonObj?.label || "Block");
+
+    await onSave({
+      id: block?.id,
+      reason,
+      reasonLabel,
+      stylists,
+      date,
+      dateTo: dateTo || undefined,
+      allDay,
+      from: allDay ? undefined : from,
+      to: allDay ? undefined : to,
+      recurring,
+      note,
+    });
+    setSaving(false);
+  };
+
+  const stylistsToDisplay = [
+    { id: "all", name: "All stylists", short: "·", tone: "a" },
+    ...allStylists
+  ];
+
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(540px, 100%)" }}>
+        <div className="modal-head">
+          <h3>{isEdit ? "Edit block" : "Block off time"}</h3>
+          <button className="modal-close" onClick={onClose}><IBT.x /></button>
+        </div>
+        <div className="modal-body" style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
+          {/* Reason */}
+          <div className="field">
+            <label>Reason</label>
+            <div className="bt-reason-grid">
+              {REASONS.map(r => (
+                <button
+                  key={r.id}
+                  className={`bt-reason ${reason === r.id ? "on" : ""} bt-tone-${r.tone}`}
+                  onClick={() => setReason(r.id)}
+                >
+                  <span className="bt-reason-ic">{IBT[r.icon as keyof typeof IBT]({})}</span>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Stylists */}
+          <div className="field" style={{ marginTop: 16 }}>
+            <label>Who's affected?</label>
+            <div className="bt-stylist-row">
+              {stylistsToDisplay.map(s => {
+                const on = stylists.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    className={`bt-stylist ${on ? "on" : ""}`}
+                    onClick={() => toggleStylist(s.id)}
+                  >
+                    {s.id !== "all" && (
+                      <span className={`avatar sm tone-${s.tone}`} style={{ width: 22, height: 22, fontSize: 10, border: 0 }}>{s.short}</span>
+                    )}
+                    {s.name}
+                    {on && <IBT.check style={{ marginLeft: 6, color: "var(--teal)" }} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Date */}
+          <div className="field-row" style={{ marginTop: 16 }}>
+            <div className="field">
+              <label>{dateTo ? "From date" : "Date"}</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>To date <small style={{ color: "var(--ink-3)", fontWeight: 400 }}>(optional, for multi-day)</small></label>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            </div>
+          </div>
+
+          {/* All day */}
+          <label className="checkbox-row" style={{ marginTop: 14 }}>
+            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
+            <span>All day</span>
+          </label>
+
+          {/* Times */}
+          {!allDay && (
+            <div className="field-row" style={{ marginTop: 12 }}>
+              <div className="field">
+                <label>From</label>
+                <select value={from} onChange={e => setFrom(e.target.value)}>
+                  {TIME_OPTS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>To</label>
+                <select value={to} onChange={e => setTo(e.target.value)}>
+                  {TIME_OPTS.filter(t => t > from).map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Recurring */}
+          <div className="field" style={{ marginTop: 14 }}>
+            <label>Repeat</label>
+            <div className="toggle" style={{ width: "100%" }}>
+              <button className={recurring === "once" ? "on" : ""} onClick={() => setRecurring("once")} style={{ flex: 1 }}>Once</button>
+              <button className={recurring === "daily" ? "on" : ""} onClick={() => setRecurring("daily")} style={{ flex: 1 }}>Every day</button>
+              <button className={recurring === "weekly" ? "on" : ""} onClick={() => setRecurring("weekly")} style={{ flex: 1 }}>Same day weekly</button>
+            </div>
+          </div>
+
+          {/* Note */}
+          <div className="field" style={{ marginTop: 14 }}>
+            <label>Note <small style={{ color: "var(--ink-3)", fontWeight: 400 }}>(internal, for your records)</small></label>
+            <textarea
+              placeholder='e.g. "Wedding in the family — back Mon"'
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              style={{ minHeight: 60 }}
+            />
+          </div>
+
+          {/* Notify customers? */}
+          <label className="checkbox-row" style={{ marginTop: 12, background: "var(--wa-soft)", padding: "10px 14px", borderRadius: 10, color: "#1F5A37" }}>
+            <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} />
+            <IBT.wa style={{ color: "var(--wa)", flexShrink: 0 }} />
+            <span style={{ fontSize: 13, lineHeight: 1.4 }}>Auto-WhatsApp customers if any existing bookings clash with this block (with a reschedule link)</span>
+          </label>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" onClick={submit} disabled={saving}>
+            {saving ? "Saving..." : (
+              <>
+                <IBT.check /> {isEdit ? "Save changes" : "Block off this time"}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== MAIN PAGE COMPONENT =====
+export default function BlockTimePage() {
+  const { salonId } = useProfile();
+  const [blocks, setBlocks] = useState<UIBlock[]>([]);
+  const [stylists, setStylists] = useState<UIStylist[]>([]);
+  const [filter, setFilter] = useState<"upcoming" | "recurring" | "past" | "all">("upcoming");
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<UIBlock | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load block items from Supabase
+  const loadBlocks = useCallback(async () => {
+    setLoading(true);
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !salonId) {
+      setBlocks(INITIAL_BLOCKS);
+      setStylists(fallbackStylists);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Load stylists for the active salon
+      const { data: stylistsData } = await supabase
+        .from("stylists")
+        .select("id, name, tone")
+        .eq("salon_id", salonId)
+        .eq("active", true);
+
+      let loadedStylists = fallbackStylists;
+      if (stylistsData && stylistsData.length > 0) {
+        loadedStylists = stylistsData.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          short: s.name[0],
+          tone: (s.tone || "tone-a").replace("tone-", ""),
+        }));
+      }
+      setStylists(loadedStylists);
+
+      // Load blocks for the active salon
+      const { data: blocksData, error } = await supabase
+        .from("blocks")
+        .select(`
+          id,
+          reason,
+          date_from,
+          date_to,
+          time_from,
+          time_to,
+          all_day,
+          recurring,
+          note,
+          stylist_id
+        `)
+        .eq("salon_id", salonId)
+        .order("date_from", { ascending: true });
+
+      if (error) throw error;
+
+      if (blocksData) {
+        const mapped: UIBlock[] = blocksData.map((row: any) => {
+          let note = row.note || "";
+          let rec: "once" | "daily" | "weekly" = "once";
+          if (row.recurring) {
+            if (note.startsWith("[weekly] ")) {
+              rec = "weekly";
+              note = note.slice(9);
+            } else if (note.startsWith("[daily] ")) {
+              rec = "daily";
+              note = note.slice(8);
+            } else {
+              rec = "daily"; // default fallback
+            }
+          }
+
+          const reasonObj = REASONS.find(r => r.id === row.reason);
+          const reasonLabel = row.reason === "custom"
+            ? (note.split("\n")[0] || "Custom block")
+            : (reasonObj?.label || row.reason || "Block");
+
+          return {
+            id: row.id,
+            reason: row.reason || "custom",
+            reasonLabel,
+            stylists: row.stylist_id ? [row.stylist_id] : ["all"],
+            date: row.date_from,
+            dateTo: row.date_to || undefined,
+            allDay: row.all_day,
+            from: row.time_from ? row.time_from.slice(0, 5) : undefined,
+            to: row.time_to ? row.time_to.slice(0, 5) : undefined,
+            recurring: rec,
+            note,
+          };
+        });
+        setBlocks(mapped);
+      } else {
+        setBlocks([]);
+      }
+    } catch (err) {
+      console.error("Error loading blocks:", err);
+      setBlocks(INITIAL_BLOCKS);
+      setStylists(fallbackStylists);
+    } finally {
+      setLoading(false);
+    }
+  }, [salonId]);
+
+  useEffect(() => {
+    if (salonId) {
+      loadBlocks();
+    } else {
+      // preview state or before auth loads
+      const t = setTimeout(() => {
+        if (!salonId) {
+          setBlocks(INITIAL_BLOCKS);
+          setStylists(fallbackStylists);
+          setLoading(false);
+        }
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [salonId, loadBlocks]);
+
+  const flashMsg = (m: string) => {
+    setFlash(m);
+    setTimeout(() => setFlash(null), 1800);
+  };
+
+  const filtered = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const sorted = [...blocks].sort((a, b) => a.date.localeCompare(b.date));
+    if (filter === "upcoming") return sorted.filter(b => (b.dateTo || b.date) >= today);
+    if (filter === "past")     return sorted.filter(b => (b.dateTo || b.date) < today);
+    if (filter === "recurring")return sorted.filter(b => b.recurring !== "once");
+    return sorted;
+  }, [blocks, filter]);
+
+  const counts = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      upcoming:  blocks.filter(b => (b.dateTo || b.date) >= today).length,
+      past:      blocks.filter(b => (b.dateTo || b.date) < today).length,
+      recurring: blocks.filter(b => b.recurring !== "once").length,
+    };
+  }, [blocks]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (b: UIBlock) => {
+    setEditing(b);
+    setShowModal(true);
+  };
+
+  const remove = async (id: string | number) => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !salonId || typeof id === "number") {
+      setBlocks(prev => prev.filter(b => b.id !== id));
+      flashMsg("Block removed");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("blocks")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      flashMsg("Block removed");
+      loadBlocks();
+    } catch (err) {
+      console.error("Error deleting block:", err);
+      flashMsg("Failed to remove block");
+    }
+  };
+
+  const save = async (b: Omit<UIBlock, "id"> & { id?: string | number }) => {
+    const supabase = getSupabaseBrowserClient();
+    const isEdit = !!b.id && typeof b.id === "string" && b.id.length > 10;
+
+    if (!supabase || !salonId) {
+      // Local fallback
+      if (b.id) {
+        setBlocks(prev => prev.map(x => x.id === b.id ? (b as UIBlock) : x));
+        flashMsg("Block updated");
+      } else {
+        setBlocks(prev => [...prev, { ...b, id: Date.now() } as UIBlock]);
+        flashMsg("Time blocked off");
+      }
+      setShowModal(false);
+      return;
+    }
+
+    try {
+      const noteToSave = b.recurring !== "once" ? `[${b.recurring}] ${b.note}` : b.note;
+
+      if (isEdit) {
+        // Edit existing row
+        const stylistId = b.stylists[0] === "all" ? null : b.stylists[0];
+        const { error } = await supabase
+          .from("blocks")
+          .update({
+            stylist_id: stylistId,
+            reason: b.reason,
+            date_from: b.date,
+            date_to: b.dateTo || null,
+            time_from: b.allDay ? null : b.from || null,
+            time_to: b.allDay ? null : b.to || null,
+            all_day: b.allDay,
+            recurring: b.recurring !== "once",
+            note: noteToSave,
+          })
+          .eq("id", b.id);
+
+        if (error) throw error;
+
+        // If extra stylists were selected, we insert new rows for them
+        if (b.stylists.length > 1 && b.stylists[0] !== "all") {
+          const extraInserts = b.stylists.slice(1).map(sid => ({
+            salon_id: salonId,
+            stylist_id: sid,
+            reason: b.reason,
+            date_from: b.date,
+            date_to: b.dateTo || null,
+            time_from: b.allDay ? null : b.from || null,
+            time_to: b.allDay ? null : b.to || null,
+            all_day: b.allDay,
+            recurring: b.recurring !== "once",
+            note: noteToSave,
+          }));
+          await supabase.from("blocks").insert(extraInserts);
+        }
+
+        flashMsg("Block updated");
+      } else {
+        // Create new blocks
+        if (b.stylists.includes("all")) {
+          const { error } = await supabase
+            .from("blocks")
+            .insert({
+              salon_id: salonId,
+              stylist_id: null,
+              reason: b.reason,
+              date_from: b.date,
+              date_to: b.dateTo || null,
+              time_from: b.allDay ? null : b.from || null,
+              time_to: b.allDay ? null : b.to || null,
+              all_day: b.allDay,
+              recurring: b.recurring !== "once",
+              note: noteToSave,
+            });
+
+          if (error) throw error;
+        } else {
+          // Insert one row for each stylist
+          const inserts = b.stylists.map(sid => ({
+            salon_id: salonId,
+            stylist_id: sid,
+            reason: b.reason,
+            date_from: b.date,
+            date_to: b.dateTo || null,
+            time_from: b.allDay ? null : b.from || null,
+            time_to: b.allDay ? null : b.to || null,
+            all_day: b.allDay,
+            recurring: b.recurring !== "once",
+            note: noteToSave,
+          }));
+
+          const { error } = await supabase.from("blocks").insert(inserts);
+          if (error) throw error;
+        }
+
+        flashMsg("Time blocked off");
+      }
+      
+      loadBlocks();
+    } catch (err) {
+      console.error("Error saving block:", err);
+      flashMsg("Failed to save block");
+    } finally {
+      setShowModal(false);
+    }
+  };
+
+  return (
+    <div className="app">
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      
+      <div className="app-top">
+        <div className="app-top-inner">
+          <div className="brand">
+            <Link className="book-back" href="/dashboard/bookings" aria-label="Back" style={{ background: "transparent", display: "inline-grid", placeItems: "center", width: 36, height: 36 }}>
+              <IBT.back />
+            </Link>
+            <span className="brand-text" style={{ marginLeft: 8 }}>Blocks &amp; closures</span>
+          </div>
+          <div className="greeting">
+            <div className="h">Block off time</div>
+            <div className="d">LUNCH BREAKS · LEAVES · HOLIDAYS · CLOSED DAYS</div>
+          </div>
+          <div className="top-actions">
+            <button className="btn btn-primary" onClick={openCreate}>
+              <IBT.plus /> Block time
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <main className="app-main" style={{ paddingBottom: 100 }}>
+        {/* Filter pills */}
+        <div className="eng-tabs">
+          <button className={`eng-tab ${filter === "upcoming" ? "on" : ""}`} onClick={() => setFilter("upcoming")}>
+            Upcoming <span className="eng-count">{counts.upcoming}</span>
+          </button>
+          <button className={`eng-tab ${filter === "recurring" ? "on" : ""}`} onClick={() => setFilter("recurring")}>
+            Recurring <span className="eng-count">{counts.recurring}</span>
+          </button>
+          <button className={`eng-tab ${filter === "past" ? "on" : ""}`} onClick={() => setFilter("past")}>
+            Past <span className="eng-count">{counts.past}</span>
+          </button>
+          <button className={`eng-tab ${filter === "all" ? "on" : ""}`} onClick={() => setFilter("all")}>
+            All <span className="eng-count">{blocks.length}</span>
+          </button>
+        </div>
+
+        {/* Calendar preview card */}
+        <div className="bt-preview">
+          <div className="bt-preview-l">
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--ink-3)" }}>HOW IT LOOKS ON YOUR CALENDAR</div>
+            <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "6px 0 0", lineHeight: 1.5 }}>
+              Blocked time appears as a striped, greyed-out block. Customers can never book over it.
+            </p>
+          </div>
+          <div className="bt-preview-r">
+            <div className="bt-preview-cal">
+              <div className="bt-prev-time">13:00</div>
+              <div className="bt-prev-cell">
+                <div className="bt-prev-appt">Priya · Haircut</div>
+              </div>
+              <div className="bt-prev-time">13:30</div>
+              <div className="bt-prev-cell">
+                <div className="bt-prev-block">
+                  <IBT.coffee /> Lunch break — Anjali
+                </div>
+              </div>
+              <div className="bt-prev-time">14:00</div>
+              <div className="bt-prev-cell"></div>
+              <div className="bt-prev-time">14:30</div>
+              <div className="bt-prev-cell">
+                <div className="bt-prev-appt">Sneha · Threading</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* List Header */}
+        <div className="cust-list-head" style={{ marginTop: 18 }}>
+          <div className="cust-count">
+            {filtered.length} {filter} block{filtered.length === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        {/* Blocks List */}
+        {loading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+            <div style={{ width: 24, height: 24, border: "3px solid var(--line)", borderTopColor: "var(--teal)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            className="cust-empty"
+            style={{
+              display: "flex",
+              gap: "14px",
+              alignItems: "flex-start",
+              padding: "32px",
+              background: "#fff",
+              border: "1px solid var(--line)",
+              borderRadius: "12px",
+              marginTop: "8px"
+            }}
+          >
+            <div
+              className="cust-empty-ic"
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "12px",
+                background: "var(--bg-2)",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0
+              }}
+            >
+              <IBT.cal style={{ width: 24, height: 24, color: "var(--ink-3)" }} />
+            </div>
+            <div>
+              <strong>No {filter} blocks</strong>
+              <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 4 }}>
+                Block off lunch breaks, leaves, or salon-closed days to keep your calendar honest.
+              </div>
+              <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={openCreate}>
+                <IBT.plus /> Block off time
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bt-list">
+            {filtered.map(b => (
+              <BlockRow key={b.id} block={b} onEdit={openEdit} onDelete={remove} stylists={stylists} />
+            ))}
+          </div>
+        )}
+      </main>
+
+      {showModal && (
+        <BlockModal
+          block={editing}
+          onClose={() => setShowModal(false)}
+          onSave={save}
+          stylists={stylists}
+        />
+      )}
+
+      {flash && (
+        <div
+          className="my-flash"
+          style={{
+            position: "fixed",
+            bottom: 100,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "var(--ink)",
+            color: "#fff",
+            padding: "10px 16px",
+            borderRadius: 10,
+            fontSize: 13,
+            zIndex: 9999,
+            boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
+            animation: "pop .2s",
+          }}
+        >
+          {flash}
+        </div>
+      )}
+    </div>
+  );
+}

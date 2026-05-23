@@ -296,9 +296,14 @@ export default function NotificationsPage() {
       <div className="app-top">
         <div className="app-top-inner">
           <div className="brand" style={{ display: "flex", alignItems: "center" }}>
-            <Link className="book-back" href="/dashboard" aria-label="Back" style={{ background: 'transparent', display: 'inline-grid', placeItems: 'center', width: 36, height: 36, color: "var(--ink)" }}>
+            <button
+              className="book-back"
+              onClick={() => router.back()}
+              aria-label="Back"
+              style={{ border: "none", cursor: "pointer", background: "transparent", display: "inline-grid", placeItems: "center", width: 36, height: 36, color: "var(--ink)" }}
+            >
               <I.back />
-            </Link>
+            </button>
             <span className="brand-text" style={{ marginLeft: 8 }}>Notifications</span>
           </div>
           <div className="greeting">

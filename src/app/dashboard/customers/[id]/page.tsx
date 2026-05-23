@@ -445,25 +445,25 @@ export default function CustomerProfilePage() {
   };
 
   return (
-    <div className="app">
+    <div className="profile-app">
       {/* Top Bar */}
-      <div className="profile-topbar" style={{ background: "#fff", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, zIndex: 30 }}>
-        <div className="profile-topbar-inner" style={{ display: "flex", alignItems: "center", height: 50, padding: "0 16px" }}>
+      <div className="profile-topbar">
+        <div className="profile-topbar-inner">
           <button
+            className="book-back"
             onClick={() => router.push("/dashboard/customers")}
-            style={{ border: 0, background: "transparent", cursor: "pointer", display: "grid", placeItems: "center", width: 32, height: 32, borderRadius: "50%" }}
             aria-label="Back"
           >
             <I.back />
           </button>
-          <div style={{ flex: 1, fontSize: 14, fontWeight: 600, letterSpacing: "-0.005em", marginLeft: 8 }}>Customer profile</div>
-          <button style={{ border: 0, background: "transparent", cursor: "pointer", display: "grid", placeItems: "center", width: 32, height: 32 }}><I.more /></button>
+          <div style={{ flex: 1, fontSize: 14, fontWeight: 600, letterSpacing: "-0.005em" }}>Customer profile</div>
+          <button className="icon-btn"><I.more /></button>
         </div>
       </div>
 
       {/* Loading skeleton */}
       {loading && (
-        <main style={{ padding: "16px 16px 120px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <main className="profile-main">
           {[160, 100, 200, 180].map((h, i) => (
             <div key={i} className="pulse" style={{ height: h, borderRadius: "var(--radius)", background: "var(--bg-2)" }} />
           ))}
@@ -471,125 +471,80 @@ export default function CustomerProfilePage() {
       )}
 
       {/* Main Container */}
-      {!loading && <main className="profile-main" style={{ padding: "16px 16px 120px", display: "flex", flexDirection: "column", gap: 16 }}>
+      {!loading && <main className="profile-main">
         {/* Profile Card */}
-        <div className="profile-hero card" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "var(--radius-lg)", padding: 20, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
-          <div
-            className={`avatar xl tone-${c.tone}`}
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 700,
-              fontSize: 24,
-              marginBottom: 12,
-              background: c.tone === "a" ? "var(--teal-soft)" : c.tone === "b" ? "var(--amber-soft)" : c.tone === "c" ? "var(--blue-soft)" : c.tone === "d" ? "var(--green-soft)" : c.tone === "e" ? "var(--rose-soft)" : "var(--bg-2)",
-              color: c.tone === "a" ? "var(--teal)" : c.tone === "b" ? "var(--amber-ink)" : c.tone === "c" ? "var(--blue)" : c.tone === "d" ? "var(--green)" : c.tone === "e" ? "var(--rose)" : "var(--ink-2)"
-            }}
-          >
+        <div className="profile-hero">
+          <div className={`avatar xl tone-${c.tone}`}>
             {initialsOf(c.name)}
           </div>
-          <div className="profile-id" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-            <div className="profile-name" style={{ fontSize: 18, fontWeight: 700, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="profile-id">
+            <div className="profile-name">
               {c.name}
-              <span
-                className={`engage-pill ${engColor}`}
-                style={{
-                  fontSize: 10,
-                  fontWeight: 500,
-                  padding: "2px 8px",
-                  borderRadius: 999,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  background: engColor === "green" ? "var(--green-soft)" : engColor === "amber" ? "var(--amber-soft)" : "var(--rose-soft)",
-                  color: engColor === "green" ? "var(--green)" : engColor === "amber" ? "var(--amber-ink)" : "var(--rose)"
-                }}
-              >
-                <span
-                  className={`engage-dot ${engColor}`}
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: "50%",
-                    background: engColor === "green" ? "var(--green)" : engColor === "amber" ? "var(--amber)" : "var(--rose)"
-                  }}
-                />
+              <span className={`engage-pill ${engColor}`}>
+                <span className={`engage-dot ${engColor}`} />
                 {engLabel}
               </span>
             </div>
-            <div className="profile-phone" style={{ fontSize: 13, color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 4 }}>
+            <div className="profile-phone">
               <I.phone /> {c.phone}
-              <span style={{ margin: "0 4px" }}>·</span>
-              <I.cal /> Member since {c.memberSince}
+              <span className="dot-sep" /> Member since {c.memberSince}
+              <span className="dot-sep" />
+              <I.cal />
             </div>
-            <div className="profile-quick" style={{ fontSize: 12, color: "var(--ink-2)", display: "flex", gap: 12, marginTop: 4 }}>
+            <div className="profile-quick">
               <span><strong>Prefers</strong> {c.prefStylist}</span>
               <span><strong>Birthday</strong> {c.birthday}</span>
             </div>
           </div>
-          <div className="profile-hero-actions" style={{ display: "flex", gap: 10, marginTop: 16, width: "100%", justifyContent: "center" }}>
-            <button className="btn btn-outline btn-sm" onClick={() => setFlash("Edit details form coming soon!")} style={{ height: 32, padding: "0 12px", border: "1px solid var(--line-2)", background: "#fff", borderRadius: 8, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}><I.edit /> Edit</button>
-            <button className="btn btn-wa btn-sm" onClick={() => setShowMsg(true)} style={{ height: 32, padding: "0 12px", background: "var(--wa-soft)", color: "var(--wa)", border: 0, borderRadius: 8, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}><I.wa style={{ width: 14, height: 14 }} /> Message</button>
+          <div className="profile-hero-actions">
+            <button className="btn btn-outline btn-sm" onClick={() => setFlash("Edit details form coming soon!")}><I.edit /> Edit</button>
+            <button className="btn btn-wa btn-sm" onClick={() => setShowMsg(true)}><I.wa style={{ width: 14, height: 14 }} /> Message</button>
           </div>
         </div>
 
         {/* Upcoming Booking */}
         {c.upcoming && (
-          <div className="upcoming card" style={{ background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: "var(--radius)", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="upcoming">
             <div className="upcoming-l">
-              <div className="t-label" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: "var(--teal-ink)", marginBottom: 4 }}>UPCOMING</div>
-              <div className="upcoming-val" style={{ fontSize: 15, fontWeight: 600, color: "var(--teal-ink)" }}>{c.upcoming.service}</div>
-              <div className="upcoming-meta" style={{ fontSize: 12, color: "var(--teal-ink)", opacity: 0.8, marginTop: 2 }}>{c.upcoming.date} · {c.upcoming.time} · with {c.upcoming.stylist}</div>
+              <div className="t-label">UPCOMING</div>
+              <div className="upcoming-val">{c.upcoming.service}</div>
+              <div className="upcoming-meta">{c.upcoming.date} · {c.upcoming.time} · with {c.upcoming.stylist}</div>
             </div>
-            <button className="btn btn-outline btn-sm" onClick={() => router.push("/dashboard/bookings/BK-2026-0517")} style={{ background: "#fff", border: "1px solid var(--teal-soft-2)", color: "var(--teal)", fontSize: 12, height: 32, borderRadius: 8, padding: "0 12px", cursor: "pointer" }}>View booking</button>
+            <button className="btn btn-outline btn-sm" onClick={() => router.push("/dashboard/bookings/BK-2026-0517")}>View booking</button>
           </div>
         )}
 
         {/* 3 Metrics Chips */}
-        <div className="stat-chips" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-          <div className="stat-chip" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: "12px 10px", textAlign: "center" }}>
-            <div className="stat-l" style={{ fontSize: 11, color: "var(--ink-3)" }}>Total visits</div>
-            <div className="stat-v" style={{ fontSize: 20, fontWeight: 700, margin: "4px 0 2px" }}>{c.visits}</div>
-            <div className="stat-d" style={{ fontSize: 10, color: "var(--ink-3)" }}>Last on 13 May</div>
+        <div className="stat-chips">
+          <div className="stat-chip">
+            <div className="stat-l">Total visits</div>
+            <div className="stat-v">{c.visits}</div>
+            <div className="stat-d">Last on 13 May</div>
           </div>
-          <div className="stat-chip" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: "12px 10px", textAlign: "center" }}>
-            <div className="stat-l" style={{ fontSize: 11, color: "var(--ink-3)" }}>Lifetime spend</div>
-            <div className="stat-v" style={{ fontSize: 20, fontWeight: 700, margin: "4px 0 2px", color: "var(--teal)" }}><small style={{ fontSize: 14 }}>₹</small>{c.spend.toLocaleString("en-IN")}</div>
-            <div className="stat-d" style={{ fontSize: 10, color: "var(--ink-3)" }}>Avg ₹{Math.round(c.spend/c.visits).toLocaleString("en-IN")}/visit</div>
+          <div className="stat-chip">
+            <div className="stat-l">Lifetime spend</div>
+            <div className="stat-v"><small>₹</small>{c.spend.toLocaleString("en-IN")}</div>
+            <div className="stat-d">Avg ₹{Math.round(c.spend/c.visits).toLocaleString("en-IN")}/visit</div>
           </div>
-          <div className="stat-chip" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: "12px 10px", textAlign: "center" }}>
-            <div className="stat-l" style={{ fontSize: 11, color: "var(--ink-3)" }}>Fav service</div>
-            <div className="stat-v stat-v-text" style={{ fontSize: 14, fontWeight: 700, margin: "8px 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.fav}</div>
-            <div className="stat-d" style={{ fontSize: 10, color: "var(--ink-3)" }}>5 of 12 visits</div>
+          <div className="stat-chip">
+            <div className="stat-l">Fav service</div>
+            <div className="stat-v stat-v-text">{c.fav}</div>
+            <div className="stat-d">5 of last {c.visits} visits</div>
           </div>
         </div>
 
         {/* Notes Log */}
-        <section className="profile-section" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div className="section-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div className="l" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Notes</h2>
-              <span className="count" style={{ fontSize: 11, background: "var(--bg-2)", padding: "2px 6px", borderRadius: 999, color: "var(--ink-3)" }}>{notes.length}</span>
+        <section className="profile-section">
+          <div className="section-head">
+            <div className="l">
+              <h2>Notes</h2>
+              <span className="count">{notes.length}</span>
             </div>
             <div className="r">
               {!addingNote && (
                 <button
                   className="btn btn-sm btn-outline"
                   onClick={() => setAddingNote(true)}
-                  style={{
-                    height: 28,
-                    borderRadius: 6,
-                    border: "1px solid var(--line-2)",
-                    background: "#fff",
-                    fontSize: 12,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4
-                  }}
                 >
                   <I.plus /> Add note
                 </button>
@@ -598,79 +553,70 @@ export default function CustomerProfilePage() {
           </div>
 
           {addingNote && (
-            <div className="note-card note-new" style={{ background: "#fff", border: "1px solid var(--teal-soft-2)", borderRadius: "var(--radius)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="note-card note-new">
               <textarea
                 placeholder="Anything you want to remember about Priya — preferences, allergies, conversations…"
                 value={newNote}
                 onChange={e => setNewNote(e.target.value)}
                 autoFocus
-                style={{
-                  width: "100%",
-                  height: 80,
-                  border: 0,
-                  outline: 0,
-                  resize: "none",
-                  fontSize: 13,
-                  fontFamily: "inherit"
-                }}
               />
-              <div className="note-new-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setAddingNote(false); setNewNote(""); }} style={{ height: 28, fontSize: 12 }}>Cancel</button>
-                <button className="btn btn-primary btn-sm" onClick={saveNote} disabled={!newNote.trim()} style={{ height: 28, fontSize: 12, background: "var(--teal)", color: "#fff", border: 0, padding: "0 12px", borderRadius: 6, cursor: "pointer" }}>Save note</button>
+              <div className="note-new-actions">
+                <button className="btn btn-ghost btn-sm" onClick={() => { setAddingNote(false); setNewNote(""); }}>Cancel</button>
+                <button className="btn btn-primary btn-sm" onClick={saveNote} disabled={!newNote.trim()}>Save note</button>
               </div>
             </div>
           )}
 
-          <div className="notes-list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="notes-list">
             {notes.map(n => (
-              <div key={n.id} className="note-card" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: 12 }}>
-                <div className="note-head" style={{ marginBottom: 6 }}>
-                  <div className="note-author" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-2)", fontWeight: 500 }}>
-                    <div className="avatar sm tone-b" style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--amber-soft)", color: "var(--amber-ink)", display: "grid", placeItems: "center", fontSize: 10, fontWeight: "bold" }}>
-                      {n.author[0]}
-                    </div>
+              <div key={n.id} className="note-card">
+                <div className="note-head">
+                  <div className="note-author">
+                    <div className="avatar sm tone-b">{n.author[0]}</div>
                     <span>{n.author}</span>
-                    <span style={{ color: "var(--ink-4)" }}>·</span>
-                    <span style={{ color: "var(--ink-3)", fontSize: 11 }}>{n.date}</span>
+                    <span className="dot-sep" />
+                    <span style={{ color: "var(--ink-3)" }}>{n.date}</span>
                   </div>
                 </div>
-                <div className="note-text" style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.4 }}>{n.text}</div>
+                <div className="note-text">{n.text}</div>
               </div>
             ))}
             {notes.length === 0 && (
-              <div className="note-empty" style={{ padding: "20px 10px", fontStyle: "italic", fontSize: 12, color: "var(--ink-3)", textAlign: "center" }}>No notes yet. Tap &quot;Add note&quot; to remember anything about Priya.</div>
+              <div className="note-empty">No notes yet. Tap "Add note" to remember anything about Priya.</div>
             )}
           </div>
         </section>
 
         {/* Visit History */}
-        <section className="profile-section" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div className="section-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div className="l" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Visit history</h2>
-              <span className="count" style={{ fontSize: 11, background: "var(--bg-2)", padding: "2px 6px", borderRadius: 999, color: "var(--ink-3)" }}>{c.visitHistory.length} visits</span>
+        <section className="profile-section">
+          <div className="section-head">
+            <div className="l">
+              <h2>Visit history</h2>
+              <span className="count">{c.visitHistory.length} visits</span>
             </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => setFlash("Exporting customer history...")} style={{ height: 28, fontSize: 12, color: "var(--teal)", cursor: "pointer", border: 0, background: "transparent" }}>Export CSV</button>
+            <div className="r">
+              <button className="btn btn-ghost btn-sm" onClick={() => setFlash("Exporting customer history...")}>Export CSV</button>
+            </div>
           </div>
 
-          <div className="visits-list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="visits-list">
             {c.visitHistory.map((v, i) => (
-              <div key={v.id} className="visit-row" style={{ display: "flex", alignItems: "center", padding: "12px 14px", background: "#fff", border: "1px solid var(--line)", borderRadius: "var(--radius)" }}>
-                <div className="visit-date" style={{ marginRight: 14, minWidth: 46, textAlign: "center" }}>
-                  <div className="vd-day" style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)" }}>{v.date.split(" ")[0]}</div>
-                  <div className="vd-mo" style={{ fontSize: 10, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.02em", marginTop: 2 }}>{v.date.split(" ").slice(1).join(" ")}</div>
+              <div key={v.id} className="visit-row">
+                <div className="visit-date">
+                  <div className="vd-day">{v.date.split(" ")[0]}</div>
+                  <div className="vd-mo">{v.date.split(" ").slice(1).join(" ")}</div>
                 </div>
-                <div className="visit-body" style={{ flex: 1, minWidth: 0 }}>
-                  <div className="visit-services" style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
+                <div className="visit-body">
+                  <div className="visit-services">
                     {v.services.map((s, j) => (
-                      <span key={j} className="visit-service" style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>
-                        {s.name} <small style={{ color: "var(--ink-3)", marginLeft: 2 }}>₹{s.amt}</small>
+                      <span key={j} className="visit-service">
+                        {s.name} <small>₹{s.amt.toLocaleString("en-IN")}</small>
                       </span>
                     ))}
                   </div>
-                  <div className="visit-meta" style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 4 }}>with {v.stylist} · paid via {v.payment}</div>
+                  <div className="visit-meta">with {v.stylist} · paid via {v.payment}</div>
                 </div>
-                <div className="visit-amount" style={{ fontSize: 15, fontWeight: 600, color: "var(--ink-2)", flexShrink: 0 }}>
+                <div className="visit-amount">
                   ₹{v.amount.toLocaleString("en-IN")}
                 </div>
               </div>
@@ -680,61 +626,20 @@ export default function CustomerProfilePage() {
       </main>}
 
       {/* Sticky Bottom Actions */}
-      <div
-        className="profile-cta"
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: "#fff",
-          borderTop: "1px solid var(--line)",
-          padding: 12,
-          display: "flex",
-          gap: 10,
-          zIndex: 40
-        }}
-      >
+      <div className="profile-cta">
         <button
           className="btn btn-outline btn-lg"
           onClick={() => setAddingNote(true)}
-          style={{
-            flex: 1,
-            height: 48,
-            borderRadius: 10,
-            border: "1px solid var(--line-2)",
-            background: "#fff",
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6
-          }}
+          style={{ flex: 1 }}
         >
           <I.plus /> Add note
         </button>
         <button
           className="btn btn-primary btn-lg"
           onClick={() => setShowMsg(true)}
-          style={{
-            flex: 2,
-            height: 48,
-            borderRadius: 10,
-            background: c.engagement === "lost" ? "var(--rose)" : "var(--teal)",
-            color: "#fff",
-            border: 0,
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6
-          }}
+          style={{ flex: 2, background: c.engagement === "lost" ? "var(--rose)" : undefined }}
         >
-          <I.wa style={{ width: 16, height: 16 }} /> Re-engage customer
+          <I.wa style={{ width: 16, height: 16 }} /> Send re-engagement message
         </button>
       </div>
 

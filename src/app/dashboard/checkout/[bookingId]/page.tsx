@@ -4,6 +4,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { useProfile } from "@/context/ProfileContext";
+import { insertNotification } from "@/lib/notifications";
 
 // ===== TYPES =====
 interface Customer {
@@ -115,6 +117,7 @@ const IC = {
 export default function CheckoutPage() {
   const params = useParams();
   const router = useRouter();
+  const { salonId } = useProfile();
 
   const bookingId = (params?.bookingId as string) || "";
 
@@ -325,6 +328,7 @@ export default function CheckoutPage() {
   };
 
   const finishPayment = async (p: PaymentInfo) => {
+    if (!baseBooking) return;
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
     if (isUuid) {
       const supabase = getSupabaseBrowserClient();
@@ -380,6 +384,16 @@ export default function CheckoutPage() {
             .eq("id", bookingId);
 
           if (statusError) throw statusError;
+
+          if (salonId) {
+            insertNotification({
+              salon_id: salonId,
+              type: "payment",
+              title: "Payment received",
+              body: `₹${total.toLocaleString("en-IN")} received from ${baseBooking.customer.name} via ${p.method}`,
+              meta: { booking_id: bookingId, amount: total, method: p.method },
+            });
+          }
 
         } catch (err) {
           console.error("Failed to save payment to Supabase:", err);
@@ -841,78 +855,6 @@ export default function CheckoutPage() {
             {flash}
           </div>
         )}
-      </div>
-
-      {/* Tweaks Panel */}
-      <div style={{ marginTop: 24, display: "flex", justifyContent: "center" }}>
-        <div style={{
-          background: "#fff",
-          border: "1px solid var(--line)",
-          borderRadius: 12,
-          padding: "12px 18px",
-          width: "100%",
-          maxWidth: 560,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
-            Tweak Panel (Simulation)
-          </div>
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: "var(--ink-3)" }}>Stage:</div>
-              <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                {(["bill", "pay", "receipt"] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      if (s === "receipt" && !payment) {
-                        setPayment({ method: "UPI · Simulation", received: total });
-                      }
-                      setStage(s);
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: "4px 8px",
-                      borderRadius: 6,
-                      border: stage === s ? "1px solid var(--teal)" : "1px solid var(--line-2)",
-                      background: stage === s ? "var(--teal-soft)" : "#fff",
-                      color: stage === s ? "var(--teal)" : "var(--ink-2)",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: "var(--ink-3)" }}>Method:</div>
-              <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                {["upi", "cash", "card"].map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMethod(m)}
-                    style={{
-                      flex: 1,
-                      padding: "4px 8px",
-                      borderRadius: 6,
-                      border: method === m ? "1px solid var(--teal)" : "1px solid var(--line-2)",
-                      background: method === m ? "var(--teal-soft)" : "#fff",
-                      color: method === m ? "var(--teal)" : "var(--ink-2)",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

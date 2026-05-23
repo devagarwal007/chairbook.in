@@ -135,53 +135,29 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
   const endMin = toMinHours(a.startH, a.startM) + a.duration;
   const endStr = `${String(Math.floor(endMin / 60)).padStart(2,"0")}:${String(endMin % 60).padStart(2,"0")}`;
 
-  const statusColors: Record<string, { bg: string; border: string; text: string }> = {
-    confirmed: { bg: "var(--teal-soft)", border: "var(--teal)", text: "var(--teal-ink)" },
-    arrived:   { bg: "#fff8e6", border: "var(--amber)", text: "#7a5200" },
-    completed: { bg: "#f0f0f0", border: "#ccc", text: "var(--ink-3)" },
-    noshow:    { bg: "#fff0f0", border: "var(--rose)", text: "var(--rose)" },
-  };
-  const col = statusColors[a.status] || statusColors.confirmed;
+  const cls = `bk-block status-${a.status}`;
 
   return (
     <div
       onClick={onClick}
+      className={cls}
+      style={{ top, height }}
       title={`${a.customer} · ${a.service} · ${start}–${endStr}`}
-      style={{
-        position: "absolute",
-        top,
-        left: 2,
-        right: 2,
-        height,
-        background: col.bg,
-        borderLeft: `3px solid ${col.border}`,
-        borderRadius: 6,
-        padding: "3px 6px",
-        cursor: "pointer",
-        overflow: "hidden",
-        zIndex: 1,
-        transition: "opacity 0.15s",
-        boxSizing: "border-box",
-      }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <div className="bk-block-top">
         {!narrow && (
           <div
             className={`avatar sm tone-${a.tone}`}
-            style={{ width: 16, height: 16, fontSize: 8, border: 0, borderRadius: "50%", flexShrink: 0, display: "inline-grid", placeItems: "center", fontWeight: "bold" }}
+            style={{ width: 20, height: 20, fontSize: 9, border: 0 }}
           >
             {a.initials}
           </div>
         )}
-        <div style={{ fontSize: 11, fontWeight: 600, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {a.customer}
-        </div>
-        <span style={{ fontSize: 9, color: col.border, marginLeft: "auto", flexShrink: 0 }}>{start}</span>
+        <div className="bk-block-name">{a.customer}</div>
+        <span className="bk-block-time">{start}</span>
       </div>
-      {height > 32 && (
-        <div style={{ fontSize: 10, color: col.text, opacity: 0.8, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {a.service}
-        </div>
+      {height > 28 && (
+        <div className="bk-block-svc">{a.service}</div>
       )}
     </div>
   );
@@ -296,63 +272,60 @@ interface WeekViewProps {
 }
 
 function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }: WeekViewProps) {
-  const TOTAL_HEIGHT = TIME_LABELS.length * SLOT_HEIGHT * 2;
   return (
-    <div style={{ overflowX: "auto", overflowY: "hidden" }}>
-      {/* Day headers */}
-      <div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, borderBottom: "1px solid var(--line)" }}>
-        <div />
-        {weekDays.map((day, i) => {
+    <div className="bk-week">
+      {/* Header */}
+      <div className="bk-grid-head">
+        <div className="bk-time-col"></div>
+        {weekDays.map((day) => {
           const key = formatDateKey(day);
           const isToday = key === todayKey;
           const cnt = appts.filter(a => a.dayKey === key && (stylistFilter === "all" || a.stylistId === stylistFilter)).length;
           return (
-            <div key={i} style={{ padding: "8px 4px", textAlign: "center", background: isToday ? "var(--teal-soft)" : "transparent" }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: isToday ? "var(--teal)" : "var(--ink-3)", letterSpacing: "0.05em" }}>
-                {DOW_FULL[day.getDay()]}
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: isToday ? "var(--teal)" : "var(--ink)", lineHeight: 1.2 }}>
-                {day.getDate()}
-              </div>
-              <div style={{ fontSize: 10, color: "var(--ink-3)" }}>{cnt} bk</div>
+            <div key={key} className={`bk-day-head ${isToday ? "today" : ""}`}>
+              <div className="bk-day-dow">{DOW_FULL[day.getDay()]}</div>
+              <div className="bk-day-dom">{day.getDate()}</div>
+              <div className="bk-day-count">{cnt} booking{cnt === 1 ? "" : "s"}</div>
             </div>
           );
         })}
       </div>
 
       {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)` }}>
-        {/* Time column */}
-        <div>
+      <div className="bk-grid">
+        <div className="bk-time-col">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} style={{ height: SLOT_HEIGHT * 2, borderBottom: "1px solid var(--line)", paddingTop: 2, paddingRight: 6, textAlign: "right" }}>
-              <span style={{ fontSize: 10, color: "var(--ink-4)", fontVariantNumeric: "tabular-nums" }}>{label}</span>
+            <div key={i} className="bk-time-row" style={{ height: SLOT_HEIGHT * 2 }}>
+              <span className="bk-time-lbl">{label}</span>
             </div>
           ))}
         </div>
 
         {/* Day columns */}
-        {weekDays.map((day, i) => {
+        {weekDays.map((day) => {
           const key = formatDateKey(day);
           const isToday = key === todayKey;
           const dayAppts = appts.filter(a => a.dayKey === key && (stylistFilter === "all" || a.stylistId === stylistFilter));
           const nowTop = isToday ? ((nowMin - START_HOUR * 60) / 30) * SLOT_HEIGHT : -1;
+          const nowHours = Math.floor(nowMin / 60);
+          const nowMins = nowMin % 60;
+          const nowStr = `${String(nowHours).padStart(2, "0")}:${String(nowMins).padStart(2, "0")}`;
 
           return (
-            <div key={i} style={{ position: "relative", borderLeft: "1px solid var(--line)", background: isToday ? "rgba(0,170,140,0.03)" : "transparent", height: TOTAL_HEIGHT }}>
-              {/* Hour rows */}
+            <div key={key} className={`bk-day-col ${isToday ? "today" : ""}`}>
+              {/* hour lines */}
               {TIME_LABELS.map((_, hi) => (
-                <div key={hi} style={{ height: SLOT_HEIGHT * 2, borderBottom: "1px dashed var(--line)", boxSizing: "border-box" }} />
+                <div key={hi} className="bk-hour-row" style={{ height: SLOT_HEIGHT * 2 }} />
               ))}
 
-              {/* Now line */}
+              {/* now line */}
               {isToday && nowTop >= 0 && (
-                <div style={{ position: "absolute", top: nowTop, left: 0, right: 0, height: 2, background: "var(--rose)", zIndex: 3, pointerEvents: "none" }}>
-                  <div style={{ position: "absolute", left: -4, top: -4, width: 10, height: 10, borderRadius: "50%", background: "var(--rose)" }} />
+                <div className="bk-now" style={{ top: nowTop }}>
+                  <span className="bk-now-lbl">{nowStr}</span>
                 </div>
               )}
 
-              {/* Appointments */}
+              {/* appointments */}
               {dayAppts.map(a => (
                 <ApptBlock key={a.id} a={a} narrow onClick={() => onSelect(a)} />
               ))}
@@ -377,35 +350,36 @@ interface DayViewProps {
 
 function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isToday }: DayViewProps) {
   const visibleStylists = stylistFilter === "all" ? stylists : stylists.filter(s => s.id === stylistFilter);
-  const TOTAL_HEIGHT = TIME_LABELS.length * SLOT_HEIGHT * 2;
   const nowTop = isToday ? ((nowMin - START_HOUR * 60) / 30) * SLOT_HEIGHT : -1;
+  const nowHours = Math.floor(nowMin / 60);
+  const nowMins = nowMin % 60;
+  const nowStr = `${String(nowHours).padStart(2, "0")}:${String(nowMins).padStart(2, "0")}`;
 
   return (
-    <div style={{ overflowX: "auto", overflowY: "hidden" }}>
-      {/* Stylist headers */}
-      <div style={{ display: "grid", gridTemplateColumns: `52px repeat(${visibleStylists.length}, 1fr)`, borderBottom: "1px solid var(--line)" }}>
-        <div />
+    <div className="bk-day-view">
+      {/* Header */}
+      <div className="bk-grid-head" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
+        <div className="bk-time-col"></div>
         {visibleStylists.map(s => {
           const cnt = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id).length;
           return (
-            <div key={s.id} style={{ padding: "10px 8px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div className={`avatar md tone-${s.tone}`} style={{ width: 36, height: 36, borderRadius: "50%", fontSize: 14, fontWeight: "bold", display: "grid", placeItems: "center" }}>
-                {s.short}
+            <div key={s.id} className="bk-stylist-head">
+              <div className={`avatar md tone-${s.tone}`}>{s.short}</div>
+              <div>
+                <div className="bk-stylist-name">{s.name}</div>
+                <div className="bk-stylist-count">{cnt} appointment{cnt !== 1 ? "" : "s"}</div>
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>{s.name}</div>
-              <div style={{ fontSize: 10, color: "var(--ink-3)" }}>{cnt} appt{cnt !== 1 ? "s" : ""}</div>
             </div>
           );
         })}
       </div>
 
       {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: `52px repeat(${visibleStylists.length}, 1fr)` }}>
-        {/* Time column */}
-        <div>
+      <div className="bk-grid" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
+        <div className="bk-time-col">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} style={{ height: SLOT_HEIGHT * 2, borderBottom: "1px solid var(--line)", paddingTop: 2, paddingRight: 6, textAlign: "right" }}>
-              <span style={{ fontSize: 10, color: "var(--ink-4)" }}>{label}</span>
+            <div key={i} className="bk-time-row" style={{ height: SLOT_HEIGHT * 2 }}>
+              <span className="bk-time-lbl">{label}</span>
             </div>
           ))}
         </div>
@@ -414,18 +388,20 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
         {visibleStylists.map(s => {
           const stylistAppts = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id);
           return (
-            <div key={s.id} style={{ position: "relative", borderLeft: "1px solid var(--line)", background: "rgba(0,170,140,0.02)", height: TOTAL_HEIGHT }}>
+            <div key={s.id} className={`bk-day-col ${isToday ? "today" : ""}`}>
+              {/* hour lines */}
               {TIME_LABELS.map((_, hi) => (
-                <div key={hi} style={{ height: SLOT_HEIGHT * 2, borderBottom: "1px dashed var(--line)", boxSizing: "border-box" }} />
+                <div key={hi} className="bk-hour-row" style={{ height: SLOT_HEIGHT * 2 }} />
               ))}
 
-              {/* Now line */}
+              {/* now line */}
               {isToday && nowTop >= 0 && (
-                <div style={{ position: "absolute", top: nowTop, left: 0, right: 0, height: 2, background: "var(--rose)", zIndex: 3, pointerEvents: "none" }}>
-                  <div style={{ position: "absolute", left: -4, top: -4, width: 10, height: 10, borderRadius: "50%", background: "var(--rose)" }} />
+                <div className="bk-now" style={{ top: nowTop }}>
+                  <span className="bk-now-lbl">{nowStr}</span>
                 </div>
               )}
 
+              {/* appointments */}
               {stylistAppts.map(a => (
                 <ApptBlock key={a.id} a={a} onClick={() => onSelect(a)} />
               ))}
@@ -611,23 +587,23 @@ export default function BookingsPage() {
 
       <main className="app-main" style={{ paddingBottom: 80 }}>
         {/* Toolbar */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <div className="bk-toolbar">
+          <div className="bk-toolbar-l">
+            <div className="bk-nav">
               <button className="icon-btn" onClick={goBack} aria-label="Previous"><I.chevL /></button>
-              <button className="btn btn-sm" onClick={goToday} style={{ border: "1px solid var(--line-2)", background: "#fff", color: "var(--ink-2)", height: 32, padding: "0 12px" }}>Today</button>
+              <button className="btn btn-outline btn-sm" onClick={goToday}>Today</button>
               <button className="icon-btn" onClick={goForward} aria-label="Next"><I.chevR /></button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <strong style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.3, fontFamily: "var(--font-mono)", letterSpacing: "0.02em" }}>
+            <div className="bk-date-range">
+              <strong>
                 {view === "week"
                   ? `${weekDays[0].getDate()} – ${weekDays[6].getDate()} ${MONTH_NAMES[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`
                   : `${baseDate.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
               </strong>
-              {view === "week" && <span style={{ fontSize: 10, color: "var(--ink-3)" }}>Week {getWeekNumber(weekDays[0])}</span>}
+              {view === "week" && <span>Week {getWeekNumber(weekDays[0])}</span>}
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="bk-toolbar-r">
             <div className="toggle" style={{ position: "relative" }}>
               <div
                 className="toggle-slider"
@@ -639,11 +615,11 @@ export default function BookingsPage() {
               <button className={view === "day" ? "on" : ""} onClick={() => setView("day")} style={{ position: "relative", zIndex: 1 }}>Day</button>
               <button className={view === "week" ? "on" : ""} onClick={() => setView("week")} style={{ position: "relative", zIndex: 1 }}>Week</button>
             </div>
-            <Link href="/dashboard/new-booking" className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, textDecoration: "none" }}>
-              <I.plus /> New booking
+            <Link href="/dashboard/block-time" className="btn btn-ghost btn-sm">
+              Block time
             </Link>
-            <Link href="/dashboard/block-time" className="btn btn-sm" style={{ border: "1px solid var(--line-2)", background: "#fff", color: "var(--ink-2)", height: 32, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, textDecoration: "none" }}>
-              🚫 Block time
+            <Link href="/dashboard/new-booking" className="btn btn-primary btn-sm">
+              <I.plus style={{ width: 14, height: 14 }} /> New booking
             </Link>
           </div>
         </div>
@@ -691,7 +667,7 @@ export default function BookingsPage() {
         </div>
 
         {/* Calendar card */}
-        <div className="card" style={{ overflow: "hidden", border: "1px solid var(--line)", borderRadius: "var(--radius)" }}>
+        <div className="bk-calendar card">
           {loading ? (
             <div style={{ padding: "40px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
               {Array.from({ length: 6 }).map((_, i) => (

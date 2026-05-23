@@ -3027,6 +3027,7 @@ footer {
 .timeline {
   position: relative;
   padding-left: 88px;
+  padding-top: 16px;
   transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity;
 }

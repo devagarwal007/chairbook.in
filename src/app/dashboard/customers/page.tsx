@@ -6,7 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 import { initialsOf } from "@/lib/utils";
 
 
@@ -46,7 +46,7 @@ export default function CustomersPage() {
   const [tab, setTab] = useState("all");
   const [sort, setSort] = useState("recent");
   const [selected, setSelected] = useState<string | number | null>(null);
-  const { flash, show: showFlash } = useFlash(2000);
+  const { show: showFlash } = useToast();
   const [sortOpen, setSortOpen] = useState(false);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -561,12 +561,7 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {/* Flash Messages */}
-      {flash && (
-        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
-          {flash}
-        </div>
-      )}
+
     </div>
   );
 }

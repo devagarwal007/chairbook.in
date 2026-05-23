@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 import { insertNotification } from "@/lib/notifications";
 import { isUUID } from "@/lib/utils";
 import { Icons as IC } from "@/components/ui/Icons";
@@ -62,7 +62,7 @@ export default function CheckoutPage() {
   const [tip, setTip] = useState<number>(0);
   const [roundOff, setRoundOff] = useState<boolean>(true);
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
-  const { flash, show: triggerFlash } = useFlash(1800);
+  const { show: triggerFlash } = useToast();
   const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
 
   // Fetch Booking details if UUID
@@ -764,25 +764,7 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {flash && (
-          <div
-            style={{
-              position: "fixed",
-              bottom: 40,
-              left: "50%",
-              transform: "translateX(-50%)",
-              background: "var(--ink)",
-              color: "#fff",
-              padding: "10px 16px",
-              borderRadius: 10,
-              fontSize: 13,
-              zIndex: 80,
-              boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-            }}
-          >
-            {flash}
-          </div>
-        )}
+
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
 import { Icons as I } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 
 import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates } from "@/types";
 
@@ -133,7 +133,7 @@ export default function SettingsPage() {
   const [data, setData] = useState<SettingsData>(INITIAL_DATA);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const { flash, show: showFlash } = useFlash(1800);
+  const { show: showFlash } = useToast();
   const [loading, setLoading] = useState(true);
 
   // Supabase states
@@ -1495,26 +1495,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Global Toast Notification */}
-      {flash && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 120,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 10,
-            fontSize: 13,
-            zIndex: 60,
-            boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-          }}
-        >
-          {flash}
-        </div>
-      )}
+
     </div>
   );
 }

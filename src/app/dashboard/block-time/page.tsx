@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 
 import { Icons as IBT } from "@/components/ui/Icons";
 
@@ -332,7 +332,7 @@ export default function BlockTimePage() {
   const [filter, setFilter] = useState<"upcoming" | "recurring" | "past" | "all">("upcoming");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<UIBlock | null>(null);
-  const { flash, show: flashMsg } = useFlash(1800);
+  const { show: flashMsg } = useToast();
   const [loading, setLoading] = useState(true);
 
   // Load block items from Supabase
@@ -728,11 +728,7 @@ export default function BlockTimePage() {
         />
       )}
 
-      {flash && (
-        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[9999] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)] animate-pop">
-          {flash}
-        </div>
-      )}
+
     </div>
   );
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 import { isUUID, initialsOf } from "@/lib/utils";
 
 import { Customer } from "@/types";
@@ -170,7 +170,7 @@ export default function CustomerProfilePage() {
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [showMsg, setShowMsg] = useState(false);
-  const { flash, show: showFlash } = useFlash(2000);
+  const { show: showFlash } = useToast();
   const [ownerName, setOwnerName] = useState("Owner");
 
   useEffect(() => {
@@ -557,11 +557,7 @@ export default function CustomerProfilePage() {
       {showMsg && <MessageModal customer={c} onClose={() => setShowMsg(false)} onSend={sendMsg} />}
 
       {/* ─── FLASH MESSAGE ─── */}
-      {flash && (
-        <div className="fixed bottom-[120px] left-1/2 -translate-x-1/2 bg-ink text-white px-4 py-[10px] rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
-          {flash}
-        </div>
-      )}
+
     </div>
   );
 }

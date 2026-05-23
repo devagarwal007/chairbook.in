@@ -9,7 +9,8 @@ import { toMin, formatTime12h, formatTime12hFromMin, formatDateDisplay, isUUID, 
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
-import { useSalonData, useBookings, useTimeUpdate, useFlash } from "@/hooks";
+import { useSalonData, useBookings, useTimeUpdate } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 import { Appointment, Stylist, Service } from "@/types";
 
 // ===== TYPES =====
@@ -45,7 +46,7 @@ export default function DashboardPage() {
   // Custom Hooks Extraction
   const { bookings: appts, setBookings: setAppts, loading: loadingBookings, refresh: refreshBookings } = useBookings(salonId, day);
   const { nowTimeMin, dateDisplayStr } = useTimeUpdate(!!salonId);
-  const { flash, show: showFlash } = useFlash(2000);
+  const { show: showFlash } = useToast();
 
   const { stylists: dbStylists, services: dbServices, loading: salonDataLoading } = useSalonData(salonId);
 
@@ -406,12 +407,7 @@ export default function DashboardPage() {
       {/* Walk-In Modal */}
       {showWalkIn && <WalkInModal onClose={() => setShowWalkIn(false)} onAdd={addWalkIn} services={activeServices} stylists={activeStylists} />}
 
-      {/* Flash Messages */}
-      {flash && (
-        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white p-[10px_16px] rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)] animate-[pop_0.2s_ease-out]">
-          {flash}
-        </div>
-      )}
+
 
     </div>
   );

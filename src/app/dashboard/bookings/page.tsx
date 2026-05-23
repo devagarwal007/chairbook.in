@@ -7,7 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+
 import { toMinHours, initialsOf, formatDateKey } from "@/lib/utils";
 
 import { Stylist, CalAppt } from "@/types";
@@ -424,7 +424,7 @@ export default function BookingsPage() {
   const [stylistFilter, setStylistFilter] = useState<string | number>("all");
   const [selected, setSelected] = useState<CalAppt | null>(null);
   const [showBlockModal, setShowBlockModal] = useState(false);
-  const { flash } = useFlash(2000);
+
   const [appts, setAppts] = useState<CalAppt[]>([]);
   const [stylists, setStylists] = useState<Stylist[]>(FALLBACK_STYLISTS);
   const [loading, setLoading] = useState(true);
@@ -819,12 +819,7 @@ export default function BookingsPage() {
         {showBlockModal && <BlockTimeModal onClose={() => setShowBlockModal(false)} salonId={salonId} stylists={stylists} baseDate={baseDate} />}
       </main>
 
-      {/* Flash */}
-      {flash && (
-        <div className="fixed bottom-[90px] left-1/2 -translate-x-1/2 bg-ink text-white p-[10px_16px] rounded-[10px] text-[13px] z-[60]">
-          {flash}
-        </div>
-      )}
+
     </div>
   );
 }

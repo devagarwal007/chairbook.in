@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icons } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 import type { HeaderProps } from "@/types";
 
 export default function Header({
@@ -18,7 +18,7 @@ export default function Header({
 }: HeaderProps) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [salonOpen, setSalonOpen] = useState(true);
-  const { flash, show: showFlash } = useFlash(1800);
+  const { show: showFlash } = useToast();
   
   const { profile } = useProfile();
 
@@ -143,11 +143,7 @@ export default function Header({
         </div>
       </div>
 
-      {flash && (
-        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-[var(--ink)] text-white px-4 py-2.5 rounded-[10px] text-xs z-[9999] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)] animate-[pop_0.2s_ease-out]">
-          {flash}
-        </div>
-      )}
+
     </>
   );
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 import { insertNotification } from "@/lib/notifications";
 import { BookingData } from "@/types";
 import { isUUID } from "@/lib/utils";
@@ -320,7 +320,7 @@ export default function BookingDetailPage() {
   const [status, setStatus] = useState<"confirmed" | "arrived" | "completed" | "noshow" | "cancelled">("confirmed");
   const [showResch, setShowResch] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
-  const { flash, show: showFlash } = useFlash(2000);
+  const { show: showFlash } = useToast();
   const [activity, setActivity] = useState(BOOKING.activity);
   const [rescheduled, setRescheduled] = useState<{ date: string; time: string } | null>(null);
   const [salonInfo, setSalonInfo] = useState({
@@ -1070,16 +1070,7 @@ export default function BookingDetailPage() {
         </div>
       </main>
 
-      {flash && (
-        <div style={{
-          position: "fixed", bottom: 180, left: "50%", transform: "translateX(-50%)",
-          background: "var(--ink)", color: "#fff", padding: "10px 16px",
-          borderRadius: 10, fontSize: 13, zIndex: 80,
-          boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-        }}>
-          {flash}
-        </div>
-      )}
+
 
       {showResch && <RescheduleModal booking={b} onClose={() => setShowResch(false)} onConfirm={handleReschedule} />}
       {showCancel && <CancelModal booking={b} onClose={() => setShowCancel(false)} onConfirm={handleCancel} />}

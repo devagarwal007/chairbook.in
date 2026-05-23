@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 
 import { Icons as I } from "@/components/ui/Icons";
 import type { Actor, NotificationItem } from "@/types";
@@ -52,7 +52,7 @@ export default function NotificationsPage() {
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const { flash, show: flashMsg } = useFlash(1600);
+  const { show: flashMsg } = useToast();
 
   // Load notifications from DB
   useEffect(() => {
@@ -392,11 +392,7 @@ export default function NotificationsPage() {
         )}
       </main>
 
-      {flash && (
-        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
-          {flash}
-        </div>
-      )}
+
 
       {/* Bottom Nav Bar */}
       <nav className="bottom-nav">

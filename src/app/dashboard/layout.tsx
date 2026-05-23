@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/layout/BottomNav";
 import { ProfileProvider } from "@/context/ProfileContext";
+import { ToastProvider } from "@/context/ToastContext";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -22,8 +23,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <ProfileProvider>
-      {children}
-      {shouldShowNav && <BottomNav />}
+      <ToastProvider>
+        {children}
+        {shouldShowNav && <BottomNav />}
+      </ToastProvider>
     </ProfileProvider>
   );
 }

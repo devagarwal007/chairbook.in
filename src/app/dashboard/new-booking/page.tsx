@@ -7,7 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { initialsOf } from "@/lib/utils";
-import { useFlash } from "@/hooks";
+import { useToast } from "@/context/ToastContext";
 
 import { Customer, Service, Stylist } from "@/types";
 import { Icons as IN } from "@/components/ui/Icons";
@@ -561,7 +561,7 @@ export default function NewBookingPage() {
   const [sendConfirm, setSendConfirm] = useState(true);
   const [takePayment, setTakePayment] = useState(false);
   const [created, setCreated] = useState(false);
-  const { flash, show: showFlash } = useFlash(2000);
+  const { show: showFlash } = useToast();
   const [newBookingId, setNewBookingId] = useState<string | null>(null);
 
   // DB-loaded data
@@ -1077,11 +1077,7 @@ export default function NewBookingPage() {
         </div>
       )}
 
-      {flash && (
-        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
-          {flash}
-        </div>
-      )}
+
     </div>
   );
 }

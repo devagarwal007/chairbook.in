@@ -5,13 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
-import { Icons } from "@/components/ui/Icons";
+import { Icons as I } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
-
-const I = {
-  ...Icons,
-  bellSm: Icons.bell,
-};
 
 import { HoursData, Service, Stylist } from "@/types";
 
@@ -81,7 +76,7 @@ const TABS = [
   { id: "team",     label: "Team",          icon: I.team },
   { id: "whatsapp", label: "WhatsApp",      icon: I.wa },
   { id: "plan",     label: "Subscription",  icon: I.card },
-  { id: "notifs",   label: "Notifications", icon: I.bellSm },
+  { id: "notifs",   label: "Notifications", icon: I.bell },
   { id: "account",  label: "Account",       icon: I.user },
 ];
 
@@ -1256,7 +1251,7 @@ export default function SettingsPage() {
                   fontWeight: 600,
                 }}
               >
-                <Icons.logout style={{ width: 14, height: 14 }} /> Logout
+                <I.logout style={{ width: 14, height: 14 }} /> Logout
               </button>
             </div>
           </div>
@@ -1294,7 +1289,7 @@ export default function SettingsPage() {
           </div>
           <div className="top-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <Link href="/dashboard/notifications" className="icon-btn" aria-label="Notifications" style={{ display: "flex" }}>
-              <I.bellSm style={{ width: 18, height: 18 }} />
+              <I.bell style={{ width: 18, height: 18 }} />
               <span className="ind"></span>
             </Link>
             <div className="avatar sm tone-b">{data.account?.name ? data.account.name[0].toUpperCase() : "R"}</div>
@@ -1366,11 +1361,11 @@ export default function SettingsPage() {
 
       {/* Bottom Navigation */}
       <nav className="bottom-nav">
-        <Link className="bn-item" href="/dashboard"><Icons.home /><span>Home</span></Link>
-        <Link className="bn-item" href="/dashboard/bookings"><Icons.calendar /><span>Bookings</span></Link>
-        <Link className="bn-item" href="/dashboard/customers"><Icons.users /><span>Customers</span></Link>
-        <Link className="bn-item" href="/dashboard/insights"><Icons.chart /><span>Insights</span></Link>
-        <Link className="bn-item active" href="/dashboard/settings"><Icons.settings /><span>Settings</span></Link>
+        <Link className="bn-item" href="/dashboard"><I.home /><span>Home</span></Link>
+        <Link className="bn-item" href="/dashboard/bookings"><I.calendar /><span>Bookings</span></Link>
+        <Link className="bn-item" href="/dashboard/customers"><I.users /><span>Customers</span></Link>
+        <Link className="bn-item" href="/dashboard/insights"><I.chart /><span>Insights</span></Link>
+        <Link className="bn-item active" href="/dashboard/settings"><I.settings /><span>Settings</span></Link>
       </nav>
 
       {/* SERVICE MODAL (ADD & EDIT) */}

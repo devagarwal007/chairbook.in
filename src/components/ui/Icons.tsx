@@ -176,4 +176,120 @@ export const Icons = {
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
     </svg>
   ),
+  pin: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+  star: ({ width = 13, height = 13, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width={width} height={height} style={style} {...props}>
+      <path d="m12 2 3 7 7 .6-5.3 4.7L18.5 22 12 18 5.5 22l1.8-7.7L2 9.6 9 9z" />
+    </svg>
+  ),
+  back: ({ width = 18, height = 18, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="m15 18-6-6 6-6"/>
+    </svg>
+  ),
+  check: ({ width = 14, height = 14, strokeWidth = 2.5, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M20 6 9 17l-5-5"/>
+    </svg>
+  ),
+  clock: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 7v5l3 2"/>
+    </svg>
+  ),
+  spark: ({ width = 14, height = 14, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width={width} height={height} style={style} {...props}>
+      <path d="M12 2 13.4 9.1 20.5 10.5 13.4 11.9 12 19 10.6 11.9 3.5 10.5 10.6 9.1z"/>
+    </svg>
+  ),
+  shield: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  ),
+  lock: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  ),
+  more: ({ width = 18, height = 18, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+    </svg>
+  ),
+  phone: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.6a2 2 0 0 1-.5 2L7.9 9.7a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2-.5c.9.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2z"/>
+    </svg>
+  ),
+  checkall: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="m18 7-9 9-3-3M9 7l3 3M2 12l3 3"/>
+    </svg>
+  ),
+  cash: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>
+    </svg>
+  ),
+  cancel: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <circle cx="12" cy="12" r="9"/><path d="M5 5l14 14"/>
+    </svg>
+  ),
+  summary: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>
+    </svg>
+  ),
+  insights: ({ width = 20, height = 20, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M3 21V3M21 21H3" />
+      <rect x="7" y="11" width="3" height="6" rx="0.5" />
+      <rect x="12" y="7" width="3" height="10" rx="0.5" />
+      <rect x="17" y="13" width="3" height="4" rx="0.5" />
+    </svg>
+  ),
+  cal: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <rect x="3" y="5" width="18" height="16" rx="2"/>
+      <path d="M8 3v4M16 3v4M3 10h18"/>
+    </svg>
+  ),
+  upi: ({ width = 20, height = 20, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20h.01M17 14h.01M20 17h.01" />
+    </svg>
+  ),
+  split: ({ width = 20, height = 20, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M3 6h13l5 6-5 6H3M16 6v12" />
+    </svg>
+  ),
+  coffee: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M17 8h1a4 4 0 0 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3"/>
+    </svg>
+  ),
+  plane: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M17.8 19.2 16 11l3.5-3.5a2.12 2.12 0 1 0-3-3L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+    </svg>
+  ),
+  party: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M3 21h18l-7-14a2 2 0 0 0-3 0z"/>
+      <path d="M9 17h6M11 13h2M12 9V5"/>
+    </svg>
+  ),
 };

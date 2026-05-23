@@ -190,7 +190,7 @@ Tables defined in `supabase/migrations/`:
 ## Do's and Don'ts
 
 ### Do
-- Write all styles in `globals.css` using design tokens.
+- Write all styles in tailwind css do not use globals.css for new styles. Only use globals.css for design tokens and utility classes.
 - Use the `Icons` namespace from `Icons.tsx` for any SVG icon.
 - Provide mock/fallback data so pages render without Supabase.
 - Use shimmer skeletons for loading states.
@@ -199,7 +199,6 @@ Tables defined in `supabase/migrations/`:
 - Indian number formatting for currency (`₹1,23,400`).
 
 ### Don't
-- Don't rewrite existing styles to Tailwind (unless migrating specifically). Both styles coexist peacefully.
 - Don't add box-shadows to cards (1px borders only).
 - Don't use `--wa` (WhatsApp green) for generic success states.
 - Don't add bouncy/spring animations or parallax effects.

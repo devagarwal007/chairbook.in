@@ -192,8 +192,8 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
               </select>
             </div>
           </div>
-          <label className="checkbox-row" style={{ marginTop: 12 }}>
-            <input type="checkbox" checked={newCust.noPhone} onChange={e => setNewCust({ ...newCust, noPhone: e.target.checked })} />
+          <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-3">
+            <input type="checkbox" checked={newCust.noPhone} onChange={e => setNewCust({ ...newCust, noPhone: e.target.checked })} className="accent-teal w-4 h-4 shrink-0" />
             <span>This customer doesn&apos;t want to share a phone number (guest mode — no WhatsApp reminders)</span>
           </label>
           {newCust.name.trim() && (
@@ -401,8 +401,8 @@ function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onD
         </div>
       )}
 
-      <label className="checkbox-row" style={{ marginTop: 16, padding: "12px 14px", background: "var(--amber-soft)", borderRadius: 10, color: "var(--amber-ink)", display: "flex", gap: 10, alignItems: "center", cursor: "pointer" }}>
-        <input type="checkbox" checked={overrideAvail} onChange={e => setOverrideAvail(e.target.checked)} />
+      <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-4 py-3 px-3.5 bg-amber-soft rounded-[10px] text-amber-ink">
+        <input type="checkbox" checked={overrideAvail} onChange={e => setOverrideAvail(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
         <span style={{ fontSize: 13 }}>Allow booking over taken slots (use with caution — may cause double-booking)</span>
       </label>
     </div>
@@ -482,15 +482,15 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
       </div>
 
       <div className="nb-toggles">
-        <label className="checkbox-row" style={{ display: "flex", gap: 10, alignItems: "center", cursor: customer.phone ? "pointer" : "not-allowed" }}>
-          <input type="checkbox" checked={sendConfirm} onChange={e => setSendConfirm(e.target.checked)} disabled={!customer.phone} />
+        <label className={`flex items-center gap-2.5 text-[13px] ${customer.phone ? "cursor-pointer" : "cursor-not-allowed"}`}>
+          <input type="checkbox" checked={sendConfirm} onChange={e => setSendConfirm(e.target.checked)} disabled={!customer.phone} className="accent-teal w-4 h-4 shrink-0" />
           <span>
             Send a WhatsApp confirmation to {customer.name.split(" ")[0]}
             {!customer.phone && <small style={{ color: "var(--ink-3)" }}> · no phone on file</small>}
           </span>
         </label>
-        <label className="checkbox-row" style={{ display: "flex", gap: 10, alignItems: "center", cursor: "pointer", marginTop: 10 }}>
-          <input type="checkbox" checked={takePayment} onChange={e => setTakePayment(e.target.checked)} />
+        <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-2.5">
+          <input type="checkbox" checked={takePayment} onChange={e => setTakePayment(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
           <span>Take payment in advance after creating</span>
         </label>
       </div>
@@ -1034,7 +1034,9 @@ export default function NewBookingPage() {
       )}
 
       {flash && (
-        <div className="my-flash" style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: "var(--ink)", color: "#fff", padding: "10px 16px", borderRadius: 10, fontSize: 13, zIndex: 60, boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)" }}>{flash}</div>
+        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
+          {flash}
+        </div>
       )}
     </div>
   );

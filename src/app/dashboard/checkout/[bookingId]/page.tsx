@@ -650,13 +650,14 @@ export default function CheckoutPage() {
                 </div>
                 <div className="ck-adj-row">
                   <span>Round off to nearest ₹10</span>
-                  <label className="set-toggle">
+                  <label className="inline-flex cursor-pointer items-center relative shrink-0">
                     <input
                       type="checkbox"
+                      className="absolute opacity-0 pointer-events-none peer"
                       checked={roundOff}
                       onChange={(e) => setRoundOff(e.target.checked)}
                     />
-                    <span className="set-toggle-track"></span>
+                    <span className="w-9 h-5.5 rounded-full bg-line-2 relative transition-colors duration-150 before:content-[''] before:absolute before:left-[2px] before:top-[2px] before:w-[18px] before:h-[18px] before:rounded-full before:bg-white before:transition-transform before:duration-[180ms] before:ease-[cubic-bezier(0.2,0.9,0.3,1.2)] before:shadow-[0_1px_2px_rgba(0,0,0,0.1)] peer-checked:bg-teal peer-checked:before:translate-x-[14px]"></span>
                   </label>
                 </div>
               </div>

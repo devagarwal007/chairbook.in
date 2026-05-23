@@ -82,27 +82,33 @@ function BlockRow({ block, onEdit, onDelete, stylists }: BlockRowProps) {
   };
 
   return (
-    <div className={`bt-row bt-tone-${reason?.tone || "amber"}`}>
-      <div className={`bt-ic`}>
+    <div className="grid grid-cols-[44px_1fr_auto] gap-3.5 p-[14px_18px] items-center bg-white border border-line rounded-xl">
+      <div className={`w-10 h-10 rounded-[10px] grid place-items-center shrink-0 ${
+        reason?.tone === "amber" 
+          ? "bg-amber-soft text-amber-ink" 
+          : reason?.tone === "rose" 
+            ? "bg-rose-soft text-rose" 
+            : "bg-bg-2 text-ink-2"
+      }`}>
         {reason && IBT[reason.icon as keyof typeof IBT]({})}
       </div>
-      <div className="bt-main">
-        <div className="bt-name">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold tracking-[-0.005em] flex items-center gap-2 flex-wrap">
           {block.reasonLabel}
           {block.recurring === "daily" && <span className="badge neutral no-dot" style={{ fontSize: 10, padding: "2px 7px", marginLeft: 8 }}>DAILY</span>}
           {block.recurring === "weekly" && <span className="badge neutral no-dot" style={{ fontSize: 10, padding: "2px 7px", marginLeft: 8 }}>WEEKLY</span>}
         </div>
-        <div className="bt-meta">
+        <div className="text-xs text-ink-3 mt-1 leading-[1.5]">
           {formatDate(block.date)}
           {block.dateTo && block.dateTo !== block.date && <> – {formatDate(block.dateTo)}</>}
           {" · "}
           {block.allDay ? "All day" : `${block.from} – ${block.to}`}
           {" · "}
-          <strong>{stylistNamesOf(block.stylists)}</strong>
+          <strong className="text-ink-2 font-medium">{stylistNamesOf(block.stylists)}</strong>
         </div>
-        {block.note && <div className="bt-note">"{block.note}"</div>}
+        {block.note && <div className="text-xs text-ink-3 italic mt-1.5 pl-2.5 border-l-2 border-line-2">"{block.note}"</div>}
       </div>
-      <div className="bt-actions">
+      <div className="flex gap-6">
         <button className="cust-action wa" style={{ opacity: 1, background: "transparent", borderColor: "var(--line)" }} onClick={() => onEdit(block)}>
           <IBT.edit />
         </button>
@@ -191,14 +197,20 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
           {/* Reason */}
           <div className="field">
             <label>Reason</label>
-            <div className="bt-reason-grid">
+            <div className="grid grid-cols-3 gap-1.5 max-[720px]:grid-cols-2">
               {REASONS.map(r => (
                 <button
                   key={r.id}
-                  className={`bt-reason ${reason === r.id ? "on" : ""} bt-tone-${r.tone}`}
+                  className={`flex items-center gap-2 py-2.5 px-3 border rounded-[10px] font-inherit text-[13px] cursor-pointer transition-all duration-150 text-left ${
+                    reason === r.id 
+                      ? "border-teal bg-teal-soft text-teal-ink font-medium" 
+                      : "border-line bg-white text-ink-2 hover:border-line-2"
+                  }`}
                   onClick={() => setReason(r.id)}
                 >
-                  <span className="bt-reason-ic">{IBT[r.icon as keyof typeof IBT]({})}</span>
+                  <span className={`w-6 h-6 rounded-md grid place-items-center shrink-0 ${
+                    reason === r.id ? "bg-teal text-white" : "bg-bg-2 text-ink-2"
+                  }`}>{IBT[r.icon as keyof typeof IBT]({})}</span>
                   {r.label}
                 </button>
               ))}
@@ -208,13 +220,17 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
           {/* Stylists */}
           <div className="field" style={{ marginTop: 16 }}>
             <label>Who's affected?</label>
-            <div className="bt-stylist-row">
+            <div className="flex gap-1.5 flex-wrap">
               {stylistsToDisplay.map(s => {
                 const on = stylists.includes(s.id);
                 return (
                   <button
                     key={s.id}
-                    className={`bt-stylist ${on ? "on" : ""}`}
+                    className={`inline-flex items-center gap-2 py-2 px-3 border rounded-full font-inherit text-[13px] cursor-pointer transition-all duration-150 ${
+                      on 
+                        ? "border-teal bg-teal-soft text-teal-ink font-medium" 
+                        : "border-line bg-white text-ink-2 hover:border-line-2"
+                    }`}
                     onClick={() => toggleStylist(s.id)}
                   >
                     {s.id !== "all" && (
@@ -241,8 +257,8 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
           </div>
 
           {/* All day */}
-          <label className="checkbox-row" style={{ marginTop: 14 }}>
-            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
+          <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-3.5">
+            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
             <span>All day</span>
           </label>
 
@@ -286,8 +302,8 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
           </div>
 
           {/* Notify customers? */}
-          <label className="checkbox-row" style={{ marginTop: 12, background: "var(--wa-soft)", padding: "10px 14px", borderRadius: 10, color: "#1F5A37" }}>
-            <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} />
+          <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-3 bg-wa-soft py-2.5 px-3.5 rounded-[10px] text-[#1f5a37]">
+            <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
             <IBT.wa style={{ color: "var(--wa)", flexShrink: 0 }} />
             <span style={{ fontSize: 13, lineHeight: 1.4 }}>Auto-WhatsApp customers if any existing bookings clash with this block (with a reschedule link)</span>
           </label>
@@ -626,54 +642,54 @@ export default function BlockTimePage() {
 
       <main className="app-main" style={{ paddingBottom: 100 }}>
         {/* Filter pills */}
-        <div className="eng-tabs">
-          <button className={`eng-tab ${filter === "upcoming" ? "on" : ""}`} onClick={() => setFilter("upcoming")}>
-            Upcoming <span className="eng-count">{counts.upcoming}</span>
+        <div className="flex gap-1.5 items-center mb-4.5 flex-wrap max-[720px]:overflow-x-auto max-[720px]:flex-nowrap max-[720px]:mx-[-16px] max-[720px]:mb-4 max-[720px]:px-4 [&::-webkit-scrollbar]:hidden">
+          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "upcoming" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("upcoming")}>
+            Upcoming <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "upcoming" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{counts.upcoming}</span>
           </button>
-          <button className={`eng-tab ${filter === "recurring" ? "on" : ""}`} onClick={() => setFilter("recurring")}>
-            Recurring <span className="eng-count">{counts.recurring}</span>
+          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "recurring" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("recurring")}>
+            Recurring <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "recurring" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{counts.recurring}</span>
           </button>
-          <button className={`eng-tab ${filter === "past" ? "on" : ""}`} onClick={() => setFilter("past")}>
-            Past <span className="eng-count">{counts.past}</span>
+          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "past" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("past")}>
+            Past <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "past" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{counts.past}</span>
           </button>
-          <button className={`eng-tab ${filter === "all" ? "on" : ""}`} onClick={() => setFilter("all")}>
-            All <span className="eng-count">{blocks.length}</span>
+          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "all" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("all")}>
+            All <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "all" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{blocks.length}</span>
           </button>
         </div>
 
         {/* Calendar preview card */}
-        <div className="bt-preview">
-          <div className="bt-preview-l">
+        <div className="grid grid-cols-2 gap-6 bg-white border border-line rounded-[14px] p-5.5 mb-6 max-[720px]:grid-cols-1">
+          <div className="flex flex-col justify-center">
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--ink-3)" }}>HOW IT LOOKS ON YOUR CALENDAR</div>
             <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "6px 0 0", lineHeight: 1.5 }}>
               Blocked time appears as a striped, greyed-out block. Customers can never book over it.
             </p>
           </div>
-          <div className="bt-preview-r">
-            <div className="bt-preview-cal">
-              <div className="bt-prev-time">13:00</div>
-              <div className="bt-prev-cell">
-                <div className="bt-prev-appt">Priya · Haircut</div>
+          <div>
+            <div className="grid grid-cols-[44px_1fr] gap-0 bg-bg border border-line rounded-lg overflow-hidden">
+              <div className="p-2 text-right font-mono text-[10px] text-ink-3 border-r border-line first:border-t-0">13:00</div>
+              <div className="p-1 min-h-[28px] flex items-center">
+                <div className="w-full py-1 px-2 rounded bg-blue-soft text-blue border-l-[3px] border-blue text-[11px] font-semibold">Priya · Haircut</div>
               </div>
-              <div className="bt-prev-time">13:30</div>
-              <div className="bt-prev-cell">
-                <div className="bt-prev-block">
+              <div className="p-2 text-right font-mono text-[10px] text-ink-3 border-t border-r border-line">13:30</div>
+              <div className="p-1 border-t border-line min-h-[28px] flex items-center">
+                <div className="w-full py-1 px-2 rounded text-ink-3 text-[11px] font-medium flex items-center gap-1.5 border-l-[3px] border-ink-3" style={{ backgroundImage: "repeating-linear-gradient(-45deg, var(--bg-2), var(--bg-2) 5px, var(--bg) 5px, var(--bg) 10px)" }}>
                   <IBT.coffee /> Lunch break — Anjali
                 </div>
               </div>
-              <div className="bt-prev-time">14:00</div>
-              <div className="bt-prev-cell"></div>
-              <div className="bt-prev-time">14:30</div>
-              <div className="bt-prev-cell">
-                <div className="bt-prev-appt">Sneha · Threading</div>
+              <div className="p-2 text-right font-mono text-[10px] text-ink-3 border-t border-r border-line">14:00</div>
+              <div className="p-1 border-t border-line min-h-[28px] flex items-center"></div>
+              <div className="p-2 text-right font-mono text-[10px] text-ink-3 border-t border-r border-line">14:30</div>
+              <div className="p-1 border-t border-line min-h-[28px] flex items-center">
+                <div className="w-full py-1 px-2 rounded bg-blue-soft text-blue border-l-[3px] border-blue text-[11px] font-semibold">Sneha · Threading</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* List Header */}
-        <div className="cust-list-head" style={{ marginTop: 18 }}>
-          <div className="cust-count">
+        <div className="flex items-center justify-between px-1 pb-2.5 gap-3 max-[720px]:flex-col max-[720px]:items-start max-[720px]:gap-2 mt-[18px]">
+          <div className="text-[13px] text-ink font-medium">
             {filtered.length} {filter} block{filtered.length === 1 ? "" : "s"}
           </div>
         </div>
@@ -684,31 +700,8 @@ export default function BlockTimePage() {
             <div style={{ width: 24, height: 24, border: "3px solid var(--line)", borderTopColor: "var(--teal)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
           </div>
         ) : filtered.length === 0 ? (
-          <div
-            className="cust-empty"
-            style={{
-              display: "flex",
-              gap: "14px",
-              alignItems: "flex-start",
-              padding: "32px",
-              background: "#fff",
-              border: "1px solid var(--line)",
-              borderRadius: "12px",
-              marginTop: "8px"
-            }}
-          >
-            <div
-              className="cust-empty-ic"
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "12px",
-                background: "var(--bg-2)",
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0
-              }}
-            >
+          <div className="flex gap-3.5 items-start p-8 bg-white border border-line rounded-xl mt-2">
+            <div className="w-11 h-11 rounded-xl bg-bg-2 grid place-items-center shrink-0">
               <IBT.cal style={{ width: 24, height: 24, color: "var(--ink-3)" }} />
             </div>
             <div>
@@ -722,7 +715,7 @@ export default function BlockTimePage() {
             </div>
           </div>
         ) : (
-          <div className="bt-list">
+          <div className="flex flex-col gap-2">
             {filtered.map(b => (
               <BlockRow key={b.id} block={b} onEdit={openEdit} onDelete={remove} stylists={stylists} />
             ))}
@@ -740,23 +733,7 @@ export default function BlockTimePage() {
       )}
 
       {flash && (
-        <div
-          className="my-flash"
-          style={{
-            position: "fixed",
-            bottom: 100,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 10,
-            fontSize: 13,
-            zIndex: 9999,
-            boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-            animation: "pop .2s",
-          }}
-        >
+        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[9999] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)] animate-pop">
           {flash}
         </div>
       )}

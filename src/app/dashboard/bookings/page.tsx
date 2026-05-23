@@ -114,16 +114,19 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
   const endMin = toMinHours(a.startH, a.startM) + a.duration;
   const endStr = `${String(Math.floor(endMin / 60)).padStart(2,"0")}:${String(endMin % 60).padStart(2,"0")}`;
 
-  const cls = `bk-block status-${a.status}`;
-
   return (
     <div
       onClick={onClick}
-      className={cls}
+      className={`absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 cursor-pointer transition-all duration-120 z-10 overflow-hidden hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-6px_rgba(0,0,0,0.18)] hover:z-20 ${
+        a.status === 'confirmed' ? 'bg-blue-soft text-blue border-l-[3px] border-blue' :
+        a.status === 'arrived' ? 'bg-amber-soft text-amber-ink border-l-[3px] border-amber' :
+        a.status === 'completed' ? 'bg-green-soft text-green border-l-[3px] border-green' :
+        a.status === 'noshow' ? 'bg-rose-soft text-rose border-l-[3px] border-rose' : ''
+      }`}
       style={{ top, height }}
       title={`${a.customer} · ${a.service} · ${start}–${endStr}`}
     >
-      <div className="bk-block-top">
+      <div className="flex items-center justify-between gap-1.5">
         {!narrow && (
           <div
             className={`avatar sm tone-${a.tone}`}
@@ -132,11 +135,11 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
             {a.initials}
           </div>
         )}
-        <div className="bk-block-name">{a.customer}</div>
-        <span className="bk-block-time">{start}</span>
+        <div className={`font-bold text-[11px] tracking-[-0.005em] whitespace-nowrap overflow-hidden text-ellipsis flex-1 ${a.status === 'noshow' ? 'text-rose line-through' : 'text-ink'}`}>{a.customer}</div>
+        <span className="font-mono text-[9px] shrink-0">{start}</span>
       </div>
       {height > 28 && (
-        <div className="bk-block-svc">{a.service}</div>
+        <div className="text-[10px] opacity-85 whitespace-nowrap overflow-hidden text-ellipsis">{a.service}</div>
       )}
     </div>
   );
@@ -203,8 +206,8 @@ function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () 
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: "100%", height: 42, border: "1px solid var(--line-2)", borderRadius: 8, padding: "0 10px", outline: 0, fontSize: 14 }} />
             </div>
           </div>
-          <label className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
+          <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
             <span>All-day block</span>
           </label>
           {!allDay && (
@@ -252,30 +255,30 @@ interface WeekViewProps {
 
 function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }: WeekViewProps) {
   return (
-    <div className="bk-week">
+    <div className="overflow-hidden">
       {/* Header */}
-      <div className="bk-grid-head">
-        <div className="bk-time-col"></div>
+      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-line bg-white sticky top-0 z-10 max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]">
+        <div className="bg-bg border-r border-line relative"></div>
         {weekDays.map((day) => {
           const key = formatDateKey(day);
           const isToday = key === todayKey;
           const cnt = appts.filter(a => a.dayKey === key && (stylistFilter === "all" || a.stylistId === stylistFilter)).length;
           return (
-            <div key={key} className={`bk-day-head ${isToday ? "today" : ""}`}>
-              <div className="bk-day-dow">{DOW_FULL[day.getDay()]}</div>
-              <div className="bk-day-dom">{day.getDate()}</div>
-              <div className="bk-day-count">{cnt} booking{cnt === 1 ? "" : "s"}</div>
+            <div key={key} className={`p-3 text-center border-r border-line flex flex-col items-center justify-center max-[720px]:p-[8px_6px] ${isToday ? "bg-teal-soft" : ""}`}>
+              <div className={`text-[10px] font-bold tracking-[0.05em] ${isToday ? "text-teal" : "text-ink-3"}`}>{DOW_FULL[day.getDay()]}</div>
+              <div className={`font-bold mt-1 leading-none max-[720px]:text-base text-lg ${isToday ? "text-teal-ink" : "text-ink-2"}`}>{day.getDate()}</div>
+              <div className={`text-[11px] mt-1.5 max-[720px]:text-[10px] ${isToday ? "text-teal-ink" : "text-ink-3"}`}>{cnt} booking{cnt === 1 ? "" : "s"}</div>
             </div>
           );
         })}
       </div>
 
       {/* Grid */}
-      <div className="bk-grid">
-        <div className="bk-time-col">
+      <div className="grid grid-cols-[60px_repeat(7,1fr)] relative max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]">
+        <div className="bg-bg border-r border-line relative">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} className="bk-time-row" style={{ height: SLOT_HEIGHT * 2 }}>
-              <span className="bk-time-lbl">{label}</span>
+            <div key={i} className="border-b border-dashed border-line relative first:border-t-0 group" style={{ height: SLOT_HEIGHT * 2 }}>
+              <span className="font-mono text-xs text-ink-3 absolute right-2 -top-1.75 bg-bg px-1 max-[720px]:text-[9px] group-first:top-1">{label}</span>
             </div>
           ))}
         </div>
@@ -291,16 +294,16 @@ function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }
           const nowStr = `${String(nowHours).padStart(2, "0")}:${String(nowMins).padStart(2, "0")}`;
 
           return (
-            <div key={key} className={`bk-day-col ${isToday ? "today" : ""}`}>
+            <div key={key} className={`relative border-r border-line ${isToday ? "bg-[rgba(15,110,86,0.025)]" : ""}`}>
               {/* hour lines */}
               {TIME_LABELS.map((_, hi) => (
-                <div key={hi} className="bk-hour-row" style={{ height: SLOT_HEIGHT * 2 }} />
+                <div key={hi} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005]" style={{ height: SLOT_HEIGHT * 2 }} />
               ))}
 
               {/* now line */}
               {isToday && nowTop >= 0 && (
-                <div className="bk-now" style={{ top: nowTop }}>
-                  <span className="bk-now-lbl">{nowStr}</span>
+                <div className="absolute left-0 right-0 h-0.5 bg-teal z-10 pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
+                  <span className="absolute left-2 -top-2 bg-teal text-white text-[9px] font-mono py-0.25 px-1 rounded">{nowStr}</span>
                 </div>
               )}
 
@@ -335,18 +338,18 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
   const nowStr = `${String(nowHours).padStart(2, "0")}:${String(nowMins).padStart(2, "0")}`;
 
   return (
-    <div className="bk-day-view">
+    <div className="overflow-hidden">
       {/* Header */}
-      <div className="bk-grid-head" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
-        <div className="bk-time-col"></div>
+      <div className="grid border-b border-line bg-white sticky top-0 z-10 max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
+        <div className="bg-bg border-r border-line relative"></div>
         {visibleStylists.map(s => {
           const cnt = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id).length;
           return (
-            <div key={s.id} className="bk-stylist-head">
+            <div key={s.id} className="p-[10px_8px] text-left border-r border-line flex items-center gap-2.5">
               <div className={`avatar md tone-${s.tone}`}>{s.short}</div>
               <div>
-                <div className="bk-stylist-name">{s.name}</div>
-                <div className="bk-stylist-count">{cnt} appointment{cnt !== 1 ? "" : "s"}</div>
+                <div className="text-sm font-semibold">{s.name}</div>
+                <div className="text-[11px] text-ink-3 mt-0.5">{cnt} appointment{cnt !== 1 ? "" : "s"}</div>
               </div>
             </div>
           );
@@ -354,11 +357,11 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
       </div>
 
       {/* Grid */}
-      <div className="bk-grid" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
-        <div className="bk-time-col">
+      <div className="grid relative max-[720px]:grid-cols-[44px_repeat(7,minmax(80px,1fr))] max-[720px]:min-w-[600px]" style={{ gridTemplateColumns: `60px repeat(${visibleStylists.length}, 1fr)` }}>
+        <div className="bg-bg border-r border-line relative">
           {TIME_LABELS.map((label, i) => (
-            <div key={i} className="bk-time-row" style={{ height: SLOT_HEIGHT * 2 }}>
-              <span className="bk-time-lbl">{label}</span>
+            <div key={i} className="border-b border-dashed border-line relative first:border-t-0 group" style={{ height: SLOT_HEIGHT * 2 }}>
+              <span className="font-mono text-xs text-ink-3 absolute right-2 -top-1.75 bg-bg px-1 max-[720px]:text-[9px] group-first:top-1">{label}</span>
             </div>
           ))}
         </div>
@@ -367,16 +370,16 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
         {visibleStylists.map(s => {
           const stylistAppts = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id);
           return (
-            <div key={s.id} className={`bk-day-col ${isToday ? "today" : ""}`}>
+            <div key={s.id} className={`relative border-r border-line ${isToday ? "bg-[rgba(15,110,86,0.025)]" : ""}`}>
               {/* hour lines */}
               {TIME_LABELS.map((_, hi) => (
-                <div key={hi} className="bk-hour-row" style={{ height: SLOT_HEIGHT * 2 }} />
+                <div key={hi} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005]" style={{ height: SLOT_HEIGHT * 2 }} />
               ))}
 
               {/* now line */}
               {isToday && nowTop >= 0 && (
-                <div className="bk-now" style={{ top: nowTop }}>
-                  <span className="bk-now-lbl">{nowStr}</span>
+                <div className="absolute left-0 right-0 h-0.5 bg-teal z-10 pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
+                  <span className="absolute left-2 -top-2 bg-teal text-white text-[9px] font-mono py-0.25 px-1 rounded">{nowStr}</span>
                 </div>
               )}
 
@@ -564,35 +567,35 @@ export default function BookingsPage() {
       {/* Reusable Header */}
       <Header title="Bookings" subtitle={dateRangeStr} />
 
-      <main className="app-main" style={{ paddingBottom: 80 }}>
+      <main className="pb-[80px]">
         {/* Toolbar */}
-        <div className="bk-toolbar">
-          <div className="bk-toolbar-l">
-            <div className="bk-nav">
+        <div className="flex items-center justify-between gap-4 mb-3.5 flex-wrap max-[980px]:flex-col max-[980px]:items-stretch">
+          <div className="flex items-center gap-4 max-[980px]:justify-between">
+            <div className="flex gap-1.5 items-center">
               <button className="icon-btn" onClick={goBack} aria-label="Previous"><I.chevL /></button>
               <button className="btn btn-outline btn-sm" onClick={goToday}>Today</button>
               <button className="icon-btn" onClick={goForward} aria-label="Next"><I.chevR /></button>
             </div>
-            <div className="bk-date-range">
-              <strong>
+            <div className="flex flex-col gap-0.5">
+              <strong className="text-[15px] font-semibold tracking-[-0.005em]">
                 {view === "week"
                   ? `${weekDays[0].getDate()} – ${weekDays[6].getDate()} ${MONTH_NAMES[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`
                   : `${baseDate.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
               </strong>
-              {view === "week" && <span>Week {getWeekNumber(weekDays[0])}</span>}
+              {view === "week" && <span className="text-xs text-ink-3 font-mono tracking-[0.04em]">Week {getWeekNumber(weekDays[0])}</span>}
             </div>
           </div>
-          <div className="bk-toolbar-r">
-            <div className="toggle" style={{ position: "relative" }}>
+          <div className="flex items-center gap-2.5 max-[980px]:justify-between">
+            <div className="relative flex p-0.5 bg-bg-2 rounded-lg border border-line">
               <div
-                className="toggle-slider"
+                className="absolute top-0.5 bottom-0.5 bg-white rounded shadow-sm transition-transform duration-200"
                 style={{
                   width: "calc(50% - 3px)",
                   transform: view === "day" ? "translateX(0)" : "translateX(100%)",
                 }}
               />
-              <button className={view === "day" ? "on" : ""} onClick={() => setView("day")} style={{ position: "relative", zIndex: 1 }}>Day</button>
-              <button className={view === "week" ? "on" : ""} onClick={() => setView("week")} style={{ position: "relative", zIndex: 1 }}>Week</button>
+              <button className={`px-4 py-1.5 text-sm font-medium transition-colors ${view === "day" ? "text-ink" : "text-ink-3"}`} onClick={() => setView("day")} style={{ position: "relative", zIndex: 1 }}>Day</button>
+              <button className={`px-4 py-1.5 text-sm font-medium transition-colors ${view === "week" ? "text-ink" : "text-ink-3"}`} onClick={() => setView("week")} style={{ position: "relative", zIndex: 1 }}>Week</button>
             </div>
             <Link href="/dashboard/block-time" className="btn btn-ghost btn-sm">
               Block time
@@ -604,9 +607,9 @@ export default function BookingsPage() {
         </div>
 
         {/* Stylist filter chips + legend */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button
-            className={`filter-chip ${stylistFilter === "all" ? "on" : ""}`}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${stylistFilter === "all" ? "bg-teal text-white border-teal" : "bg-bg-1 text-ink-2 border-line hover:border-teal/30"}`}
             onClick={() => setStylistFilter("all")}
           >
             All stylists
@@ -646,7 +649,7 @@ export default function BookingsPage() {
         </div>
 
         {/* Calendar card */}
-        <div className="bk-calendar card">
+        <div className="overflow-hidden p-0 max-[720px]:overflow-x-auto card">
           {loading ? (
             <div style={{ padding: "40px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
               {Array.from({ length: 6 }).map((_, i) => (

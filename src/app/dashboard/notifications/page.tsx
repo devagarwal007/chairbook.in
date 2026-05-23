@@ -296,7 +296,7 @@ export default function NotificationsPage() {
           <div className="greeting">
             <div className="h" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--t-h3)", fontWeight: 600 }}>
               Notifications
-              {counts.unread > 0 && <span className="nt-unread-pill" style={{ fontSize: 10, background: "var(--rose-soft)", color: "var(--rose)", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{counts.unread} unread</span>}
+              {counts.unread > 0 && <span className="inline-block text-[10px] bg-rose-soft text-rose py-0.5 px-2 rounded-full font-semibold align-middle">{counts.unread} unread</span>}
             </div>
             <div className="d" style={{ fontSize: "var(--t-body-sm)", color: "var(--ink-3)", marginTop: 2 }}>{dateStr}</div>
           </div>
@@ -313,36 +313,26 @@ export default function NotificationsPage() {
 
       <main className="app-main" style={{ paddingBottom: 100, maxWidth: 760, margin: "0 auto" }}>
         {/* Filter pills */}
-        <div className="eng-tabs" style={{ display: "flex", alignItems: "center", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16, borderBottom: "1px solid var(--line)" }}>
+        <div className="flex items-center gap-2 pb-1.5 mb-4 border-b border-line overflow-x-auto max-[720px]:mx-[-16px] max-[720px]:px-4 [&::-webkit-scrollbar]:hidden">
           {FILTERS.map(f => (
             <button
               key={f.id}
-              className={`eng-tab ${filter === f.id ? 'on' : ''}`}
+              className={`flex items-center gap-1.5 py-2 px-3 rounded-sm border text-[13px] font-medium cursor-pointer whitespace-nowrap transition-all duration-150 ${
+                filter === f.id 
+                  ? "border-teal bg-teal-soft text-teal" 
+                  : "border-line bg-white text-ink-2 hover:border-line-2"
+              }`}
               onClick={() => setFilter(f.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 12px",
-                borderRadius: "var(--radius-sm)",
-                border: filter === f.id ? "1px solid var(--teal)" : "1px solid var(--line)",
-                background: filter === f.id ? "var(--teal-soft)" : "#fff",
-                color: filter === f.id ? "var(--teal)" : "var(--ink-2)",
-                fontSize: "var(--t-body-sm)",
-                fontWeight: 500,
-                cursor: "pointer",
-                whiteSpace: "nowrap"
-              }}
             >
               {f.label}
-              <span className="eng-count" style={{ fontSize: 10, color: "var(--ink-3)", marginLeft: 2 }}>{counts[f.id]}</span>
+              <span className="text-[10px] text-ink-3 ml-0.5">{counts[f.id]}</span>
             </button>
           ))}
         </div>
 
         {filtered.length === 0 ? (
-          <div className="cust-empty" style={{ padding: "48px 24px", textAlign: "center", background: "#fff", border: "1px solid var(--line)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
-            <div className="cust-empty-ic" style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--bg-2)", display: "grid", placeItems: "center" }}>
+          <div className="py-12 px-6 text-center bg-white border border-line rounded-xl flex flex-col items-center justify-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-bg-2 grid place-items-center">
               <I.bell />
             </div>
             <div>
@@ -354,16 +344,16 @@ export default function NotificationsPage() {
           </div>
         ) : (
           Object.entries(groups).map(([day, items]) => (
-            <div key={day} className="nt-group">
-              <div className="nt-day">{day}</div>
-              <div className="nt-list">
+            <div key={day} className="mb-2">
+              <div className="text-[11px] font-bold text-ink-3 uppercase tracking-[0.07em] py-3 px-0 pb-1.5">{day}</div>
+              <div className="flex flex-col gap-0 border border-line rounded-lg overflow-hidden bg-white">
                 {items.map(n => {
                   const kind = KINDS[n.kind] || { icon: 'bell', tone: 'neutral', label: 'Notification' };
                   const IconComponent = I[kind.icon];
                   return (
                     <div
                       key={n.id}
-                      className={`nt-row ${n.unread ? 'unread' : ''}`}
+                      className={`flex items-start gap-3 p-[14px_16px] border-b border-line last:border-b-0 transition-colors duration-120 relative hover:bg-bg-2 max-[540px]:p-3 max-[540px]:gap-2.5 ${n.unread ? 'bg-[#f7fbf9] hover:bg-teal-soft' : 'bg-white'}`}
                       onClick={() => {
                         markRead(n.id);
                         router.push(n.link);
@@ -373,24 +363,40 @@ export default function NotificationsPage() {
                       {n.actor ? (
                         <div className={`avatar md tone-${n.actor.tone}`} style={{ position: 'relative', width: 40, height: 40 }}>
                           {n.actor.initials}
-                          <span className={`nt-kind-dot tone-${kind.tone}`}>{IconComponent && <IconComponent />}</span>
+                          <span className={`absolute -bottom-0.5 -right-0.5 w-4.5 h-4.5 rounded-full grid place-items-center border-2 border-white [&>svg]:w-2.25 [&>svg]:h-2.25 ${
+                            kind.tone === 'teal' ? 'bg-teal text-white' :
+                            kind.tone === 'amber' ? 'bg-amber text-white' :
+                            kind.tone === 'rose' ? 'bg-rose text-white' :
+                            kind.tone === 'blue' ? 'bg-blue text-white' :
+                            kind.tone === 'green' ? 'bg-green text-white' :
+                            kind.tone === 'neutral' ? 'bg-ink-3 text-white' :
+                            kind.tone === 'wa' ? 'bg-wa text-white' : ''
+                          }`}>{IconComponent && <IconComponent />}</span>
                         </div>
                       ) : (
-                        <div className={`nt-kind-ic tone-${kind.tone}`} style={{ width: 40, height: 40 }}>
+                        <div className={`w-10 h-10 min-w-10 rounded-[10px] grid place-items-center shrink-0 ${
+                          kind.tone === 'teal' ? 'bg-teal-soft text-teal' :
+                          kind.tone === 'amber' ? 'bg-amber-soft text-amber-ink' :
+                          kind.tone === 'rose' ? 'bg-rose-soft text-rose' :
+                          kind.tone === 'blue' ? 'bg-blue-soft text-blue' :
+                          kind.tone === 'green' ? 'bg-green-soft text-green' :
+                          kind.tone === 'neutral' ? 'bg-bg-2 text-ink-3' :
+                          kind.tone === 'wa' ? 'bg-wa-soft text-wa' : ''
+                        }`}>
                           {IconComponent && <IconComponent />}
                         </div>
                       )}
-                      <div className="nt-body">
-                        <div className="nt-title">
-                          {n.unread && <span className="nt-dot"></span>}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-medium text-ink leading-[1.4] flex items-center gap-1.5 flex-wrap">
+                          {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-teal shrink-0 inline-block"></span>}
                           {n.title}
                         </div>
-                        <div className="nt-meta">{n.meta}</div>
+                        <div className="text-xs text-ink-3 mt-0.75 leading-[1.45] whitespace-nowrap overflow-hidden text-ellipsis max-[540px]:text-[11px]">{n.meta}</div>
                       </div>
-                      <div className="nt-side">
-                        <div className="nt-ts mono">{n.ts}</div>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0 min-w-[50px]">
+                        <div className="text-[11px] text-ink-4 whitespace-nowrap tabular-nums max-[540px]:text-[10px] mono">{n.ts}</div>
                         <button
-                          className="nt-dismiss"
+                          className="w-5.5 h-5.5 rounded-md border border-line bg-transparent grid place-items-center cursor-pointer text-ink-3 transition-all duration-100 p-0 hover:bg-rose-soft hover:text-rose hover:border-rose"
                           onClick={(e) => dismiss(n.id, e)}
                           aria-label="Dismiss"
                         >
@@ -407,21 +413,7 @@ export default function NotificationsPage() {
       </main>
 
       {flash && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 100,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 10,
-            fontSize: 13,
-            zIndex: 60,
-            boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-          }}
-        >
+        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
           {flash}
         </div>
       )}

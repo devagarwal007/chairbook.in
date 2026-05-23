@@ -143,10 +143,10 @@ interface SectionHeadProps {
 
 function SectionHead({ title, desc, action }: SectionHeadProps) {
   return (
-    <div className="set-section-head">
+    <div className="flex justify-between items-end gap-4 mb-1.5">
       <div>
-        <h2>{title}</h2>
-        {desc && <p>{desc}</p>}
+        <h2 className="text-sm font-semibold tracking-[0.04em] uppercase text-ink-3 m-0">{title}</h2>
+        {desc && <p className="text-xs text-ink-3 mt-1">{desc}</p>}
       </div>
       {action}
     </div>
@@ -162,11 +162,11 @@ interface RowFieldProps {
 
 function RowField({ label, value, hint, action }: RowFieldProps) {
   return (
-    <div className="set-row">
+    <div className="flex justify-between items-center py-3.5 border-b border-line first:pt-0 last:border-b-0 last:pb-0">
       <div>
-        <div className="set-row-lbl">{label}</div>
-        <div className="set-row-val">{value}</div>
-        {hint && <div className="set-row-hint">{hint}</div>}
+        <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3">{label}</div>
+        <div className="text-sm font-medium mt-1">{value}</div>
+        {hint && <div className="text-xs text-ink-3 mt-0.5">{hint}</div>}
       </div>
       {action || <button className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>Edit</button>}
     </div>
@@ -705,9 +705,9 @@ export default function SettingsPage() {
     switch (activeTab) {
       case "salon":
         return (
-          <div className="set-content">
+          <div className="flex flex-col gap-[18px]">
             <SectionHead title="Salon profile" desc="What your customers see on the booking page." />
-            <div className="set-card">
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
               <div className="field">
                 <label>Salon name</label>
                 <input
@@ -752,10 +752,10 @@ export default function SettingsPage() {
             </div>
 
             <SectionHead title="Photos" desc="At least one photo helps customers trust the salon. 3:2 aspect, < 5 MB each." />
-            <div className="set-card">
-              <div className="set-photos">
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+              <div className="grid grid-cols-4 gap-2.5 max-[720px]:grid-cols-2">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="set-photo-slot">
+                  <div key={i} className="relative aspect-[3/2] rounded-lg overflow-hidden border border-line">
                     <svg viewBox="0 0 100 70" width="100%" height="100%">
                       <defs>
                         <pattern id={`stripes-${i}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -765,33 +765,34 @@ export default function SettingsPage() {
                       <rect width="100" height="70" fill="var(--teal-soft)" />
                       <rect width="100" height="70" fill={`url(#stripes-${i})`} />
                     </svg>
-                    <div className="set-photo-label">photo {i}</div>
+                    <div className="absolute bottom-1.5 left-2 font-mono text-[10px] text-teal-ink bg-white/80 py-0.5 px-1.5 rounded">photo {i}</div>
                   </div>
                 ))}
-                <button className="set-photo-add" onClick={() => setFlash("Photo upload is a mockup")}>
-                  <span className="set-photo-add-ic">+</span>
+                <button className="aspect-[3/2] rounded-lg bg-bg-2 border border-dashed border-line-2 flex flex-col items-center justify-center gap-1.5 font-inherit text-xs text-ink-3 cursor-pointer transition-colors duration-150 hover:bg-bg hover:border-ink-3 hover:text-ink" onClick={() => setFlash("Photo upload is a mockup")}>
+                  <span className="w-7 h-7 rounded-full bg-white grid place-items-center text-lg font-light border border-line">+</span>
                   Add photo
                 </button>
               </div>
             </div>
 
             <SectionHead title="Working hours" desc="Customers will only see slots inside these hours." />
-            <div className="set-card">
-              <div className="set-hours">
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+              <div className="flex flex-col gap-1">
                 {DAYS.map(d => {
                   const h = data.hours[d.id] || { open: false, from: "10:00", to: "20:00" };
                   return (
-                    <div key={d.id} className={`set-hour-row ${h.open ? "" : "off"}`}>
-                      <label className="set-hour-toggle">
+                    <div key={d.id} className={`grid grid-cols-[200px_1fr] gap-4 py-2.5 border-b border-line items-center last:border-b-0 max-[720px]:grid-cols-1 max-[720px]:gap-2 ${h.open ? "" : "opacity-60"}`}>
+                      <label className="flex items-center gap-3 text-sm font-medium cursor-pointer">
                         <input
                           type="checkbox"
+                          className="accent-teal w-4 h-4"
                           checked={h.open}
                           onChange={e => update({ ...data, hours: { ...data.hours, [d.id]: { ...h, open: e.target.checked } } })}
                         />
                         <span>{d.name}</span>
                       </label>
                       {h.open ? (
-                        <div className="set-hour-times">
+                        <div className="flex items-center gap-2.5 justify-end max-[720px]:justify-start max-[720px]:pl-7">
                           <input
                             className="ob-time"
                             value={h.from}
@@ -805,7 +806,7 @@ export default function SettingsPage() {
                           />
                         </div>
                       ) : (
-                        <div className="set-hour-times closed">Closed</div>
+                        <div className="flex items-center gap-2.5 justify-end max-[720px]:justify-start max-[720px]:pl-7 text-[13px] text-ink-3 italic">Closed</div>
                       )}
                     </div>
                   );
@@ -817,7 +818,7 @@ export default function SettingsPage() {
 
       case "services":
         return (
-          <div className="set-content">
+          <div className="flex flex-col gap-[18px]">
             <SectionHead
               title="Services"
               desc={`${data.services.filter(s => s.active).length} active · ${data.services.length} total`}
@@ -827,44 +828,45 @@ export default function SettingsPage() {
                 </button>
               }
             />
-            <div className="set-card" style={{ padding: 0 }}>
+            <div className="bg-white border border-line rounded-xl p-0">
               {["Hair", "Skin", "Hands", "Nails", "General"].map(cat => {
                 const items = data.services.filter(s => s.cat === cat);
                 if (items.length === 0) return null;
                 return (
                   <div key={cat}>
-                    <div className="set-svc-cat">
-                      {cat} <span>{items.length}</span>
+                    <div className="p-[12px_20px] text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 bg-bg border-b border-line flex gap-2">
+                      {cat} <span className="text-ink-4 font-mono">{items.length}</span>
                     </div>
                     {items.map(s => (
-                      <div key={s.id} className={`set-svc-row ${!s.active ? "inactive" : ""}`}>
-                        <div className="set-svc-main">
-                          <div className="set-svc-name">{s.name}</div>
-                          <div className="set-svc-meta">
+                      <div key={s.id} className={`grid grid-cols-[1fr_auto_auto_auto] gap-3 p-[12px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto] ${!s.active ? "opacity-55" : ""}`}>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold">{s.name}</div>
+                          <div className="text-xs text-ink-3 mt-0.5 font-mono">
                             {s.duration} min · ₹{s.price.toLocaleString("en-IN")}
                             {!s.active && " · Hidden from booking page"}
                           </div>
                         </div>
-                        <label className="set-toggle">
+                        <label className="inline-flex cursor-pointer items-center relative shrink-0">
                           <input
                             type="checkbox"
+                            className="absolute opacity-0 pointer-events-none peer"
                             checked={s.active}
                             onChange={() => {
                               const list = data.services.map(item => item.id === s.id ? { ...item, active: !item.active } : item);
                               update({ ...data, services: list });
                             }}
                           />
-                          <span className="set-toggle-track"></span>
+                          <span className="w-9 h-5.5 rounded-full bg-line-2 relative transition-colors duration-150 before:content-[''] before:absolute before:left-[2px] before:top-[2px] before:w-[18px] before:h-[18px] before:rounded-full before:bg-white before:transition-transform before:duration-[180ms] before:ease-[cubic-bezier(0.2,0.9,0.3,1.2)] before:shadow-[0_1px_2px_rgba(0,0,0,0.1)] peer-checked:bg-teal peer-checked:before:translate-x-[14px]"></span>
                         </label>
                         <button
-                          className="cust-action wa"
+                          className="cust-action wa max-[720px]:hidden"
                           style={{ opacity: 1, background: "transparent", borderColor: "var(--line)", cursor: "pointer" }}
                           onClick={() => openEditService(s)}
                         >
                           <I.edit style={{ width: 14, height: 14 }} />
                         </button>
                         <button
-                          className="cust-action"
+                          className="cust-action max-[720px]:hidden"
                           style={{ opacity: 1, background: "transparent", borderColor: "var(--line)", color: "var(--rose)", cursor: "pointer" }}
                           onClick={() => {
                             const list = data.services.filter(item => item.id !== s.id);
@@ -884,7 +886,7 @@ export default function SettingsPage() {
 
       case "team":
         return (
-          <div className="set-content">
+          <div className="flex flex-col gap-[18px]">
             <SectionHead
               title="Team"
               desc={`${data.team.length} stylists${data.plan === "salon" ? " · Up to 5 on your plan" : ""}`}
@@ -894,17 +896,17 @@ export default function SettingsPage() {
                 </button>
               }
             />
-            <div className="set-card" style={{ padding: 0 }}>
+            <div className="bg-white border border-line rounded-xl p-0">
               {data.team.map(s => (
-                <div key={s.id} className="set-team-row">
+                <div key={s.id} className="grid grid-cols-[40px_1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[40px_1fr]">
                   <div className={`avatar md tone-${s.tone}`}>{s.name[0]}</div>
-                  <div className="set-team-main">
-                    <div className="set-team-name">{s.name}</div>
-                    <div className="set-team-role">{s.role}</div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">{s.name}</div>
+                    <div className="text-xs text-ink-3 mt-0.5">{s.role}</div>
                   </div>
-                  <div className="set-team-comm">
-                    <div className="num">{s.commission}%</div>
-                    <div className="lbl">Commission</div>
+                  <div className="text-right px-2.5 border-l border-line max-[720px]:col-span-full max-[720px]:p-0 max-[720px]:border-0 max-[720px]:text-left max-[720px]:flex max-[720px]:items-baseline max-[720px]:gap-2">
+                    <div className="text-base font-semibold tracking-[-0.015em]">{s.commission}%</div>
+                    <div className="text-[10px] text-ink-3 tracking-[0.04em] uppercase max-[720px]:before:content-['·'] max-[720px]:before:mr-1">Commission</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button
@@ -933,11 +935,11 @@ export default function SettingsPage() {
 
       case "whatsapp":
         return (
-          <div className="set-content">
+          <div className="flex flex-col gap-[18px]">
             <SectionHead title="WhatsApp integration" desc="The number customers receive messages from." />
-            <div className="set-card">
-              <div className="set-wa-status">
-                <div className="set-wa-status-l">
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+              <div className="flex justify-between items-center gap-3.5">
+                <div className="flex items-center gap-3.5">
                   <I.wa style={{ color: "var(--wa)", width: 22, height: 22 }} />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>+91 {data.wa.number}</div>
@@ -951,25 +953,26 @@ export default function SettingsPage() {
             </div>
 
             <SectionHead title="Automations" desc="Reduce no-shows and bring people back without lifting a finger." />
-            <div className="set-card">
-              <div className="set-toggle-row">
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+              <div className="flex justify-between items-center gap-4 py-3.5 border-b border-line first:pt-0 last:border-b-0 last:pb-0">
                 <div>
-                  <div className="set-toggle-name">Auto-confirm via WhatsApp</div>
-                  <div className="set-toggle-hint">When a customer books, send them a WhatsApp confirmation immediately.</div>
+                  <div className="text-sm font-semibold">Auto-confirm via WhatsApp</div>
+                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">When a customer books, send them a WhatsApp confirmation immediately.</div>
                 </div>
-                <label className="set-toggle">
+                <label className="inline-flex cursor-pointer items-center relative shrink-0">
                   <input
                     type="checkbox"
+                    className="absolute opacity-0 pointer-events-none peer"
                     checked={data.wa.autoConfirm}
                     onChange={e => update({ ...data, wa: { ...data.wa, autoConfirm: e.target.checked } })}
                   />
-                  <span className="set-toggle-track"></span>
+                  <span className="w-9 h-5.5 rounded-full bg-line-2 relative transition-colors duration-150 before:content-[''] before:absolute before:left-[2px] before:top-[2px] before:w-[18px] before:h-[18px] before:rounded-full before:bg-white before:transition-transform before:duration-[180ms] before:ease-[cubic-bezier(0.2,0.9,0.3,1.2)] before:shadow-[0_1px_2px_rgba(0,0,0,0.1)] peer-checked:bg-teal peer-checked:before:translate-x-[14px]"></span>
                 </label>
               </div>
-              <div className="set-toggle-row">
+              <div className="flex justify-between items-center gap-4 py-3.5 border-b border-line first:pt-0 last:border-b-0 last:pb-0">
                 <div>
-                  <div className="set-toggle-name">Send reminders {data.wa.reminder} hours before</div>
-                  <div className="set-toggle-hint">Customers reply YES to confirm. Studies show this cuts no-shows by 60%.</div>
+                  <div className="text-sm font-semibold">Send reminders {data.wa.reminder} hours before</div>
+                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">Customers reply YES to confirm. Studies show this cuts no-shows by 60%.</div>
                 </div>
                 <select
                   value={data.wa.reminder}
@@ -982,46 +985,47 @@ export default function SettingsPage() {
                   <option value={48}>48 hrs</option>
                 </select>
               </div>
-              <div className="set-toggle-row">
+              <div className="flex justify-between items-center gap-4 py-3.5 border-b border-line first:pt-0 last:border-b-0 last:pb-0">
                 <div>
-                  <div className="set-toggle-name">Promotional broadcasts</div>
-                  <div className="set-toggle-hint">Allow sending offers / campaigns to your customer list. Off by default.</div>
+                  <div className="text-sm font-semibold">Promotional broadcasts</div>
+                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">Allow sending offers / campaigns to your customer list. Off by default.</div>
                 </div>
-                <label className="set-toggle">
+                <label className="inline-flex cursor-pointer items-center relative shrink-0">
                   <input
                     type="checkbox"
+                    className="absolute opacity-0 pointer-events-none peer"
                     checked={data.wa.sendOffers}
                     onChange={e => update({ ...data, wa: { ...data.wa, sendOffers: e.target.checked } })}
                   />
-                  <span className="set-toggle-track"></span>
+                  <span className="w-9 h-5.5 rounded-full bg-line-2 relative transition-colors duration-150 before:content-[''] before:absolute before:left-[2px] before:top-[2px] before:w-[18px] before:h-[18px] before:rounded-full before:bg-white before:transition-transform before:duration-[180ms] before:ease-[cubic-bezier(0.2,0.9,0.3,1.2)] before:shadow-[0_1px_2px_rgba(0,0,0,0.1)] peer-checked:bg-teal peer-checked:before:translate-x-[14px]"></span>
                 </label>
               </div>
             </div>
 
             <SectionHead title="Message templates" desc="Edit what your customers see. Variables like {name} are replaced automatically." />
-            <div className="set-card">
-              <div className="set-tpl-row">
-                <div className="set-tpl-l">
-                  <div className="set-tpl-name">Booking confirmation</div>
-                  <div className="set-tpl-preview">{data.wa.templates?.confirmation}</div>
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+              <div className="flex gap-3.5 py-3 border-b border-line items-start first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex-1">
+                  <div className="text-[13px] font-semibold">Booking confirmation</div>
+                  <div className="text-xs text-ink-3 mt-1 bg-bg-2 p-[8px_10px] rounded-lg font-mono leading-[1.45]">{data.wa.templates?.confirmation}</div>
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => openEditTemplate("confirmation")}>
                   <I.edit style={{ marginRight: 4 }} /> Edit
                 </button>
               </div>
-              <div className="set-tpl-row">
-                <div className="set-tpl-l">
-                  <div className="set-tpl-name">Reminder</div>
-                  <div className="set-tpl-preview">{data.wa.templates?.reminder}</div>
+              <div className="flex gap-3.5 py-3 border-b border-line items-start first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex-1">
+                  <div className="text-[13px] font-semibold">Reminder</div>
+                  <div className="text-xs text-ink-3 mt-1 bg-bg-2 p-[8px_10px] rounded-lg font-mono leading-[1.45]">{data.wa.templates?.reminder}</div>
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => openEditTemplate("reminder")}>
                   <I.edit style={{ marginRight: 4 }} /> Edit
                 </button>
               </div>
-              <div className="set-tpl-row">
-                <div className="set-tpl-l">
-                  <div className="set-tpl-name">Re-engagement</div>
-                  <div className="set-tpl-preview">{data.wa.templates?.reengagement}</div>
+              <div className="flex gap-3.5 py-3 border-b border-line items-start first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex-1">
+                  <div className="text-[13px] font-semibold">Re-engagement</div>
+                  <div className="text-xs text-ink-3 mt-1 bg-bg-2 p-[8px_10px] rounded-lg font-mono leading-[1.45]">{data.wa.templates?.reengagement}</div>
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => openEditTemplate("reengagement")}>
                   <I.edit style={{ marginRight: 4 }} /> Edit
@@ -1034,37 +1038,37 @@ export default function SettingsPage() {
       case "plan":
         const current = PLANS.find(p => p.id === data.plan) || PLANS[1];
         return (
-          <div className="set-content">
+          <div className="flex flex-col gap-[18px]">
             <SectionHead title="Current plan" />
-            <div className="set-card set-plan-card">
-              <div className="set-plan-l">
+            <div className="bg-teal-soft border border-teal-soft-2 rounded-xl p-[20px_22px] flex justify-between items-center gap-6 max-[720px]:flex-col max-[720px]:items-start">
+              <div className="flex-1 min-w-0">
                 <span className="badge confirmed no-dot" style={{ marginBottom: 8, padding: "4px 10px" }}>
                   {current.name.toUpperCase()} PLAN · ACTIVE
                 </span>
-                <div className="set-plan-price">
-                  ₹{current.price.toLocaleString("en-IN")}<span> / month</span>
+                <div className="text-[32px] font-semibold tracking-[-0.025em] text-teal-ink">
+                  ₹{current.price.toLocaleString("en-IN")}<span className="text-sm font-normal text-ink-3"> / month</span>
                 </div>
-                <div className="set-plan-desc">{current.desc} · Next charge on 1 June 2026</div>
+                <div className="text-[13px] text-ink-2 mt-1">{current.desc} · Next charge on 1 June 2026</div>
               </div>
-              <div className="set-plan-r">
+              <div className="flex flex-col gap-2 items-end max-[720px]:flex-row max-[720px]:self-stretch">
                 <button className="btn btn-outline btn-sm" onClick={() => setFlash("Plan management is a mockup")}>Manage payment</button>
                 <button className="btn btn-ghost btn-sm" style={{ color: "var(--rose)" }} onClick={() => setFlash("Plan cancellation is a mockup")}>Cancel plan</button>
               </div>
             </div>
 
             <SectionHead title="Change plan" desc="Upgrade or downgrade anytime. Pro-rated to your next bill." />
-            <div className="set-plan-grid">
+            <div className="grid grid-cols-3 gap-3 max-[720px]:grid-cols-1">
               {PLANS.map(p => {
                 const isCurrent = p.id === data.plan;
                 return (
-                  <div key={p.id} className={`set-plan-card-sm ${isCurrent ? "on" : ""}`}>
-                    <div className="set-plan-name">{p.name}</div>
-                    <div className="set-plan-pricesm">
-                      ₹{p.price.toLocaleString("en-IN")}<span>/mo</span>
+                  <div key={p.id} className={`bg-white border rounded-xl p-4.5 transition-colors duration-150 ${isCurrent ? "border-teal" : "border-line"}`}>
+                    <div className="text-sm font-semibold">{p.name}</div>
+                    <div className="text-2xl font-semibold tracking-[-0.02em] mt-1.5">
+                      ₹{p.price.toLocaleString("en-IN")}<span className="text-xs font-normal text-ink-3">/mo</span>
                     </div>
-                    <div className="set-plan-desc">{p.desc}</div>
+                    <div className="text-xs mt-1 text-ink-2">{p.desc}</div>
                     <button
-                      className="btn btn-outline btn-sm"
+                      className="btn btn-outline btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ marginTop: 14, width: "100%" }}
                       onClick={() => update({ ...data, plan: p.id })}
                       disabled={isCurrent}
@@ -1077,20 +1081,20 @@ export default function SettingsPage() {
             </div>
 
             <SectionHead title="Billing history" />
-            <div className="set-card" style={{ padding: 0 }}>
+            <div className="bg-white border border-line rounded-xl p-0">
               {[
                 { date: "1 May 2026", plan: "Salon · monthly", amount: 1179, method: "UPI · ravi@okhdfc" },
                 { date: "1 Apr 2026", plan: "Salon · monthly", amount: 1179, method: "UPI · ravi@okhdfc" },
                 { date: "1 Mar 2026", plan: "Solo · monthly",  amount: 589,  method: "Card · ****4527" },
               ].map((b, i) => (
-                <div key={i} className="set-bill-row">
+                <div key={i} className="grid grid-cols-[1fr_1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto]">
                   <div>
-                    <div className="set-bill-date mono">{b.date}</div>
-                    <div className="set-bill-plan">{b.plan}</div>
+                    <div className="text-[13px] font-semibold mono">{b.date}</div>
+                    <div className="text-xs text-ink-3 mt-0.5">{b.plan}</div>
                   </div>
-                  <div className="set-bill-meta">{b.method}</div>
-                  <div className="set-bill-amount">₹{b.amount.toLocaleString("en-IN")}</div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setFlash("Downloading receipt...")}>Receipt</button>
+                  <div className="text-xs text-ink-3 max-[720px]:col-span-full">{b.method}</div>
+                  <div className="text-sm font-semibold font-mono">₹{b.amount.toLocaleString("en-IN")}</div>
+                  <button className="btn btn-ghost btn-sm max-[720px]:col-start-2" onClick={() => setFlash("Downloading receipt...")}>Receipt</button>
                 </div>
               ))}
             </div>
@@ -1107,28 +1111,30 @@ export default function SettingsPage() {
         const channels = ["push", "sms", "wa"] as const;
         const channelLabel = { push: "Push", sms: "SMS", wa: "WhatsApp" };
         return (
-          <div className="set-content">
+          <div className="flex flex-col gap-[18px]">
             <SectionHead title="Notifications" desc="Choose how you'd like to be alerted." />
-            <div className="set-card" style={{ padding: 0 }}>
-              <div className="set-notif-head">
+            <div className="bg-white border border-line rounded-xl p-0">
+              <div className="grid grid-cols-[1fr_80px_80px_100px] gap-2 p-[14px_20px] bg-bg border-b border-line text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 max-[720px]:hidden">
                 <div></div>
                 {channels.map(c => (
-                  <div key={c} className="set-notif-col">{channelLabel[c]}</div>
+                  <div key={c} className="text-center">{channelLabel[c]}</div>
                 ))}
               </div>
               {rows.map(r => {
                 const notifChannels = data.notifs[r.id] || { push: false, sms: false, wa: false };
                 return (
-                  <div key={r.id} className="set-notif-row">
+                  <div key={r.id} className="grid grid-cols-[1fr_80px_80px_100px] gap-2 p-[16px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-1 max-[720px]:gap-3">
                     <div>
-                      <div className="set-notif-name">{r.label}</div>
-                      <div className="set-notif-desc">{r.desc}</div>
+                      <div className="text-sm font-semibold">{r.label}</div>
+                      <div className="text-xs text-ink-3 mt-0.5">{r.desc}</div>
                     </div>
                     {channels.map(c => (
-                      <div key={c} className="set-notif-col">
-                        <label className="set-toggle">
+                      <div key={c} className="text-center max-[720px]:flex max-[720px]:justify-between max-[720px]:items-center">
+                        <span className="hidden max-[720px]:inline text-xs text-ink-2 font-medium">{channelLabel[c]}</span>
+                        <label className="inline-flex cursor-pointer items-center relative shrink-0">
                           <input
                             type="checkbox"
+                            className="absolute opacity-0 pointer-events-none peer"
                             checked={notifChannels[c] || false}
                             onChange={e => {
                               const updatedNotif = {
@@ -1144,7 +1150,7 @@ export default function SettingsPage() {
                               });
                             }}
                           />
-                          <span className="set-toggle-track"></span>
+                          <span className="w-9 h-5.5 rounded-full bg-line-2 relative transition-colors duration-150 before:content-[''] before:absolute before:left-[2px] before:top-[2px] before:w-[18px] before:h-[18px] before:rounded-full before:bg-white before:transition-transform before:duration-[180ms] before:ease-[cubic-bezier(0.2,0.9,0.3,1.2)] before:shadow-[0_1px_2px_rgba(0,0,0,0.1)] peer-checked:bg-teal peer-checked:before:translate-x-[14px]"></span>
                         </label>
                       </div>
                     ))}
@@ -1157,9 +1163,9 @@ export default function SettingsPage() {
 
       case "account":
         return (
-          <div className="set-content">
+          <div className="flex flex-col gap-[18px]">
             <SectionHead title="Your profile" />
-            <div className="set-card">
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
               <div className="field-row">
                 <div className="field">
                   <label>Name</label>
@@ -1185,14 +1191,14 @@ export default function SettingsPage() {
             </div>
 
             <SectionHead title="Preferences" />
-            <div className="set-card">
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
               <RowField label="Language" value="English" action={<button className="btn btn-ghost btn-sm" onClick={() => setFlash("Language preferences is a mockup")}>Edit</button>} />
               <RowField label="Timezone" value="Asia/Kolkata (IST)" hint="Used for booking times and reports." action={<button className="btn btn-ghost btn-sm" onClick={() => setFlash("Timezone settings is a mockup")}>Edit</button>} />
               <RowField label="Currency" value="Indian Rupee · ₹" action={<button className="btn btn-ghost btn-sm" onClick={() => setFlash("Currency settings is a mockup")}>Edit</button>} />
             </div>
 
             <SectionHead title="Danger zone" desc="Be careful here." />
-            <div className="set-card set-danger">
+            <div className="bg-white border border-rose-soft rounded-xl p-[20px_22px]">
               <RowField
                 label="Export all data"
                 value="Get a ZIP with customers, bookings, and reports."
@@ -1298,30 +1304,36 @@ export default function SettingsPage() {
       </div>
 
       <main className="app-main set-main">
-        <div className="set-layout">
+        <div className="grid grid-cols-[240px_1fr] gap-7 items-start max-[860px]:grid-cols-1">
           {/* Sidebar tabs */}
-          <aside className="set-sidebar">
+          <aside className="flex flex-col gap-0.5 bg-white border border-line rounded-xl p-2 sticky top-[100px] max-[860px]:flex-row max-[860px]:overflow-x-auto max-[860px]:static max-[860px]:flex-nowrap max-[860px]:p-1.5 max-[860px]:gap-1 max-[860px]:[&::-webkit-scrollbar]:hidden">
             {TABS.map(tab => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  className={`set-tab ${active ? "on" : ""}`}
+                  className={`flex items-center gap-2.5 py-2.5 px-3 border-0 rounded-lg font-inherit text-[13px] cursor-pointer text-left transition-colors duration-150 max-[860px]:shrink-0 max-[860px]:py-2 max-[860px]:px-3 ${
+                    active
+                      ? "bg-teal-soft text-teal-ink font-semibold"
+                      : "bg-transparent text-ink-2 hover:bg-bg-2 hover:text-ink"
+                  }`}
                   onClick={() => setActiveTab(tab.id)}
                 >
-                  <span className="set-tab-ic">
+                  <span className={`w-7 h-7 rounded-[7px] grid place-items-center shrink-0 max-[860px]:hidden ${
+                    active ? "bg-teal text-white" : "bg-bg-2 text-ink-2"
+                  }`}>
                     <Icon style={{ width: 16, height: 16 }} />
                   </span>
                   {tab.label}
-                  <I.chevR style={{ marginLeft: "auto", color: "var(--ink-4)", width: 14, height: 14 }} />
+                  <I.chevR className="ml-auto text-ink-4 w-3.5 h-3.5 max-[860px]:hidden" />
                 </button>
               );
             })}
           </aside>
 
           {/* Active Panel Content */}
-          <div className="set-panel">
+          <div className="min-w-0">
             {renderTabContent()}
           </div>
         </div>
@@ -1329,10 +1341,10 @@ export default function SettingsPage() {
 
       {/* Sticky save bar */}
       {dirty && (
-        <div className="set-savebar">
-          <div className="set-savebar-l">You have unsaved changes.</div>
-          <div className="set-savebar-r">
-            <button className="btn btn-ghost" style={{ cursor: "pointer" }} onClick={discard}>Discard</button>
+        <div className="fixed bottom-[calc(var(--bottom-nav-h)+18px)] left-1/2 -translate-x-1/2 w-[min(720px,calc(100%-32px))] bg-ink text-white rounded-[14px] p-[14px_18px] flex justify-between items-center gap-4 shadow-[0_20px_40px_-20px_rgba(14,21,18,0.4)] z-50 animate-pop">
+          <div className="text-[13px]">You have unsaved changes.</div>
+          <div className="flex gap-2">
+            <button className="btn btn-ghost text-white/70 hover:bg-white/8 hover:text-white" style={{ cursor: "pointer" }} onClick={discard}>Discard</button>
             <button className="btn btn-primary" style={{ cursor: "pointer" }} onClick={handleSave}>Save changes</button>
           </div>
         </div>

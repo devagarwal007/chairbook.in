@@ -274,26 +274,16 @@ export default function CustomersPage() {
         </div>
 
         {/* Engagement tabs & Sort */}
-        <div className="eng-tabs" style={{ display: "flex", alignItems: "center", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
+        <div className="flex items-center gap-2 pb-1.5 mb-4 overflow-x-auto max-[720px]:mx-[-16px] max-[720px]:px-4 [&::-webkit-scrollbar]:hidden">
           {FILTER_TABS.map(f => (
             <button
               key={f.id}
-              className={`eng-tab ${tab === f.id ? "on" : ""}`}
+              className={`flex items-center gap-1.5 py-2 px-3 rounded-sm border text-[13px] font-medium cursor-pointer whitespace-nowrap transition-all duration-150 ${
+                tab === f.id 
+                  ? "border-teal bg-teal-soft text-teal" 
+                  : "border-line bg-white text-ink-2 hover:border-line-2"
+              }`}
               onClick={() => setTab(f.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 12px",
-                borderRadius: "var(--radius-sm)",
-                border: tab === f.id ? "1px solid var(--teal)" : "1px solid var(--line)",
-                background: tab === f.id ? "var(--teal-soft)" : "#fff",
-                color: tab === f.id ? "var(--teal)" : "var(--ink-2)",
-                fontSize: "var(--t-body-sm)",
-                fontWeight: 500,
-                cursor: "pointer",
-                whiteSpace: "nowrap"
-              }}
             >
               {f.id !== "all" && (
                 <span
@@ -306,7 +296,7 @@ export default function CustomersPage() {
                 />
               )}
               {f.label}
-              <span style={{ fontSize: 11, color: "var(--ink-3)", marginLeft: 2 }}>{counts[f.id as keyof typeof counts]}</span>
+              <span className="text-[11px] text-ink-3 ml-0.5">{counts[f.id as keyof typeof counts]}</span>
             </button>
           ))}
 
@@ -386,17 +376,7 @@ export default function CustomersPage() {
         </div>
 
         {/* Result Head / Winback Broadcast */}
-        <div
-          className="cust-list-head"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 12,
-            fontSize: "var(--t-body-sm)",
-            color: "var(--ink-3)"
-          }}
-        >
+        <div className="flex items-center justify-between pb-2.5 px-1 gap-3 max-[720px]:flex-col max-[720px]:items-start max-[720px]:gap-2 mb-3 text-[13px] text-ink-3">
           <div>
             {filtered.length} {filtered.length === 1 ? "customer" : "customers"}
             {q && <span> matching &quot;{q}&quot;</span>}
@@ -453,22 +433,8 @@ export default function CustomersPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div
-            className="cust-empty"
-            style={{
-              padding: "48px 24px",
-              textAlign: "center",
-              background: "#fff",
-              border: "1px solid var(--line)",
-              borderRadius: "var(--radius)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 12
-            }}
-          >
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--bg-2)", display: "grid", placeItems: "center" }}>
+          <div className="py-12 px-6 text-center bg-white border border-line rounded-xl flex flex-col items-center justify-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-bg-2 grid place-items-center">
               <I.search style={{ color: "var(--ink-3)", width: 20, height: 20 }} />
             </div>
             <div>
@@ -716,21 +682,7 @@ export default function CustomersPage() {
 
       {/* Flash Messages */}
       {flash && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 100,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 10,
-            fontSize: 13,
-            zIndex: 60,
-            boxShadow: "0 12px 24px -10px rgba(0,0,0,0.3)",
-          }}
-        >
+        <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 bg-ink text-white py-2.5 px-4 rounded-[10px] text-[13px] z-[60] shadow-[0_12px_24px_-10px_rgba(0,0,0,0.3)]">
           {flash}
         </div>
       )}

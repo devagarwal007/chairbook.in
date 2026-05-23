@@ -386,12 +386,12 @@ export default function CustomerProfilePage() {
   };
 
   return (
-    <div className="profile-app">
+    <div className="pb-[120px] max-[640px]:pb-[100px]">
       {/* Top Bar */}
-      <div className="profile-topbar">
-        <div className="profile-topbar-inner">
+      <div className="sticky top-0 z-[100] bg-bg/85 backdrop-blur-md border-b border-line">
+        <div className="max-w-[760px] mx-auto flex items-center h-14 px-6 max-[640px]:px-4 max-[640px]:h-[52px]">
           <button
-            className="book-back"
+            className="grid place-items-center w-9 h-9 rounded-full text-ink-2 transition-colors duration-150 no-underline hover:bg-bg-2 hover:text-ink"
             onClick={() => router.push("/dashboard/customers")}
             aria-label="Back"
           >
@@ -404,7 +404,7 @@ export default function CustomerProfilePage() {
 
       {/* Loading skeleton */}
       {loading && (
-        <main className="profile-main">
+        <main className="max-w-[760px] mx-auto p-[22px_24px_32px] flex flex-col gap-4.5 max-[640px]:p-[18px_16px_28px] max-[640px]:gap-3.5">
           {[160, 100, 200, 180].map((h, i) => (
             <div key={i} className="pulse" style={{ height: h, borderRadius: "var(--radius)", background: "var(--bg-2)" }} />
           ))}
@@ -412,76 +412,80 @@ export default function CustomerProfilePage() {
       )}
 
       {/* Main Container */}
-      {!loading && <main className="profile-main">
+      {!loading && <main className="max-w-[760px] mx-auto p-[22px_24px_32px] flex flex-col gap-4.5 max-[640px]:p-[18px_16px_28px] max-[640px]:gap-3.5">
         {/* Profile Card */}
-        <div className="profile-hero">
-          <div className={`avatar xl tone-${c.tone}`}>
+        <div className="grid grid-cols-[80px_1fr] gap-5 p-6 bg-white border border-line rounded-xl items-start max-[640px]:grid-cols-1 max-[640px]:text-center max-[640px]:justify-items-center max-[640px]:p-[20px_18px] max-[640px]:gap-4">
+          <div className={`avatar xl tone-${c.tone} w-20 h-20 text-[28px] max-[640px]:w-[72px] max-[640px]:h-[72px] max-[640px]:text-2xl`}>
             {initialsOf(c.name)}
           </div>
-          <div className="profile-id">
-            <div className="profile-name">
+          <div className="min-w-0 flex flex-col gap-2 max-[640px]:items-center max-[640px]:gap-1.5">
+            <div className="text-xl font-bold tracking-[-0.01em] text-ink flex items-center flex-wrap gap-2.5 max-[640px]:text-xl max-[640px]:flex-col max-[640px]:gap-2">
               {c.name}
-              <span className={`engage-pill ${engColor}`}>
-                <span className={`engage-dot ${engColor}`} />
+              <span className={`inline-flex items-center gap-1.25 text-[11px] font-medium py-0.75 px-2.5 rounded-full ${
+                engColor === "green" ? "bg-green-soft text-green" : engColor === "amber" ? "bg-amber-soft text-amber-ink" : "bg-rose-soft text-rose"
+              }`}>
+                <span className={`w-1.25 h-1.25 rounded-full ${
+                  engColor === "green" ? "bg-[#2DA76C]" : engColor === "amber" ? "bg-amber" : "bg-rose"
+                }`} />
                 {engLabel}
               </span>
             </div>
-            <div className="profile-phone">
-              <I.phone /> {c.phone}
-              <span className="dot-sep" /> Member since {c.memberSince}
-              <span className="dot-sep" />
+            <div className="text-sm text-ink-3 flex items-center flex-wrap gap-1.5 max-[640px]:text-sm max-[640px]:flex-wrap max-[640px]:justify-center">
+              <I.phone className="align-[-2px]" /> {c.phone}
+              <span className="text-ink-4 mx-0.5" /> Member since {c.memberSince}
+              <span className="text-ink-4 mx-0.5" />
               <I.cal />
             </div>
-            <div className="profile-quick">
-              <span><strong>Prefers</strong> {c.prefStylist}</span>
-              <span><strong>Birthday</strong> {c.birthday}</span>
+            <div className="text-sm text-ink-2 flex gap-4 max-[640px]:text-xs max-[640px]:gap-3 max-[640px]:justify-center">
+              <span><strong className="text-ink font-semibold mr-1">Prefers</strong> {c.prefStylist}</span>
+              <span><strong className="text-ink font-semibold mr-1">Birthday</strong> {c.birthday}</span>
             </div>
           </div>
-          <div className="profile-hero-actions">
-            <button className="btn btn-outline btn-sm" onClick={() => setFlash("Edit details form coming soon!")}><I.edit /> Edit</button>
-            <button className="btn btn-wa btn-sm" onClick={() => setShowMsg(true)}><I.wa style={{ width: 14, height: 14 }} /> Message</button>
+          <div className="flex flex-col gap-2 items-start max-[640px]:flex-row max-[640px]:w-full max-[640px]:justify-center">
+            <button className="btn btn-outline btn-sm flex-1 max-[640px]:flex-1 max-[640px]:max-w-[160px]" onClick={() => setFlash("Edit details form coming soon!")}><I.edit /> Edit</button>
+            <button className="btn btn-wa btn-sm flex-1 max-[640px]:flex-1 max-[640px]:max-w-[160px]" onClick={() => setShowMsg(true)}><I.wa style={{ width: 14, height: 14 }} /> Message</button>
           </div>
         </div>
 
         {/* Upcoming Booking */}
         {c.upcoming && (
-          <div className="upcoming">
-            <div className="upcoming-l">
-              <div className="t-label">UPCOMING</div>
-              <div className="upcoming-val">{c.upcoming.service}</div>
-              <div className="upcoming-meta">{c.upcoming.date} · {c.upcoming.time} · with {c.upcoming.stylist}</div>
+          <div className="flex items-center justify-between gap-4 p-[16px_20px] bg-teal-soft border border-teal-soft-2 rounded-xl max-[640px]:flex-col max-[640px]:items-start max-[640px]:gap-3 max-[640px]:p-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-bold tracking-[0.06em] uppercase text-teal-ink mb-1.5">UPCOMING</div>
+              <div className="text-base font-semibold tracking-[-0.01em] text-teal-ink">{c.upcoming.service}</div>
+              <div className="text-sm text-teal-ink opacity-80 mt-1">{c.upcoming.date} · {c.upcoming.time} · with {c.upcoming.stylist}</div>
             </div>
-            <button className="btn btn-outline btn-sm" onClick={() => router.push("/dashboard/bookings/BK-2026-0517")}>View booking</button>
+            <button className="btn btn-outline btn-sm shrink-0 max-[640px]:w-full max-[640px]:justify-center" onClick={() => router.push("/dashboard/bookings/BK-2026-0517")}>View booking</button>
           </div>
         )}
 
         {/* 3 Metrics Chips */}
-        <div className="stat-chips">
-          <div className="stat-chip">
-            <div className="stat-l">Total visits</div>
-            <div className="stat-v">{c.visits}</div>
-            <div className="stat-d">Last on 13 May</div>
+        <div className="grid grid-cols-3 gap-3 max-[640px]:grid-cols-1 max-[640px]:gap-2.5">
+          <div className="bg-surface border border-line rounded-xl p-4 text-left max-[640px]:p-4 max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:grid-rows-[auto_auto] max-[640px]:gap-y-1 max-[640px]:items-center">
+            <div className="text-xs text-ink-3 font-medium mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Total visits</div>
+            <div className="text-2xl font-bold text-ink tracking-[-0.02em] max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-[22px]">{c.visits}</div>
+            <div className="text-[11px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Last on 13 May</div>
           </div>
-          <div className="stat-chip">
-            <div className="stat-l">Lifetime spend</div>
-            <div className="stat-v"><small>₹</small>{c.spend.toLocaleString("en-IN")}</div>
-            <div className="stat-d">Avg ₹{Math.round(c.spend/c.visits).toLocaleString("en-IN")}/visit</div>
+          <div className="bg-surface border border-line rounded-xl p-4 text-left max-[640px]:p-4 max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:grid-rows-[auto_auto] max-[640px]:gap-y-1 max-[640px]:items-center">
+            <div className="text-xs text-ink-3 font-medium mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Lifetime spend</div>
+            <div className="text-2xl font-bold text-ink tracking-[-0.02em] max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-[22px]"><small className="text-base font-medium">₹</small>{c.spend.toLocaleString("en-IN")}</div>
+            <div className="text-[11px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Avg ₹{Math.round(c.spend/c.visits).toLocaleString("en-IN")}/visit</div>
           </div>
-          <div className="stat-chip">
-            <div className="stat-l">Fav service</div>
-            <div className="stat-v stat-v-text">{c.fav}</div>
-            <div className="stat-d">5 of last {c.visits} visits</div>
+          <div className="bg-surface border border-line rounded-xl p-4 text-left max-[640px]:p-4 max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:grid-rows-[auto_auto] max-[640px]:gap-y-1 max-[640px]:items-center">
+            <div className="text-xs text-ink-3 font-medium mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Fav service</div>
+            <div className="text-base overflow-hidden text-ellipsis whitespace-nowrap mt-1 max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-lg">{c.fav}</div>
+            <div className="text-[11px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">5 of last {c.visits} visits</div>
           </div>
         </div>
 
         {/* Notes Log */}
-        <section className="profile-section">
-          <div className="section-head">
-            <div className="l">
-              <h2>Notes</h2>
-              <span className="count">{notes.length}</span>
+        <section className="bg-white rounded-xl border border-line p-[20px_22px] flex flex-col gap-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-semibold m-0">Notes</h2>
+              <span className="text-xs bg-bg-2 py-0.5 px-2 rounded-full text-ink-3">{notes.length}</span>
             </div>
-            <div className="r">
+            <div className="flex items-center gap-2">
               {!addingNote && (
                 <button
                   className="btn btn-sm btn-outline"
@@ -494,14 +498,15 @@ export default function CustomerProfilePage() {
           </div>
 
           {addingNote && (
-            <div className="note-card note-new">
+            <div className="bg-surface border border-line rounded-xl p-[14px_16px] border-teal bg-teal-soft">
               <textarea
                 placeholder="Anything you want to remember about Priya — preferences, allergies, conversations…"
                 value={newNote}
                 onChange={e => setNewNote(e.target.value)}
                 autoFocus
+                className="border-0 bg-transparent w-full h-20 font-inherit text-[13px] resize-none outline-none text-ink"
               />
-              <div className="note-new-actions">
+              <div className="flex justify-end gap-2">
                 <button className="btn btn-ghost btn-sm" onClick={() => { setAddingNote(false); setNewNote(""); }}>Cancel</button>
                 <button className="btn btn-primary btn-sm" onClick={saveNote} disabled={!newNote.trim()}>Save note</button>
               </div>
@@ -510,54 +515,54 @@ export default function CustomerProfilePage() {
 
           <div className="notes-list">
             {notes.map(n => (
-              <div key={n.id} className="note-card">
-                <div className="note-head">
-                  <div className="note-author">
-                    <div className="avatar sm tone-b">{n.author[0]}</div>
+              <div key={n.id} className="bg-surface border border-line rounded-xl p-[14px_16px] mb-3 last:mb-0">
+                <div className="mb-2">
+                  <div className="flex items-center gap-2 text-xs text-ink-2 font-medium">
+                    <div className="avatar sm tone-b w-5.5 h-5.5 text-[10px]">{n.author[0]}</div>
                     <span>{n.author}</span>
-                    <span className="dot-sep" />
+                    <span className="text-ink-4 mx-0.5" />
                     <span style={{ color: "var(--ink-3)" }}>{n.date}</span>
                   </div>
                 </div>
-                <div className="note-text">{n.text}</div>
+                <div className="text-[13px] text-ink-2 leading-[1.5]">{n.text}</div>
               </div>
             ))}
             {notes.length === 0 && (
-              <div className="note-empty">No notes yet. Tap "Add note" to remember anything about Priya.</div>
+              <div className="p-5 italic text-[13px] text-ink-3 text-center">No notes yet. Tap "Add note" to remember anything about Priya.</div>
             )}
           </div>
         </section>
 
         {/* Visit History */}
-        <section className="profile-section">
-          <div className="section-head">
-            <div className="l">
-              <h2>Visit history</h2>
-              <span className="count">{c.visitHistory.length} visits</span>
+        <section className="bg-white rounded-xl border border-line p-[20px_22px] flex flex-col gap-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-semibold m-0">Visit history</h2>
+              <span className="text-xs bg-bg-2 py-0.5 px-2 rounded-full text-ink-3">{c.visitHistory.length} visits</span>
             </div>
-            <div className="r">
+            <div className="flex items-center gap-2">
               <button className="btn btn-ghost btn-sm" onClick={() => setFlash("Exporting customer history...")}>Export CSV</button>
             </div>
           </div>
 
-          <div className="visits-list">
+          <div className="visits-list flex flex-col gap-3">
             {c.visitHistory.map((v, i) => (
-              <div key={v.id} className="visit-row">
-                <div className="visit-date">
-                  <div className="vd-day">{v.date.split(" ")[0]}</div>
-                  <div className="vd-mo">{v.date.split(" ").slice(1).join(" ")}</div>
+              <div key={v.id} className="grid grid-cols-[52px_1fr_auto] gap-3.5 items-center p-[14px_16px] bg-surface border border-line rounded-xl max-[640px]:grid-cols-[48px_1fr_auto] max-[640px]:gap-3 max-[640px]:p-[12px_14px]">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-ink tracking-[-0.02em] max-[640px]:text-base">{v.date.split(" ")[0]}</div>
+                  <div className="text-[10px] text-ink-3 uppercase tracking-[0.04em] mt-0.5">{v.date.split(" ").slice(1).join(" ")}</div>
                 </div>
-                <div className="visit-body">
-                  <div className="visit-services">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap gap-x-2.5 gap-y-1.5">
                     {v.services.map((s, j) => (
-                      <span key={j} className="visit-service">
-                        {s.name} <small>₹{s.amt.toLocaleString("en-IN")}</small>
+                      <span key={j} className="text-[13px] font-medium text-ink">
+                        {s.name} <small className="text-ink-3 font-normal">₹{s.amt.toLocaleString("en-IN")}</small>
                       </span>
                     ))}
                   </div>
-                  <div className="visit-meta">with {v.stylist} · paid via {v.payment}</div>
+                  <div className="text-xs text-ink-3 mt-1">with {v.stylist} · paid via {v.payment}</div>
                 </div>
-                <div className="visit-amount">
+                <div className="text-[15px] font-semibold text-ink-2 whitespace-nowrap">
                   ₹{v.amount.toLocaleString("en-IN")}
                 </div>
               </div>
@@ -567,16 +572,16 @@ export default function CustomerProfilePage() {
       </main>}
 
       {/* Sticky Bottom Actions */}
-      <div className="profile-cta">
+      <div className="fixed bottom-[calc(var(--bottom-nav-h)+24px)] left-1/2 -translate-x-1/2 max-w-[712px] w-[calc(100%-48px)] bg-white/92 backdrop-blur-md border border-line rounded-2xl p-2.5 flex gap-2.5 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.1)] z-40 max-[640px]:left-4 max-[640px]:right-4 max-[640px]:transform-none max-[640px]:max-w-none max-[640px]:w-auto max-[640px]:bottom-[calc(var(--bottom-nav-h)+16px)]">
         <button
-          className="btn btn-outline btn-lg"
+          className="btn btn-outline h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5"
           onClick={() => setAddingNote(true)}
           style={{ flex: 1 }}
         >
           <I.plus /> Add note
         </button>
         <button
-          className="btn btn-primary btn-lg"
+          className="btn btn-primary h-12 text-sm px-4.5 max-[640px]:text-[13px] max-[640px]:h-11 max-[640px]:px-3.5"
           onClick={() => setShowMsg(true)}
           style={{ flex: 2, background: c.engagement === "lost" ? "var(--rose)" : undefined }}
         >

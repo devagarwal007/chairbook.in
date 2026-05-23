@@ -723,11 +723,11 @@ export default function BookingsPage() {
         {/* Selected booking quick view */}
         {selected && (
           <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
             onClick={() => setSelected(null)}
           >
             <div
-              style={{ width: "min(560px, 100%)", background: "#fff", borderRadius: "16px 16px 0 0", padding: 20, animation: "pop 0.2s ease-out" }}
+              style={{ width: "min(560px, 100%)", background: "#fff", borderRadius: 16, padding: 20, animation: "pop 0.2s ease-out", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}

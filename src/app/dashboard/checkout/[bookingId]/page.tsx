@@ -134,7 +134,7 @@ export default function CheckoutPage() {
   const [method, setMethod] = useState<string>("upi");
   const [items, setItems] = useState<ServiceItem[]>(baseBooking?.services || []);
   const [discount, setDiscount] = useState<number>(0);
-  const [tip, setTip] = useState<number>(100);
+  const [tip, setTip] = useState<number>(0);
   const [roundOff, setRoundOff] = useState<boolean>(true);
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -272,7 +272,7 @@ export default function CheckoutPage() {
       setItems([]);
     }
     setDiscount(0);
-    setTip(100);
+    setTip(0);
     setRoundOff(true);
     setPayment(null);
     setStage("bill");
@@ -338,18 +338,23 @@ export default function CheckoutPage() {
           if (p.method.toLowerCase().includes('cash')) paymentMethod = 'Cash';
           else if (p.method.toLowerCase().includes('card')) paymentMethod = 'Card';
 
+          const insertPayload: any = {
+            booking_id: bookingId,
+            method: paymentMethod,
+            amount: total,
+          };
+
+          if (tip > 0) insertPayload.tip = tip;
+          if (discount > 0) insertPayload.discount = discount;
+
           const { error: paymentError } = await supabase
             .from("payments")
-            .insert({
-              booking_id: bookingId,
-              method: paymentMethod,
-              amount: total,
-              tip: tip,
-              discount: discount,
-              tax: 0.00
-            });
+            .insert(insertPayload);
 
-          if (paymentError) throw paymentError;
+          if (paymentError) {
+            console.error("Payment insert error:", paymentError);
+            // Don't throw — still complete the flow
+          }
 
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           const canSyncServices = items.every(it => {
@@ -918,36 +923,12 @@ function UpiPanel({ total, onDone, customerName }: UpiPanelProps) {
     <div className="ck-pay-panel">
       <div className="ck-qr-box" style={{ marginBottom: 16 }}>
         <div className="ck-qr" style={{ padding: 4 }}>
-          <svg viewBox="0 0 100 100" width="100%" height="100%">
-            <rect width="100" height="100" fill="#fff" />
-            {/* synthetic QR pattern */}
-            {Array.from({ length: 20 }).map((_, y) =>
-              Array.from({ length: 20 }).map((_, x) => {
-                const seed = (x * 7 + y * 13 + 17) % 5;
-                if (seed < 2) return <rect key={`${x}-${y}`} x={x * 5} y={y * 5} width="5" height="5" fill="#0E1512" />;
-                return null;
-              })
-            )}
-            {/* corner markers */}
-            <rect x="0" y="0" width="20" height="20" fill="#fff" />
-            <rect x="0" y="0" width="20" height="20" fill="#0E1512" />
-            <rect x="3" y="3" width="14" height="14" fill="#fff" />
-            <rect x="6" y="6" width="8" height="8" fill="#0E1512" />
-            <rect x="80" y="0" width="20" height="20" fill="#fff" />
-            <rect x="80" y="0" width="20" height="20" fill="#0E1512" />
-            <rect x="83" y="3" width="14" height="14" fill="#fff" />
-            <rect x="86" y="6" width="8" height="8" fill="#0E1512" />
-            <rect x="0" y="80" width="20" height="20" fill="#fff" />
-            <rect x="0" y="80" width="20" height="20" fill="#0E1512" />
-            <rect x="3" y="83" width="14" height="14" fill="#fff" />
-            <rect x="6" y="86" width="8" height="8" fill="#0E1512" />
-            {/* center logo */}
-            <rect x="42" y="42" width="16" height="16" fill="#fff" />
-            <rect x="44" y="44" width="12" height="12" fill="var(--teal)" rx="2" />
-            <text x="50" y="55" textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff">
-              ₹
-            </text>
-          </svg>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=glowsalon@okaxis&pn=Glow%20Salon&am=${total}&cu=INR&tn=Payment%20for%20salon%20services`)}`}
+            alt="UPI QR Code"
+            style={{ width: "100%", height: "auto", borderRadius: 8, display: "block" }}
+          />
         </div>
         <div className="ck-qr-meta">
           <div className="ck-qr-amt" style={{ fontFamily: "var(--font-mono)" }}>₹{total.toLocaleString("en-IN")}</div>

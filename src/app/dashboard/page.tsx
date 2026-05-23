@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
 import { toMin } from "@/lib/utils";
@@ -61,6 +62,7 @@ const STATUS_ORDER: ("confirmed" | "arrived" | "completed" | "noshow")[] = ["con
 // ===== MAIN DASHBOARD PAGE =====
 export default function DashboardPage() {
   const { profile, salonId, loading: profileLoading } = useProfile();
+  const router = useRouter();
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | number | null>(3); // Active one starts expanded
@@ -112,124 +114,141 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [salonId]);
 
-  const loadDbBookings = async (activeSalonId: string, activeDay: string) => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !activeSalonId) return;
-
-    setLoadingBookings(true);
-    try {
-      const d = new Date();
-      if (activeDay === "tomorrow") {
-        d.setDate(d.getDate() + 1);
-      }
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dateNum = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${dateNum}`;
-
-      const { data, error } = await supabase
-        .from("bookings")
-        .select(`
-          id,
-          customer_id,
-          date,
-          start_time,
-          duration,
-          status,
-          notes,
-          customer:customers (id, name, phone),
-          stylist:stylists (id, name, tone),
-          booking_services (
-            qty,
-            price_at_booking,
-            service:services (id, name)
-          )
-        `)
-        .eq("salon_id", activeSalonId)
-        .eq("date", dateStr)
-        .order("start_time", { ascending: true });
-
-      if (error) throw error;
-
-      if (data) {
-        const customerIds = Array.from(new Set(data.map((b) => b.customer_id).filter(Boolean)));
-        const visitsMap: Record<string, number> = {};
-        
-        if (customerIds.length > 0) {
-          const { data: visitsData } = await supabase
-            .from("bookings")
-            .select("customer_id, status")
-            .in("customer_id", customerIds)
-            .in("status", ["Completed", "Paid"]);
-            
-          if (visitsData) {
-            visitsData.forEach((v) => {
-              visitsMap[v.customer_id] = (visitsMap[v.customer_id] || 0) + 1;
-            });
-          }
-        }
-
-        const cleanTone = (t: string) => t.replace("tone-", "");
-        const mappedAppts: Appointment[] = data.map((b: any) => {
-          const custName = b.customer?.name || "Walk-in Customer";
-          const initials = custName
-            .split(" ")
-            .map((p: string) => p[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2) || "WC";
-          
-          const cleanToneVal = b.stylist?.tone ? cleanTone(b.stylist.tone) : "a";
-          const serviceNames = b.booking_services
-            ?.map((bs: any) => bs.service?.name)
-            .filter(Boolean)
-            .join(" + ") || "No service";
-          
-          const price = b.booking_services
-            ?.reduce((total: number, bs: any) => total + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
-
-          const mapDbStatusToUi = (s: string): "confirmed" | "arrived" | "completed" | "noshow" => {
-            const lower = (s || "").toLowerCase();
-            if (lower === "confirmed") return "confirmed";
-            if (lower === "arrived") return "arrived";
-            if (lower === "completed" || lower === "paid") return "completed";
-            if (lower === "no-show") return "noshow";
-            return "confirmed";
-          };
-
-          return {
-            id: b.id,
-            customerId: b.customer_id,
-            time: (b.start_time || "09:00").slice(0, 5),
-            duration: b.duration || 30,
-            customer: custName,
-            initials,
-            tone: cleanToneVal,
-            service: serviceNames,
-            stylist: b.stylist?.id || "unassigned",
-            price,
-            status: mapDbStatusToUi(b.status),
-            visits: visitsMap[b.customer_id] || 0,
-            phone: b.customer?.phone || "",
-            note: b.notes || ""
-          };
-        });
-
-        setAppts(mappedAppts);
-      }
-    } catch (err) {
-      console.error("Error loading bookings from Supabase:", err);
-      setAppts([]);
-    } finally {
-      setLoadingBookings(false);
-      setPageLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (salonId) {
-      loadDbBookings(salonId, day);
-    }
+    if (!salonId) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+      setLoadingBookings(true);
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        if (!cancelled) {
+          setLoadingBookings(false);
+          setPageLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const d = new Date();
+        if (day === "tomorrow") {
+          d.setDate(d.getDate() + 1);
+        }
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dateNum = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${dateNum}`;
+
+        const { data, error } = await supabase
+          .from("bookings")
+          .select(`
+            id,
+            customer_id,
+            date,
+            start_time,
+            duration,
+            status,
+            notes,
+            customer:customers (id, name, phone),
+            stylist:stylists (id, name, tone),
+            booking_services (
+              qty,
+              price_at_booking,
+              service:services (id, name)
+            )
+          `)
+          .eq("salon_id", salonId)
+          .eq("date", dateStr)
+          .order("start_time", { ascending: true });
+
+        if (cancelled) return;
+        if (error) throw error;
+
+        if (data) {
+          const customerIds = Array.from(new Set(data.map((b) => b.customer_id).filter(Boolean)));
+          const visitsMap: Record<string, number> = {};
+          
+          if (customerIds.length > 0) {
+            const { data: visitsData } = await supabase
+              .from("bookings")
+              .select("customer_id, status")
+              .in("customer_id", customerIds)
+              .in("status", ["Completed", "Paid"]);
+              
+            if (visitsData && !cancelled) {
+              visitsData.forEach((v) => {
+                visitsMap[v.customer_id] = (visitsMap[v.customer_id] || 0) + 1;
+              });
+            }
+          }
+
+          if (cancelled) return;
+
+          const cleanTone = (t: string) => t.replace("tone-", "");
+          const mappedAppts: Appointment[] = data.map((b: any) => {
+            const custName = b.customer?.name || "Walk-in Customer";
+            const initials = custName
+              .split(" ")
+              .map((p: string) => p[0])
+              .join("")
+              .toUpperCase()
+              .slice(0, 2) || "WC";
+            
+            const cleanToneVal = b.stylist?.tone ? cleanTone(b.stylist.tone) : "a";
+            const serviceNames = b.booking_services
+              ?.map((bs: any) => bs.service?.name)
+              .filter(Boolean)
+              .join(" + ") || "No service";
+            
+            const price = b.booking_services
+              ?.reduce((total: number, bs: any) => total + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
+
+            const mapDbStatusToUi = (s: string): "confirmed" | "arrived" | "completed" | "noshow" => {
+              const lower = (s || "").toLowerCase();
+              if (lower === "confirmed") return "confirmed";
+              if (lower === "arrived") return "arrived";
+              if (lower === "completed" || lower === "paid") return "completed";
+              if (lower === "no-show") return "noshow";
+              return "confirmed";
+            };
+
+            return {
+              id: b.id,
+              customerId: b.customer_id,
+              time: (b.start_time || "09:00").slice(0, 5),
+              duration: b.duration || 30,
+              customer: custName,
+              initials,
+              tone: cleanToneVal,
+              service: serviceNames,
+              stylist: b.stylist?.id || "unassigned",
+              price,
+              status: mapDbStatusToUi(b.status),
+              visits: visitsMap[b.customer_id] || 0,
+              phone: b.customer?.phone || "",
+              note: b.notes || ""
+            };
+          });
+
+          setAppts(mappedAppts);
+        }
+      } catch (err) {
+        console.error("Error loading bookings from Supabase:", err);
+        if (!cancelled) setAppts([]);
+      } finally {
+        if (!cancelled) {
+          setLoadingBookings(false);
+          setPageLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [salonId, day]);
 
   // Combine lists depending on connection state
@@ -348,7 +367,8 @@ export default function DashboardPage() {
 
         setFlash(`${name} added to schedule`);
         setTimeout(() => setFlash(null), 2000);
-        loadDbBookings(salonId, day);
+        // Force state reload by updating day state / running inlined fetch
+        setDay(day);
         return;
       } catch (err: any) {
         console.error("Error creating walk-in booking:", err);
@@ -579,7 +599,11 @@ export default function DashboardPage() {
               </strong>{" "}
               Send a follow-up WhatsApp in one tap.
             </div>
-            <button className="btn btn-sm" style={{ background: "var(--teal)", color: "#fff", height: 32 }}>
+            <button
+              className="btn btn-sm"
+              style={{ background: "var(--teal)", color: "#fff", height: 32 }}
+              onClick={() => router.push("/dashboard/bookings")}
+            >
               Review →
             </button>
           </div>
@@ -685,6 +709,7 @@ interface ApptRowProps {
 }
 
 function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMin }: ApptRowProps) {
+  const router = useRouter();
   const stylist = stylists.find((s) => s.id === appt.stylist) || stylists[1] || { id: "unknown", name: appt.stylist, tone: "a" };
   const start = toMin(appt.time);
   const end = start + appt.duration;
@@ -773,7 +798,13 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
               <button
                 key={s}
                 className={`status-btn ${s === "noshow" ? "danger" : ""}`}
-                onClick={() => onStatus(appt.id, s)}
+                onClick={() => {
+                  if (s === "completed") {
+                    router.push(`/dashboard/checkout/${bookingParam}`);
+                  } else {
+                    onStatus(appt.id, s);
+                  }
+                }}
                 style={appt.status === s ? { borderColor: "var(--teal)", color: "var(--teal)", background: "var(--teal-soft)" } : {}}
               >
                 {appt.status === s && "✓ "}
@@ -839,11 +870,22 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
           <div className="field-row">
             <div className="field">
               <label>Customer name</label>
-              <input placeholder="e.g. Priya Sharma" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+              <input
+                placeholder="e.g. Priya Sharma"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+                style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
+              />
             </div>
             <div className="field">
               <label>Phone (optional)</label>
-              <input placeholder="+91 98xxx" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input
+                placeholder="+91 98xxx"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
+              />
             </div>
           </div>
           <div className="field">

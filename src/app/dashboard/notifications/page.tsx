@@ -122,6 +122,7 @@ interface Actor {
 
 interface NotificationItem {
   id: number;
+  dbId?: string;
   kind: string;
   ts: string;
   day: string;
@@ -201,6 +202,7 @@ export default function NotificationsPage() {
 
             return {
               id: i + 1,
+              dbId: n.id,
               kind: n.type || "new_booking",
               ts,
               day,
@@ -251,8 +253,24 @@ export default function NotificationsPage() {
     return out;
   }, [notifs]);
 
-  const markRead = (id: number) => {
+  const markRead = async (id: number) => {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+    if (salonId) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          const notif = notifs.find(n => n.id === id);
+          if (notif && notif.dbId) {
+            await supabase
+              .from("notifications")
+              .update({ read: true })
+              .eq("id", notif.dbId);
+          }
+        } catch (err) {
+          console.error("Error marking notification read:", err);
+        }
+      }
+    }
   };
 
   const dateStr = (() => {
@@ -269,9 +287,23 @@ export default function NotificationsPage() {
     return `${dayName} · ${dayNum} ${monthName} ${year} · ${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
   })();
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
     setNotifs(prev => prev.map(n => ({ ...n, unread: false })));
     flashMsg('All marked as read');
+    if (salonId) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        try {
+          await supabase
+            .from("notifications")
+            .update({ read: true })
+            .eq("salon_id", salonId)
+            .eq("read", false);
+        } catch (err) {
+          console.error("Error marking all notifications read:", err);
+        }
+      }
+    }
   };
 
   const dismiss = (id: number, e: React.MouseEvent) => {
@@ -290,6 +322,54 @@ export default function NotificationsPage() {
     });
     return out;
   }, [filtered]);
+
+  if (loading) {
+    return (
+      <div className="app">
+        <div className="app-top">
+          <div className="app-top-inner">
+            <div className="brand" style={{ display: "flex", alignItems: "center" }}>
+              <div className="pulse" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--bg-2)" }} />
+              <div className="pulse" style={{ width: 120, height: 16, borderRadius: 4, marginLeft: 8, background: "var(--bg-2)" }} />
+            </div>
+            <div className="greeting">
+              <div className="pulse" style={{ width: 160, height: 20, borderRadius: 4, background: "var(--bg-2)" }} />
+              <div className="pulse" style={{ width: 240, height: 12, borderRadius: 3, marginTop: 6, background: "var(--bg-2)" }} />
+            </div>
+          </div>
+        </div>
+        <main className="app-main" style={{ paddingBottom: 100, maxWidth: 760, margin: "0 auto" }}>
+          {/* Filter pills skeleton */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, paddingBottom: 6, borderBottom: "1px solid var(--line)" }}>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="pulse" style={{ width: 80, height: 34, borderRadius: 8, background: "var(--bg-2)" }} />
+            ))}
+          </div>
+          {/* Day group skeleton */}
+          <div style={{ marginBottom: 22 }}>
+            <div className="pulse" style={{ width: 60, height: 10, borderRadius: 3, marginBottom: 8, background: "var(--bg-2)" }} />
+            <div style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "40px 1fr auto", gap: 14, padding: "14px 18px", borderBottom: "1px solid var(--line)" }}>
+                  <div className="pulse" style={{ width: 40, height: 40, borderRadius: 10, background: "var(--bg-2)" }} />
+                  <div>
+                    <div className="pulse" style={{ width: 180, height: 14, borderRadius: 4, background: "var(--bg-2)" }} />
+                    <div className="pulse" style={{ width: 240, height: 10, borderRadius: 3, marginTop: 6, background: "var(--bg-2)" }} />
+                  </div>
+                  <div className="pulse" style={{ width: 50, height: 12, borderRadius: 3, background: "var(--bg-2)" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+        <nav className="bottom-nav">
+          {["Home", "Bookings", "Customers", "Insights", "Settings"].map(t => (
+            <span key={t} className="bn-item"><span>{t}</span></span>
+          ))}
+        </nav>
+      </div>
+    );
+  }
 
   return (
     <div className="app">

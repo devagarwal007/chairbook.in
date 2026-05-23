@@ -3252,6 +3252,8 @@ footer {
 }
 .modal {
   width: min(440px, 100%);
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
   background: #fff;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
@@ -3334,6 +3336,11 @@ footer {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+@media (max-width: 480px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
 }
 .svc-options {
   display: grid;
@@ -4430,6 +4437,7 @@ footer {
 .ck-pay-panel{
   background: #fff; border: 1px solid var(--line); border-radius: 12px;
   padding: 18px;
+  overflow: hidden;
 }
 .ck-pay-status{
   display: flex; align-items: center; gap: 8px; justify-content: center;
@@ -4483,6 +4491,13 @@ footer {
   flex: 1; border: 0; outline: 0; background: transparent;
   font-family: inherit; font-size: 36px; font-weight: 600; color: var(--ink);
   letter-spacing: -0.02em;
+  min-width: 0;
+  -moz-appearance: textfield;
+}
+.ck-cash-input input::-webkit-outer-spin-button,
+.ck-cash-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .ck-cash-quick{
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;

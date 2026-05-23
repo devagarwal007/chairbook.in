@@ -13,39 +13,14 @@ const I = {
   bellSm: Icons.bell,
 };
 
+import { HoursData, Service, Stylist } from "@/types";
+
 // ===== TYPES =====
 interface SalonInfo {
   name: string;
   area: string;
   type: string;
   city: string;
-}
-
-interface WorkingHour {
-  open: boolean;
-  from: string;
-  to: string;
-}
-
-interface WorkingHours {
-  [key: string]: WorkingHour;
-}
-
-interface ServiceItem {
-  id: number | string;
-  name: string;
-  cat: string;
-  duration: number;
-  price: number;
-  active: boolean;
-}
-
-interface StylistItem {
-  id: number | string;
-  name: string;
-  role: string;
-  tone: string;
-  commission: number;
 }
 
 interface WhatsAppTemplates {
@@ -80,9 +55,9 @@ interface AccountInfo {
 
 interface SettingsData {
   salon: SalonInfo;
-  hours: WorkingHours;
-  services: ServiceItem[];
-  team: StylistItem[];
+  hours: HoursData;
+  services: Service[];
+  team: Stylist[];
   wa: WhatsAppInfo;
   plan: string;
   notifs: Notifications;
@@ -221,7 +196,7 @@ export default function SettingsPage() {
 
   // Service Modals state
   const [showServiceModal, setShowServiceModal] = useState(false);
-  const [editingSvc, setEditingSvc] = useState<ServiceItem | null>(null);
+  const [editingSvc, setEditingSvc] = useState<Service | null>(null);
   const [svcName, setSvcName] = useState("");
   const [svcCategory, setSvcCategory] = useState("Hair");
   const [svcDuration, setSvcDuration] = useState(30);
@@ -229,7 +204,7 @@ export default function SettingsPage() {
 
   // Stylist Modals state
   const [showStylistModal, setShowStylistModal] = useState(false);
-  const [editingStylist, setEditingStylist] = useState<StylistItem | null>(null);
+  const [editingStylist, setEditingStylist] = useState<Stylist | null>(null);
   const [stylistName, setStylistName] = useState("");
   const [stylistRole, setStylistRole] = useState("Stylist");
   const [stylistCommission, setStylistCommission] = useState(40);
@@ -321,7 +296,7 @@ export default function SettingsPage() {
             salonArea = selectedSalon.area || "";
             salonCity = selectedSalon.city || "";
             salonType = selectedSalon.type || "Unisex salon";
-            salonHours = selectedSalon.hours ? (selectedSalon.hours as WorkingHours) : INITIAL_DATA.hours;
+            salonHours = selectedSalon.hours ? (selectedSalon.hours as HoursData) : INITIAL_DATA.hours;
             salonWa = selectedSalon.wa_number || "";
           }
         }
@@ -510,7 +485,7 @@ export default function SettingsPage() {
               salon_id: supabaseSalonId,
               name: stylist.name,
               role_label: stylist.role,
-              tone: stylist.tone.startsWith("tone-") ? stylist.tone : `tone-${stylist.tone}`,
+              tone: stylist.tone ? (stylist.tone.startsWith("tone-") ? stylist.tone : `tone-${stylist.tone}`) : "tone-a",
               commission_pct: stylist.commission,
               active: true,
             };
@@ -606,10 +581,10 @@ export default function SettingsPage() {
     setShowServiceModal(true);
   };
 
-  const openEditService = (svc: ServiceItem) => {
+  const openEditService = (svc: Service) => {
     setEditingSvc(svc);
     setSvcName(svc.name);
-    setSvcCategory(svc.cat);
+    setSvcCategory(svc.cat || "Hair");
     setSvcDuration(svc.duration);
     setSvcPrice(svc.price);
     setShowServiceModal(true);
@@ -630,7 +605,7 @@ export default function SettingsPage() {
       setFlash("Service updated");
     } else {
       // Add mode
-      const newSvc: ServiceItem = {
+      const newSvc: Service = {
         id: "temp-" + Date.now(),
         name: svcName.trim(),
         cat: svcCategory,
@@ -653,11 +628,11 @@ export default function SettingsPage() {
     setShowStylistModal(true);
   };
 
-  const openEditStylist = (stylist: StylistItem) => {
+  const openEditStylist = (stylist: Stylist) => {
     setEditingStylist(stylist);
     setStylistName(stylist.name);
-    setStylistRole(stylist.role);
-    setStylistCommission(stylist.commission);
+    setStylistRole(stylist.role || "Stylist");
+    setStylistCommission(stylist.commission ?? 40);
     setShowStylistModal(true);
   };
 
@@ -676,7 +651,7 @@ export default function SettingsPage() {
       update({ ...data, team: list });
       setFlash("Stylist updated");
     } else {
-      const newStylist: StylistItem = {
+      const newStylist: Stylist = {
         id: "temp-" + Date.now(),
         name: stylistName.trim(),
         role: stylistRole,

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
+import { Customer } from "@/types";
+
 // ===== TYPES =====
 interface Note {
   id: number;
@@ -27,11 +29,8 @@ interface Visit {
   payment: string;
 }
 
-interface CustomerProfile {
-  id: string | number;
-  name: string;
+interface CustomerProfile extends Customer {
   tone: string;
-  phone: string;
   memberSince: string;
   prefStylist: string;
   birthday: string;

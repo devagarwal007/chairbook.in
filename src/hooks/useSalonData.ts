@@ -3,30 +3,11 @@
 import { useState, useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-export interface DbStylist {
-  id: string;
-  name: string;
-  short: string;
-  tone: string;
-}
+import { Stylist, Service, Customer } from "@/types";
 
-export interface DbService {
-  id: string;
-  name: string;
-  category: string;
-  duration: number;
-  price: number;
-}
-
-export interface DbCustomer {
-  id: string;
-  name: string;
-  phone: string;
-  visits: number;
-  lastDays: number;
-  spend: number;
-  tone: string;
-}
+export type DbStylist = Stylist;
+export type DbService = Service;
+export type DbCustomer = Customer;
 
 export function useSalonData(salonId: string | null) {
   const [stylists, setStylists] = useState<DbStylist[]>([]);

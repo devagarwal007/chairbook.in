@@ -7,33 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 
-// ===== TYPES =====
-interface Customer {
-  id: number | string;
-  name: string;
-  phone: string;
-  visits: number;
-  lastDays: number;
-  spend: number;
-  tone: string;
-  isNew?: boolean;
-}
-
-interface Service {
-  id: string;
-  name: string;
-  cat: string;
-  duration: number;
-  price: number;
-}
-
-interface Stylist {
-  id: string;
-  name: string;
-  tone: string;
-  short: string;
-  skills: string[];
-}
+import { Customer, Service, Stylist } from "@/types";
 
 // ===== ICONS =====
 const IN = {
@@ -205,10 +179,10 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
                   <div className="nb-cust-meta">
                     <span>{c.phone}</span>
                     <span className="dot-sep">·</span>
-                    <span>{c.visits} visit{c.visits === 1 ? "" : "s"} · Last {formatLast(c.lastDays)}</span>
+                    <span>{c.visits ?? 0} visit{(c.visits ?? 0) === 1 ? "" : "s"} · Last {formatLast(c.lastDays ?? 999)}</span>
                   </div>
                 </div>
-                <div className="nb-cust-spend mono">₹{c.spend.toLocaleString("en-IN")}</div>
+                <div className="nb-cust-spend mono">₹{(c.spend ?? 0).toLocaleString("en-IN")}</div>
                 {customer?.id === c.id && <div className="nb-cust-tick"><IN.check /></div>}
               </button>
             ))}
@@ -349,10 +323,10 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
 interface StepWhenProps {
   services: Service[];
   totalDuration: number;
-  stylist: string;
+  stylist: string | number;
   date: string;
   time: string | null;
-  onStylist: (id: string) => void;
+  onStylist: (id: string | number) => void;
   onDate: (d: string) => void;
   onTime: (t: string | null) => void;
   overrideAvail: boolean;
@@ -477,7 +451,7 @@ interface StepConfirmProps {
   services: Service[];
   totalDuration: number;
   totalPrice: number;
-  stylist: string;
+  stylist: string | number;
   date: string;
   time: string;
   note: string;
@@ -569,7 +543,7 @@ export default function NewBookingPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [newCust, setNewCust] = useState({ name: "", phone: "", source: "", noPhone: false });
   const [services, setServices] = useState<Service[]>([]);
-  const [stylist, setStylist] = useState("");
+  const [stylist, setStylist] = useState<string | number>("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState<string | null>(null);
   const [overrideAvail, setOverrideAvail] = useState(false);

@@ -7,13 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 
-// ===== TYPES =====
-interface Customer {
-  name: string;
-  initials: string;
-  tone: string;
-  phone: string;
-}
+import { Customer } from "@/types";
 
 interface ServiceItem {
   id: number;
@@ -200,6 +194,7 @@ export default function CheckoutPage() {
           const bData: Booking = {
             id: data.id,
             customer: {
+              id: customerObj?.id || "",
               name: custName,
               initials: custInitials,
               tone: stylistObj?.tone ? cleanTone(stylistObj.tone) : "b",

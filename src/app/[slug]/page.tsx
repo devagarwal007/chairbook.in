@@ -6,44 +6,12 @@ import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
 
 type Step = 1 | 2 | 3 | 4;
 
-interface SalonRow {
-  id: string;
-  name: string;
-  slug: string;
-  area: string | null;
-  city: string | null;
-  type: string | null;
-  hours: Record<string, { open: boolean; from: string; to: string }> | null;
-}
-
-interface ServiceRow {
-  id: string;
-  name: string;
-  category: string;
-  duration_min: number;
-  price: number;
-}
-
-interface StylistRow {
-  id: string;
-  name: string;
-  role_label: string | null;
-  tone: string | null;
-}
-
-interface BookingRow {
-  id: string;
-  stylist_id: string | null;
-  date: string;
-  start_time: string;
-  duration: number;
-  status: string;
-}
+import { Salon, Service, Stylist, BookingRow } from "@/types";
 
 interface BookingState {
-  salon: SalonRow | null;
-  services: ServiceRow[];
-  stylists: StylistRow[];
+  salon: Salon | null;
+  services: Service[];
+  stylists: Stylist[];
   bookings: BookingRow[];
 }
 
@@ -119,7 +87,7 @@ function getDates() {
   });
 }
 
-function getSlotsForDate(salon: SalonRow | null, dateKey: string, dates: ReturnType<typeof getDates>, duration: number) {
+function getSlotsForDate(salon: Salon | null, dateKey: string, dates: ReturnType<typeof getDates>, duration: number) {
   const date = dates.find((d) => d.key === dateKey);
   const hours = date && salon?.hours?.[date.dayKey];
   const from = hours?.from || "10:00";
@@ -154,7 +122,7 @@ function overlaps(slot: string, duration: number, booking: BookingRow) {
   return slotStart < bookingEnd && slotEnd > bookingStart;
 }
 
-function getAvailableStylistId(stylists: StylistRow[], bookings: BookingRow[], date: string, time: string, duration: number, selected: string) {
+function getAvailableStylistId(stylists: Stylist[], bookings: BookingRow[], date: string, time: string, duration: number, selected: string | number) {
   const activeBookings = bookings.filter((booking) => booking.date === date && !["Cancelled", "No-show"].includes(booking.status));
 
   if (selected !== "any") {
@@ -195,8 +163,8 @@ export default function PublicBookingPage() {
 
   const [state, setState] = useState<BookingState>({ salon: null, services: [], stylists: [], bookings: [] });
   const [step, setStep] = useState<Step>(1);
-  const [selectedServices, setSelectedServices] = useState<ServiceRow[]>([]);
-  const [selectedStylist, setSelectedStylist] = useState("any");
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [selectedStylist, setSelectedStylist] = useState<string | number>("any");
   const [selectedDate, setSelectedDate] = useState(dates[1]?.key ?? dates[0].key);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
@@ -205,7 +173,7 @@ export default function PublicBookingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const totalDuration = selectedServices.reduce((sum, service) => sum + service.duration_min, 0);
+  const totalDuration = selectedServices.reduce((sum, service) => sum + (service.duration_min || service.duration), 0);
   const totalPrice = selectedServices.reduce((sum, service) => sum + Number(service.price), 0);
 
   useEffect(() => {
@@ -248,7 +216,10 @@ export default function PublicBookingPage() {
 
       setState({
         salon,
-        services: services ?? [],
+        services: (services ?? []).map((s: any) => ({
+          ...s,
+          duration: s.duration_min,
+        })),
         stylists: stylists ?? [],
         bookings: bookings ?? [],
       });
@@ -259,7 +230,7 @@ export default function PublicBookingPage() {
   }, [dates, slug]);
 
   const groupedServices = useMemo(() => {
-    return state.services.reduce<Record<string, ServiceRow[]>>((groups, service) => {
+    return state.services.reduce<Record<string, Service[]>>((groups, service) => {
       const category = service.category || "General";
       groups[category] = [...(groups[category] ?? []), service];
       return groups;
@@ -281,7 +252,7 @@ export default function PublicBookingPage() {
   const selectedStylistName = selectedStylist === "any" ? "First available" : state.stylists.find((stylist) => stylist.id === selectedStylist)?.name ?? "Stylist";
   const canAdvance = (step === 1 && selectedServices.length > 0) || (step === 2 && selectedTime) || (step === 3 && customerName.trim().length > 1 && phone.replace(/\D/g, "").length >= 10);
 
-  const toggleService = (service: ServiceRow) => {
+  const toggleService = (service: Service) => {
     setSelectedServices((current) => (current.some((item) => item.id === service.id) ? current.filter((item) => item.id !== service.id) : [...current, service]));
   };
 
@@ -446,7 +417,7 @@ export default function PublicBookingPage() {
                           <div className="svc-info">
                             <div className="svc-name">{service.name}</div>
                             <div className="svc-meta">
-                              <I.clock /> {service.duration_min} min
+                              <I.clock /> {service.duration_min || service.duration} min
                             </div>
                           </div>
                           <div className="svc-price">
@@ -525,7 +496,7 @@ export default function PublicBookingPage() {
                   <div key={service.id} className="sum-svc-row">
                     <div>
                       <div className="sum-svc-name">{service.name}</div>
-                      <div className="sum-svc-meta">{service.duration_min} min</div>
+                      <div className="sum-svc-meta">{service.duration_min || service.duration} min</div>
                     </div>
                     <div className="sum-svc-price">₹{Number(service.price).toLocaleString("en-IN")}</div>
                   </div>

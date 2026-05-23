@@ -9,28 +9,7 @@ import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { toMinHours, initialsOf, formatDateKey } from "@/lib/utils";
 
-// ===== TYPES =====
-interface Stylist {
-  id: string;
-  name: string;
-  short: string;
-  tone: string;
-}
-
-interface CalAppt {
-  id: string | number;
-  dayKey: string; // 'YYYY-MM-DD'
-  stylistId: string;
-  startH: number;
-  startM: number;
-  duration: number;
-  customer: string;
-  initials: string;
-  tone: string;
-  service: string;
-  status: "confirmed" | "arrived" | "completed" | "noshow";
-  phone?: string;
-}
+import { Stylist, CalAppt } from "@/types";
 
 // ===== CONSTANTS =====
 const START_HOUR = 9;
@@ -265,7 +244,7 @@ function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () 
 interface WeekViewProps {
   weekDays: Date[];
   appts: CalAppt[];
-  stylistFilter: string;
+  stylistFilter: string | number;
   onSelect: (a: CalAppt) => void;
   todayKey: string;
   nowMin: number;
@@ -342,7 +321,7 @@ interface DayViewProps {
   dayKey: string;
   appts: CalAppt[];
   stylists: Stylist[];
-  stylistFilter: string;
+  stylistFilter: string | number;
   onSelect: (a: CalAppt) => void;
   nowMin: number;
   isToday: boolean;
@@ -419,7 +398,7 @@ export default function BookingsPage() {
   const router = useRouter();
   const [view, setView] = useState<"week" | "day">("week");
   const [baseDate, setBaseDate] = useState<Date>(() => new Date());
-  const [stylistFilter, setStylistFilter] = useState("all");
+  const [stylistFilter, setStylistFilter] = useState<string | number>("all");
   const [selected, setSelected] = useState<CalAppt | null>(null);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
@@ -575,7 +554,7 @@ export default function BookingsPage() {
   const isDayToday = dayKey === todayKey;
 
   // Count appointments per stylist for chips
-  const apptCountForFilter = (id: string) => {
+  const apptCountForFilter = (id: string | number) => {
     if (view === "week") return appts.filter(a => id === "all" || a.stylistId === id).length;
     return appts.filter(a => a.dayKey === dayKey && (id === "all" || a.stylistId === id)).length;
   };

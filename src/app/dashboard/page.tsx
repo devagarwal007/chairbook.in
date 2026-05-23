@@ -9,7 +9,8 @@ import { toMin } from "@/lib/utils";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
-import { useSalonData, DbStylist, DbService } from "@/lib/useSalonData";
+import { useSalonData } from "@/hooks/useSalonData";
+import { Appointment, Stylist, Service } from "@/types";
 
 // ===== HELPERS =====
 const formatTime12h = (timeStr: string) => {
@@ -32,31 +33,15 @@ const formatTime12hFromMin = (min: number) => {
 };
 
 // ===== TYPES =====
-interface Appointment {
-  id: string | number;
-  customerId?: string | number;
-  time: string;
-  duration: number;
-  customer: string;
-  initials: string;
-  tone: string;
-  service: string;
-  stylist: string;
-  price: number;
-  status: "confirmed" | "arrived" | "completed" | "noshow";
-  visits: number;
-  phone: string;
-  note: string;
-}
 
 // ===== FALLBACK DATA (only used when Supabase is unavailable) =====
-const FALLBACK_STYLISTS: DbStylist[] = [
+const FALLBACK_STYLISTS: Stylist[] = [
   { id: "all", name: "All stylists", tone: "", short: "?" },
 ];
 
-const FALLBACK_SERVICES: DbService[] = [];
+const FALLBACK_SERVICES: Service[] = [];
 
-const STATUS_LABEL = { confirmed: "Confirmed", arrived: "Arrived", completed: "Completed", noshow: "No-show" };
+const STATUS_LABEL = { confirmed: "Confirmed", arrived: "Arrived", completed: "Completed", noshow: "No-show", cancelled: "Cancelled" };
 const STATUS_ORDER: ("confirmed" | "arrived" | "completed" | "noshow")[] = ["confirmed", "arrived", "completed", "noshow"];
 
 // ===== MAIN DASHBOARD PAGE =====
@@ -66,7 +51,7 @@ export default function DashboardPage() {
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | number | null>(3); // Active one starts expanded
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState<string | number>("all");
   const [day, setDay] = useState("today");
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
@@ -331,11 +316,11 @@ export default function DashboardPage() {
     setTimeout(() => setFlash(null), 1800);
   };
 
-  const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: DbService; stylistId: string }) => {
+  const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: Service; stylistId: string | number }) => {
     const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     const supabase = getSupabaseBrowserClient();
     
-    if (supabase && salonId && isUUID(svc.id) && isUUID(stylistId)) {
+    if (supabase && salonId && isUUID(String(svc.id)) && isUUID(String(stylistId))) {
       try {
         const now = new Date();
         const y = now.getFullYear();
@@ -704,7 +689,7 @@ interface ApptRowProps {
   onToggle: () => void;
   onStatus: (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => void;
   onWA: (a: Appointment) => void;
-  stylists: DbStylist[];
+  stylists: Stylist[];
   nowTimeMin: number;
 }
 
@@ -839,9 +824,9 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
 // Add Walk-In Appointment Modal
 interface WalkInModalProps {
   onClose: () => void;
-  onAdd: (data: { name: string; phone: string; svc: DbService; stylistId: string }) => void;
-  services: DbService[];
-  stylists: DbStylist[];
+  onAdd: (data: { name: string; phone: string; svc: Service; stylistId: string | number }) => void;
+  services: Service[];
+  stylists: Stylist[];
 }
 
 function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {

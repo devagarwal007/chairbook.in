@@ -5,41 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { makeSalonSlug, saveOnboarding } from "@/lib/onboarding";
 
-// ===== TYPES =====
-interface Stylist {
-  id: number;
-  name: string;
-  role: string;
-  tone: string;
-}
-
-interface Service {
-  id: string;
-  name: string;
-  duration: number;
-  price: number;
-  preset?: boolean;
-}
-
-interface DayHour {
-  open: boolean;
-  from: string;
-  to: string;
-}
-
-interface HoursData {
-  [key: string]: DayHour;
-}
-
-interface OnboardingData {
-  name: string;
-  area: string;
-  type: string;
-  hours: HoursData;
-  stylists: Stylist[];
-  services: Service[];
-  waNumber: string;
-}
+import { DayHour, HoursData, Stylist, Service, OnboardingData } from "@/types";
 
 // ===== ICONS =====
 const IO = {
@@ -355,7 +321,7 @@ function StepTeam({ data, onChange, onNext, onBack }: StepTeamProps) {
     setRole("Stylist");
   };
 
-  const removeStylist = (id: number) => {
+  const removeStylist = (id: string | number) => {
     onChange({ ...data, stylists: data.stylists.filter((s) => s.id !== id) });
   };
 
@@ -425,7 +391,7 @@ interface StepServicesProps {
 }
 
 function StepServices({ data, onChange, onNext, onBack }: StepServicesProps) {
-  const togglePreset = (id: string) => {
+  const togglePreset = (id: string | number) => {
     const exists = data.services.find((s) => s.id === id);
     if (exists) {
       onChange({ ...data, services: data.services.filter((s) => s.id !== id) });
@@ -755,7 +721,20 @@ export default function OnboardingPage() {
     setSaveError(null);
 
     try {
-      const saved = await saveOnboarding(data);
+      const onboardingInput = {
+        ...data,
+        stylists: data.stylists.map(s => ({
+          name: s.name,
+          role: s.role || "Stylist",
+          tone: s.tone || "b",
+        })),
+        services: data.services.map(s => ({
+          name: s.name,
+          duration: s.duration,
+          price: s.price,
+        })),
+      };
+      const saved = await saveOnboarding(onboardingInput);
       setSavedSlug(saved.slug);
       setStepIdx(STEPS.length - 1);
     } catch (err) {

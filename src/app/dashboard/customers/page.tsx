@@ -10,18 +10,7 @@ import { useProfile } from "@/context/ProfileContext";
 import { initialsOf } from "@/lib/utils";
 
 
-// ===== TYPES =====
-interface Customer {
-  id: string | number;
-  name: string;
-  tone: string;
-  phone: string;
-  visits: number;
-  lastDays: number;
-  spend: number;
-  fav: string;
-  stylist: string;
-}
+import { Customer } from "@/types";
 
 // ===== DATA =====
 const CUSTOMERS: Customer[] = [
@@ -72,9 +61,9 @@ const SORT_OPTIONS = [
 
 const FILTER_TABS = [
   { id: "all",     label: "All",     match: () => true },
-  { id: "active",  label: "Active",  match: (c: Customer) => engagementOf(c.lastDays) === "active" },
-  { id: "cooling", label: "Cooling", match: (c: Customer) => engagementOf(c.lastDays) === "cooling" },
-  { id: "lost",    label: "Lost",    match: (c: Customer) => engagementOf(c.lastDays) === "lost" },
+  { id: "active",  label: "Active",  match: (c: Customer) => engagementOf(c.lastDays ?? 999) === "active" },
+  { id: "cooling", label: "Cooling", match: (c: Customer) => engagementOf(c.lastDays ?? 999) === "cooling" },
+  { id: "lost",    label: "Lost",    match: (c: Customer) => engagementOf(c.lastDays ?? 999) === "lost" },
 ];
 
 // ===== EXPORT COMPONENT =====
@@ -172,7 +161,7 @@ export default function CustomersPage() {
   const counts = useMemo(() => {
     const out = { all: customers.length, active: 0, cooling: 0, lost: 0 };
     customers.forEach(c => {
-      const eng = engagementOf(c.lastDays);
+      const eng = engagementOf(c.lastDays ?? 999);
       if (eng === "active") out.active++;
       else if (eng === "cooling") out.cooling++;
       else if (eng === "lost") out.lost++;
@@ -190,17 +179,17 @@ export default function CustomersPage() {
       list = list.filter(c =>
         c.name.toLowerCase().includes(query) ||
         c.phone.includes(query) ||
-        c.fav.toLowerCase().includes(query) ||
-        c.stylist.toLowerCase().includes(query)
+        (c.fav && c.fav.toLowerCase().includes(query)) ||
+        (c.stylist && c.stylist.toLowerCase().includes(query))
       );
     }
 
     const sorted = [...list];
-    if (sort === "recent") sorted.sort((a, b) => a.lastDays - b.lastDays);
+    if (sort === "recent") sorted.sort((a, b) => (a.lastDays ?? 999) - (b.lastDays ?? 999));
     else if (sort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sort === "visits") sorted.sort((a, b) => b.visits - a.visits);
-    else if (sort === "spend") sorted.sort((a, b) => b.spend - a.spend);
-    else if (sort === "lost") sorted.sort((a, b) => b.lastDays - a.lastDays);
+    else if (sort === "visits") sorted.sort((a, b) => (b.visits ?? 0) - (a.visits ?? 0));
+    else if (sort === "spend") sorted.sort((a, b) => (b.spend ?? 0) - (a.spend ?? 0));
+    else if (sort === "lost") sorted.sort((a, b) => (b.lastDays ?? 999) - (a.lastDays ?? 999));
 
     return sorted;
   }, [q, tab, sort, customers]);
@@ -243,7 +232,7 @@ export default function CustomersPage() {
     <div className="app animate-fade-in">
       <Header
         title="Customers"
-        subtitle={`${customers.length} TOTAL · ₹${(customers.reduce((s, c) => s + c.spend, 0) / 100000).toFixed(1)}L LIFETIME`}
+        subtitle={`${customers.length} TOTAL · ₹${(customers.reduce((s, c) => s + (c.spend ?? 0), 0) / 100000).toFixed(1)}L LIFETIME`}
         actions={
           <button
             className="icon-btn"
@@ -492,7 +481,7 @@ export default function CustomersPage() {
         ) : (
           <div className="cust-list" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filtered.map(c => {
-              const eng = engagementOf(c.lastDays);
+              const eng = engagementOf(c.lastDays ?? 999);
               return (
                 <div
                   key={c.id}
@@ -549,19 +538,19 @@ export default function CustomersPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
                       <span>{c.phone}</span>
                       <span>·</span>
-                      <span>Seen {formatLast(c.lastDays)}</span>
+                      <span>Seen {formatLast(c.lastDays ?? 999)}</span>
                     </div>
                   </div>
 
                   {/* Stats */}
                   <div style={{ textAlign: "right", marginRight: 16, flexShrink: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>{c.visits} visits</div>
-                    <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>Likes {c.fav}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>{c.visits ?? 0} visits</div>
+                    <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>Likes {c.fav ?? "—"}</div>
                   </div>
 
                   {/* Spend */}
                   <div style={{ textAlign: "right", marginRight: 16, flexShrink: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--teal)" }}>₹{c.spend.toLocaleString("en-IN")}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--teal)" }}>₹{(c.spend ?? 0).toLocaleString("en-IN")}</div>
                     <div style={{ fontSize: 10, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.02em", marginTop: 2 }}>Lifetime</div>
                   </div>
 

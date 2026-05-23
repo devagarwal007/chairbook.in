@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
+import { BookingData } from "@/types";
 
 // ===== ICONS =====
 interface IconProps extends React.SVGProps<SVGSVGElement> {}
@@ -100,29 +101,6 @@ const IBD = {
 };
 
 // ===== TYPES =====
-interface BookingData {
-  id: string;
-  status: "confirmed" | "arrived" | "completed" | "noshow" | "cancelled";
-  date: string;
-  time: string;
-  duration: number;
-  customer: {
-    id: string | number;
-    name: string;
-    initials: string;
-    tone: string;
-    phone: string;
-    visits: number;
-    lastVisit: string;
-    spend: number;
-    memberSince: string;
-  };
-  services: { name: string; duration: number; price: number }[];
-  stylist: { name: string; short: string; tone: string };
-  notes: string;
-  payment: { status: "paid" | "pending"; method: string | null };
-  activity: { ts: string; icon: string; text: string; meta: string; tone: string }[];
-}
 
 // FALLBACK: only used when no DB data available
 const BOOKING: BookingData = {

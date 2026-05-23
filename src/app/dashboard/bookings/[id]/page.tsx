@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { BookingData } from "@/types";
+import { isUUID } from "@/lib/utils";
 
 // ===== ICONS =====
 interface IconProps extends React.SVGProps<SVGSVGElement> {}
@@ -382,7 +383,7 @@ export default function BookingDetailPage() {
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const isUuid = isUUID(bookingId);
 
     if (!isUuid || !supabase) {
       setBooking(BOOKING);
@@ -603,7 +604,7 @@ export default function BookingDetailPage() {
   const isNoShow = status === "noshow";
 
   const changeStatus = async (s: "confirmed" | "arrived" | "completed" | "noshow") => {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const isUuid = isUUID(bookingId);
     
     const mapUiStatusToDb = (u: string) => {
       if (u === "confirmed") return "Confirmed";
@@ -645,7 +646,7 @@ export default function BookingDetailPage() {
   const handleReschedule = async ({ date, time, note }: { date: string; time: string; note: string }) => {
     const day = RESCH_DAYS.find(d => d.key === date);
     if (day) {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+      const isUuid = isUUID(bookingId);
       if (isUuid) {
         const supabase = getSupabaseBrowserClient();
         if (supabase) {
@@ -693,7 +694,7 @@ export default function BookingDetailPage() {
   };
 
   const handleCancel = async ({ reason, note, notify }: { reason: string; note: string; notify: boolean }) => {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const isUuid = isUUID(bookingId);
     const reasonLabel = CANCEL_REASONS.find(r => r.id === reason)?.label || "Other reason";
     if (isUuid) {
       const supabase = getSupabaseBrowserClient();
@@ -740,7 +741,7 @@ export default function BookingDetailPage() {
   };
 
   const handleRestore = async () => {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const isUuid = isUUID(bookingId);
     if (isUuid) {
       const supabase = getSupabaseBrowserClient();
       if (supabase) {

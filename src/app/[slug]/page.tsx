@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
+import { formatDateKey, formatPhone } from "@/lib/utils";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -52,14 +53,7 @@ const I = {
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, "");
-  return digits.startsWith("91") ? `+${digits}` : `+91${digits}`;
-}
 
-function toLocalDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
 
 function toMinutes(time: string) {
   const [h, m] = time.slice(0, 5).split(":").map(Number);
@@ -77,7 +71,7 @@ function getDates() {
     date.setDate(today.getDate() + index);
 
     return {
-      key: toLocalDateKey(date),
+      key: formatDateKey(date),
       dow: date.toLocaleDateString("en-IN", { weekday: "short" }).toUpperCase(),
       dom: date.getDate(),
       label: index === 0 ? "Today" : index === 1 ? "Tomorrow" : "",
@@ -98,7 +92,7 @@ function getSlotsForDate(salon: Salon | null, dateKey: string, dates: ReturnType
   }
 
   const now = new Date();
-  const isToday = dateKey === toLocalDateKey(now);
+  const isToday = dateKey === formatDateKey(now);
   const start = toMinutes(from);
   const end = toMinutes(to);
   const firstAvailable = isToday ? now.getHours() * 60 + now.getMinutes() + 45 : start;

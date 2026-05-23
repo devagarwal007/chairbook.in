@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { isUUID, initialsOf } from "@/lib/utils";
 
 import { Customer } from "@/types";
 
@@ -144,9 +145,6 @@ const TEMPLATES = [
   { id: "custom",  title: "Write your own",         body: "" },
 ];
 
-const initialsOf = (name: string) =>
-  name.split(" ").filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase();
-
 // ===== RE-ENGAGEMENT MODAL =====
 interface MessageModalProps {
   customer: CustomerProfile;
@@ -265,7 +263,7 @@ export default function CustomerProfilePage() {
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId);
+    const isUuid = isUUID(customerId);
 
     if (!isUuid || !supabase) {
       // Fall back to mock — pick by numeric ID if possible
@@ -418,7 +416,7 @@ export default function CustomerProfilePage() {
     // Save to DB
     const supabase = getSupabaseBrowserClient();
     if (supabase) {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId);
+      const isUuid = isUUID(customerId);
       if (isUuid) {
         try {
           await supabase

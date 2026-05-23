@@ -5,32 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
-import { toMin } from "@/lib/utils";
+import { toMin, formatTime12h, formatTime12hFromMin, formatDateDisplay, isUUID, mapDbStatusToUi } from "@/lib/utils";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { useSalonData } from "@/hooks/useSalonData";
 import { Appointment, Stylist, Service } from "@/types";
-
-// ===== HELPERS =====
-const formatTime12h = (timeStr: string) => {
-  const min = toMin(timeStr);
-  let h = Math.floor(min / 60);
-  const m = min % 60;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12;
-  return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
-};
-
-const formatTime12hFromMin = (min: number) => {
-  let h = Math.floor(min / 60);
-  const m = min % 60;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12;
-  return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
-};
 
 // ===== TYPES =====
 
@@ -63,18 +43,7 @@ export default function DashboardPage() {
   const [nowTimeMin, setNowTimeMin] = useState(d.getHours() * 60 + d.getMinutes());
   const [dateDisplayStr, setDateDisplayStr] = useState(formatDateDisplay(d));
 
-  function formatDateDisplay(date: Date) {
-    const dayName = date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
-    const dayNum = String(date.getDate()).padStart(2, "0");
-    const monthName = date.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
-    const year = date.getFullYear();
-    let hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    return `${dayName} · ${dayNum} ${monthName} ${year} · ${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
-  }
+
 
   useEffect(() => {
     if (profileLoading) return;
@@ -189,14 +158,7 @@ export default function DashboardPage() {
             const price = b.booking_services
               ?.reduce((total: number, bs: any) => total + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
 
-            const mapDbStatusToUi = (s: string): "confirmed" | "arrived" | "completed" | "noshow" => {
-              const lower = (s || "").toLowerCase();
-              if (lower === "confirmed") return "confirmed";
-              if (lower === "arrived") return "arrived";
-              if (lower === "completed" || lower === "paid") return "completed";
-              if (lower === "no-show") return "noshow";
-              return "confirmed";
-            };
+
 
             return {
               id: b.id,
@@ -280,7 +242,6 @@ export default function DashboardPage() {
     setFlash(`Status updated to ${STATUS_LABEL[status]}`);
     setTimeout(() => setFlash(null), 1800);
 
-    const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     if (typeof id === "string" && isUUID(id)) {
       const supabase = getSupabaseBrowserClient();
       if (supabase) {
@@ -317,7 +278,6 @@ export default function DashboardPage() {
   };
 
   const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: Service; stylistId: string | number }) => {
-    const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     const supabase = getSupabaseBrowserClient();
     
     if (supabase && salonId && isUUID(String(svc.id)) && isUUID(String(stylistId))) {

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
+import { isUUID } from "@/lib/utils";
 
 import { Customer } from "@/types";
 
@@ -137,7 +138,7 @@ export default function CheckoutPage() {
   // Fetch Booking details if UUID
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const isUuid = isUUID(bookingId);
 
     if (!isUuid || !supabase) {
       setBooking(null);
@@ -221,7 +222,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !booking?.id) return;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const isUuid = isUUID(bookingId);
     if (!isUuid) return;
 
     const loadDbServices = async () => {
@@ -324,7 +325,7 @@ export default function CheckoutPage() {
 
   const finishPayment = async (p: PaymentInfo) => {
     if (!baseBooking) return;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const isUuid = isUUID(bookingId);
     if (isUuid) {
       const supabase = getSupabaseBrowserClient();
       if (supabase) {
@@ -351,10 +352,9 @@ export default function CheckoutPage() {
             // Don't throw — still complete the flow
           }
 
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           const canSyncServices = items.every(it => {
             const sId = it.service_id || dbServices.find(ds => ds.name === it.name)?.id;
-            return sId && uuidRegex.test(String(sId));
+            return sId && isUUID(String(sId));
           });
 
           if (canSyncServices) {

@@ -12,34 +12,6 @@ import { initialsOf } from "@/lib/utils";
 
 import { Customer } from "@/types";
 
-// ===== DATA =====
-const CUSTOMERS: Customer[] = [
-  { id: 1,  name: "Priya Sharma",     tone: "b", phone: "+91 98xxx 12345", visits: 12, lastDays: 6,   spend: 12400, fav: "Hair Color",     stylist: "Anjali" },
-  { id: 2,  name: "Meera Iyer",       tone: "c", phone: "+91 98xxx 22119", visits: 5,  lastDays: 42,  spend: 6800,  fav: "Facial",         stylist: "Pooja" },
-  { id: 3,  name: "Kavya Reddy",      tone: "e", phone: "+91 98xxx 30247", visits: 8,  lastDays: 81,  spend: 9200,  fav: "Hair Color",     stylist: "Anjali" },
-  { id: 4,  name: "Sneha P.",         tone: "d", phone: "+91 98xxx 41902", visits: 3,  lastDays: 2,   spend: 2150,  fav: "Threading",      stylist: "Rekha" },
-  { id: 5,  name: "Anita Verma",      tone: "a", phone: "+91 98xxx 50819", visits: 22, lastDays: 9,   spend: 28400, fav: "Hair Spa",       stylist: "Pooja" },
-  { id: 6,  name: "Lakshmi Nair",     tone: "f", phone: "+91 98xxx 60372", visits: 1,  lastDays: 4,   spend: 350,   fav: "Manicure",       stylist: "Rekha" },
-  { id: 7,  name: "Divya Menon",      tone: "e", phone: "+91 98xxx 72184", visits: 4,  lastDays: 67,  spend: 3100,  fav: "Pedicure",       stylist: "Kiran" },
-  { id: 8,  name: "Ravi Kumar",       tone: "c", phone: "+91 98xxx 80091", visits: 7,  lastDays: 14,  spend: 4200,  fav: "Beard Trim",     stylist: "Kiran" },
-  { id: 9,  name: "Aisha Khan",       tone: "d", phone: "+91 98xxx 81234", visits: 18, lastDays: 21,  spend: 21800, fav: "Keratin",        stylist: "Anjali" },
-  { id: 10, name: "Riya Patel",       tone: "b", phone: "+91 98xxx 90456", visits: 9,  lastDays: 38,  spend: 8400,  fav: "Hair Color",     stylist: "Anjali" },
-  { id: 11, name: "Neha Gupta",       tone: "a", phone: "+91 98xxx 12356", visits: 6,  lastDays: 51,  spend: 5600,  fav: "Facial",         stylist: "Pooja" },
-  { id: 12, name: "Pooja Joshi",      tone: "f", phone: "+91 98xxx 23467", visits: 14, lastDays: 11,  spend: 16200, fav: "Hair Spa",       stylist: "Pooja" },
-  { id: 13, name: "Shreya Bhat",      tone: "e", phone: "+91 98xxx 34578", visits: 2,  lastDays: 95,  spend: 1100,  fav: "Haircut",        stylist: "Anjali" },
-  { id: 14, name: "Tanvi Kapoor",     tone: "c", phone: "+91 98xxx 45689", visits: 11, lastDays: 18,  spend: 13900, fav: "Highlights",     stylist: "Anjali" },
-  { id: 15, name: "Madhuri Desai",    tone: "b", phone: "+91 98xxx 56790", visits: 25, lastDays: 7,   spend: 34200, fav: "Bridal package", stylist: "Anjali" },
-  { id: 16, name: "Asha Rao",         tone: "d", phone: "+91 98xxx 67801", visits: 3,  lastDays: 73,  spend: 2400,  fav: "Threading",      stylist: "Rekha" },
-  { id: 17, name: "Vikram Singh",     tone: "c", phone: "+91 98xxx 78912", visits: 4,  lastDays: 28,  spend: 1600,  fav: "Haircut",        stylist: "Kiran" },
-  { id: 18, name: "Mehak Sethi",      tone: "a", phone: "+91 98xxx 89023", visits: 8,  lastDays: 47,  spend: 9100,  fav: "Manicure",       stylist: "Rekha" },
-  { id: 19, name: "Sunita Pillai",    tone: "f", phone: "+91 98xxx 90134", visits: 16, lastDays: 12,  spend: 18600, fav: "Hair Color",     stylist: "Anjali" },
-  { id: 20, name: "Rohit Agarwal",    tone: "c", phone: "+91 98xxx 01245", visits: 5,  lastDays: 32,  spend: 2200,  fav: "Haircut",        stylist: "Kiran" },
-  { id: 21, name: "Bhavana Shetty",   tone: "e", phone: "+91 98xxx 12356", visits: 7,  lastDays: 88,  spend: 6500,  fav: "Facial",         stylist: "Pooja" },
-  { id: 22, name: "Nisha Pandey",     tone: "d", phone: "+91 98xxx 23467", visits: 13, lastDays: 24,  spend: 14400, fav: "Hair Spa",       stylist: "Pooja" },
-  { id: 23, name: "Karthik Mehta",    tone: "b", phone: "+91 98xxx 34578", visits: 3,  lastDays: 56,  spend: 900,   fav: "Beard Trim",     stylist: "Kiran" },
-  { id: 24, name: "Aarti Bhandari",   tone: "f", phone: "+91 98xxx 45689", visits: 19, lastDays: 5,   spend: 22800, fav: "Highlights",     stylist: "Anjali" },
-];
-
 const engagementOf = (days: number) => days <= 30 ? "active" : days <= 60 ? "cooling" : "lost";
 
 const formatLast = (days: number) => {
@@ -274,7 +246,7 @@ export default function CustomersPage() {
         </div>
 
         {/* Engagement tabs & Sort */}
-        <div className="flex items-center gap-2 pb-1.5 mb-4 overflow-x-auto max-[720px]:mx-[-16px] max-[720px]:px-4 [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center gap-2 pb-1.5 mb-4 max-[720px]:mx-[-16px] max-[720px]:px-4 [&::-webkit-scrollbar]:hidden">
           {FILTER_TABS.map(f => (
             <button
               key={f.id}
@@ -373,6 +345,16 @@ export default function CustomersPage() {
               </div>
             )}
           </div>
+
+          {/* Add customer button */}
+          <button
+            onClick={() => setShowCreateCust(true)}
+            className="h-[34px] rounded-[10px] border border-line-2 bg-teal text-white inline-flex items-center gap-1.5 px-3 cursor-pointer flex-shrink-0 hover:bg-[var(--teal-ink)] transition-all duration-150 text-[13px] font-medium"
+            style={{ transform: "translateY(0)" }}
+          >
+            <I.plus style={{ width: 16, height: 16 }} />
+            Add Customer
+          </button>
         </div>
 
         {/* Result Head / Winback Broadcast */}
@@ -547,31 +529,6 @@ export default function CustomersPage() {
           </div>
         )}
       </main>
-
-      {/* FAB - Add customer */}
-      <button
-        className="fab"
-        onClick={() => setShowCreateCust(true)}
-        style={{
-          position: "fixed",
-          right: 24,
-          bottom: 96,
-          width: 56,
-          height: 56,
-          borderRadius: 18,
-          background: "var(--teal)",
-          color: "#fff",
-          fontSize: 28,
-          border: 0,
-          boxShadow: "0 8px 24px rgba(15,110,86,0.3)",
-          cursor: "pointer",
-          display: "grid",
-          placeItems: "center",
-          zIndex: 40
-        }}
-      >
-        +
-      </button>
 
       {/* Create Customer Modal */}
       {showCreateCust && (

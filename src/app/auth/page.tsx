@@ -36,7 +36,9 @@ export function AuthScreen({ initialMode = "signup" }: AuthScreenProps) {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setIsCheckingSession(false);
+      queueMicrotask(() => {
+        setIsCheckingSession(false);
+      });
       return;
     }
 
@@ -48,7 +50,9 @@ export function AuthScreen({ initialMode = "signup" }: AuthScreenProps) {
       } = await supabase.auth.getSession();
 
       if (!mounted || !session?.user) {
-        setIsCheckingSession(false);
+        queueMicrotask(() => {
+          setIsCheckingSession(false);
+        });
         return;
       }
 
@@ -56,7 +60,9 @@ export function AuthScreen({ initialMode = "signup" }: AuthScreenProps) {
         router.replace(await getPostLoginPath(supabase, session.user.id));
       } catch (sessionError) {
         setError(sessionError instanceof Error ? sessionError.message : "Could not check your account setup.");
-        setIsCheckingSession(false);
+        queueMicrotask(() => {
+          setIsCheckingSession(false);
+        });
       }
     };
 
@@ -151,7 +157,7 @@ export function AuthScreen({ initialMode = "signup" }: AuthScreenProps) {
           </div>
           <div className="auth-aside-body">
             <div className="auth-aside-quote">
-              "The first month we saw 14 customers we hadn't messaged in two months — sent them an offer and 9 came back."
+              {"\"The first month we saw 14 customers we hadn't messaged in two months — sent them an offer and 9 came back.\""}
             </div>
             <div className="auth-aside-attr">
               <div className="avatar md tone-b" style={{ border: "2px solid rgba(255,255,255,0.15)", width: "36px", height: "36px", borderRadius: "50%", background: "#0F6E56", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "bold" }}>RV</div>

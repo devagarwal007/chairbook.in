@@ -6,11 +6,14 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { Icons as I } from "@/components/ui/Icons";
+import { PeriodData, DbAnalyticsBooking } from "@/types";
 
 const IR = I;
 
+
+
 // ===== MOCK DATA FALLBACKS =====
-const PERIODS_MOCK: Record<string, any> = {
+const PERIODS_MOCK: Record<string, PeriodData> = {
   today: {
     label: "Today",
     dateRange: "Sunday, 19 May 2026",
@@ -224,7 +227,7 @@ function BarChart({ data, highlightIdx }: BarChartProps) {
 
 // ===== RANKED LIST COMPONENT =====
 interface RankedListProps {
-  rows: any[];
+  rows: Array<{ name: string; bookings: number; revenue: number; share: number; tone?: string; color?: string }>;
   type: "service" | "stylist";
 }
 
@@ -264,19 +267,23 @@ function RankedList({ rows, type }: RankedListProps) {
 export default function InsightsPage() {
   const [period, setPeriod] = useState<"today" | "week" | "month">("week");
   const { salonId, loading: profileLoading } = useProfile();
-  const [dbData, setDbData] = useState<Record<string, any> | null>(null);
+  const [dbData, setDbData] = useState<Record<string, PeriodData> | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch payments and booking stats from Supabase
   useEffect(() => {
     if (profileLoading) return;
     if (!salonId) {
-      setLoading(false);
+      queueMicrotask(() => {
+        setLoading(false);
+      });
       return;
     }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setLoading(false);
+      queueMicrotask(() => {
+        setLoading(false);
+      });
       return;
     }
 
@@ -309,9 +316,13 @@ export default function InsightsPage() {
           `)
           .eq("salon_id", salonId);
 
+
+
         if (error) throw error;
         if (!bookingsData || bookingsData.length === 0) {
-          setLoading(false);
+          queueMicrotask(() => {
+            setLoading(false);
+          });
           return;
         }
 
@@ -348,26 +359,26 @@ export default function InsightsPage() {
         const prevMonthEnd = new Date(refDate.getFullYear(), refDate.getMonth(), 0, 23, 59, 59, 999);
 
         // Aggregate helper
-        const calculateStats = (filteredBookings: any[], compareBookings: any[], rangeLabel: string, compLabel: string, periodType: "today" | "week" | "month") => {
-          const getRevenue = (list: any[]) =>
+        const calculateStats = (filteredBookings: DbAnalyticsBooking[], compareBookings: DbAnalyticsBooking[], rangeLabel: string, compLabel: string, periodType: "today" | "week" | "month"): PeriodData => {
+          const getRevenue = (list: DbAnalyticsBooking[]) =>
             list.reduce((acc, b) => {
               if (b.status === "Cancelled" || b.status === "No-show") return acc;
               const pay = Array.isArray(b.payments) ? b.payments[0] : b.payments;
               return acc + (pay ? Number(pay.amount) : 0);
             }, 0);
 
-          const getBookingsCount = (list: any[]) => list.filter(b => b.status !== "Cancelled").length;
+          const getBookingsCount = (list: DbAnalyticsBooking[]) => list.filter(b => b.status !== "Cancelled").length;
 
-          const getNewCustCount = (list: any[], start: Date, end: Date) => {
-            const custs = list.map(b => b.customer).filter(Boolean);
+          const getNewCustCount = (list: DbAnalyticsBooking[], start: Date, end: Date) => {
+            const custs = list.map(b => b.customer).filter((c): c is NonNullable<typeof c> => !!c);
             const uniqueCusts = Array.from(new Map(custs.map(c => [c.id, c])).values());
-            return uniqueCusts.filter((c: any) => {
+            return uniqueCusts.filter((c) => {
               const cat = new Date(c.created_at);
               return cat >= start && cat <= end;
             }).length;
           };
 
-          const getNoShowRate = (list: any[]) => {
+          const getNoShowRate = (list: DbAnalyticsBooking[]) => {
             const total = list.filter(b => b.status !== "Cancelled").length;
             if (total === 0) return 0;
             const noShow = list.filter(b => b.status === "No-show").length;
@@ -457,7 +468,7 @@ export default function InsightsPage() {
           const serviceMap: Record<string, { revenue: number; bookings: number }> = {};
           filteredBookings.forEach(b => {
             if (b.status === "Cancelled" || b.status === "No-show") return;
-            b.booking_services?.forEach((bs: any) => {
+            b.booking_services?.forEach((bs) => {
               const name = bs.service?.name || "Other Service";
               if (!serviceMap[name]) serviceMap[name] = { revenue: 0, bookings: 0 };
               serviceMap[name].revenue += Number(bs.price_at_booking) * (bs.qty || 1);
@@ -524,7 +535,7 @@ export default function InsightsPage() {
 
         // Filter and calculate
         const filterBookings = (start: Date, end: Date) =>
-          bookingsData.filter(b => {
+          (bookingsData as unknown as DbAnalyticsBooking[]).filter(b => {
             const bd = new Date(b.date);
             return bd >= start && bd <= end;
           });
@@ -580,7 +591,7 @@ export default function InsightsPage() {
     };
 
     fetchAnalytics();
-  }, [salonId]);
+  }, [salonId, profileLoading]);
 
   // Use dynamic database data if loaded and has records, else fall back to mock data
   const p = useMemo(() => {
@@ -710,11 +721,11 @@ export default function InsightsPage() {
       [],
       ["Top Services"],
       ["Name", "Revenue", "Bookings", "Share"],
-      ...p.topServices.map((s: any) => [s.name, `₹${fmt(s.revenue)}`, String(s.bookings), `${s.share}%`]),
+      ...p.topServices.map((s) => [s.name, `₹${fmt(s.revenue)}`, String(s.bookings), `${s.share}%`]),
       [],
       ["Top Stylists"],
       ["Name", "Bookings", "Revenue", "Share"],
-      ...p.topStylists.map((s: any) => [s.name, String(s.bookings), `₹${fmt(s.revenue)}`, `${s.share}%`]),
+      ...p.topStylists.map((s) => [s.name, String(s.bookings), `₹${fmt(s.revenue)}`, `${s.share}%`]),
     ];
     const csv = rows.map(r => (r as string[]).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -864,7 +875,7 @@ export default function InsightsPage() {
             </div>
             <div style={{ flex: 1 }}>
               <strong style={{ fontWeight: 600 }}>
-                {p.chart.data[p.chart.highlight].x} brought in {Math.round((p.chart.data[p.chart.highlight].v / (m.revenue.value || 1)) * 100)}% of the period's revenue.
+                {p.chart.data[p.chart.highlight].x} brought in {Math.round((p.chart.data[p.chart.highlight].v / (m.revenue.value || 1)) * 100)}% of the period{"'s"} revenue.
               </strong>{" "}
               Want to review your staffing schedule?
             </div>

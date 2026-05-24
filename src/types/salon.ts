@@ -17,3 +17,14 @@ export interface Salon {
   type: string | null;
   hours: HoursData | null;
 }
+
+export interface DbSalon {
+  id: string;
+  name: string;
+  area: string | null;
+  city: string | null;
+  type: string | null;
+  hours: HoursData | null;
+  wa_number: string | null;
+}
+

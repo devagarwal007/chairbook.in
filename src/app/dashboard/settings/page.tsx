@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
-import { Icons as I } from "@/components/ui/Icons";
+import { Icons as I, Modal, FormField, Avatar, Badge } from "@/components/ui";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
-import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates } from "@/types";
+import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow } from "@/types";
 
 // ===== CONSTANTS =====
 const DAYS = [
@@ -164,10 +164,14 @@ export default function SettingsPage() {
   const [editingTemplateKey, setEditingTemplateKey] = useState<keyof WhatsAppTemplates | null>(null);
   const [templateText, setTemplateText] = useState("");
 
+
+
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setLoading(false);
+      queueMicrotask(() => {
+        setLoading(false);
+      });
       return;
     }
 
@@ -208,7 +212,7 @@ export default function SettingsPage() {
         let salonHours = INITIAL_DATA.hours;
         let salonWa = INITIAL_DATA.wa.number;
         let orgPlan = INITIAL_DATA.plan;
-        let selectedSalon: any = null;
+        let selectedSalon: DbSalon | null = null;
 
         if (userProfile.org_id) {
           // Load plan from organizations
@@ -226,7 +230,7 @@ export default function SettingsPage() {
             .eq("is_primary", true)
             .maybeSingle();
 
-          selectedSalon = salon;
+          selectedSalon = salon as unknown as DbSalon | null;
           if (!selectedSalon) {
             const { data: firstSalon } = await supabase
               .from("salons")
@@ -234,7 +238,7 @@ export default function SettingsPage() {
               .eq("org_id", userProfile.org_id)
               .limit(1)
               .maybeSingle();
-            selectedSalon = firstSalon;
+            selectedSalon = firstSalon as unknown as DbSalon | null;
           }
 
           if (selectedSalon) {
@@ -261,7 +265,7 @@ export default function SettingsPage() {
               .eq("salon_id", currentSalonId);
 
             if (svcData && svcData.length > 0) {
-              dbServices = svcData.map((s: any) => ({
+              dbServices = (svcData as unknown as DbServiceRow[]).map((s) => ({
                 id: s.id,
                 name: s.name,
                 cat: s.category || "General",
@@ -277,7 +281,7 @@ export default function SettingsPage() {
               .eq("salon_id", currentSalonId);
 
             if (teamData && teamData.length > 0) {
-              dbTeam = teamData.map((s: any) => ({
+              dbTeam = (teamData as unknown as DbStylistRow[]).map((s) => ({
                 id: s.id,
                 name: s.name,
                 role: s.role_label || "Stylist",
@@ -300,12 +304,12 @@ export default function SettingsPage() {
           if (storedWa) {
             try {
               localWa = { ...localWa, ...JSON.parse(storedWa) };
-            } catch (e) {}
+            } catch {}
           }
           if (storedNotifs) {
             try {
               localNotifs = { ...localNotifs, ...JSON.parse(storedNotifs) };
-            } catch (e) {}
+            } catch {}
           }
         }
 
@@ -393,13 +397,21 @@ export default function SettingsPage() {
 
           // 3. Save services
           for (const svc of data.services) {
-            const svcPayload: any = {
+            const svcPayload: {
+              salon_id: string;
+              name: string;
+              category: string;
+              duration_min: number;
+              price: number;
+              active: boolean;
+              id?: string;
+            } = {
               salon_id: supabaseSalonId,
               name: svc.name,
-              category: svc.cat,
+              category: svc.cat || "General",
               duration_min: svc.duration,
               price: svc.price,
-              active: svc.active,
+              active: svc.active ?? true,
             };
             if (typeof svc.id === "string") {
               svcPayload.id = svc.id;
@@ -428,12 +440,20 @@ export default function SettingsPage() {
 
           // 5. Save team
           for (const stylist of data.team) {
-            const stylistPayload: any = {
+            const stylistPayload: {
+              salon_id: string;
+              name: string;
+              role_label: string;
+              tone: string;
+              commission_pct: number;
+              active: boolean;
+              id?: string;
+            } = {
               salon_id: supabaseSalonId,
               name: stylist.name,
-              role_label: stylist.role,
+              role_label: stylist.role || "Stylist",
               tone: stylist.tone ? (stylist.tone.startsWith("tone-") ? stylist.tone : `tone-${stylist.tone}`) : "tone-a",
-              commission_pct: stylist.commission,
+              commission_pct: stylist.commission ?? 0,
               active: true,
             };
             if (typeof stylist.id === "string") {
@@ -470,7 +490,7 @@ export default function SettingsPage() {
 
           setData(prev => ({
             ...prev,
-            services: freshSvcs ? freshSvcs.map((s: any) => ({
+            services: freshSvcs ? (freshSvcs as unknown as DbServiceRow[]).map((s) => ({
               id: s.id,
               name: s.name,
               cat: s.category || "General",
@@ -478,7 +498,7 @@ export default function SettingsPage() {
               price: Number(s.price),
               active: s.active,
             })) : prev.services,
-            team: freshTeam ? freshTeam.map((s: any) => ({
+            team: freshTeam ? (freshTeam as unknown as DbStylistRow[]).map((s) => ({
               id: s.id,
               name: s.name,
               role: s.role_label || "Stylist",
@@ -655,33 +675,29 @@ export default function SettingsPage() {
           <div className="flex flex-col gap-[18px]">
             <SectionHead title="Salon profile" desc="What your customers see on the booking page." />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
-              <div className="field">
-                <label>Salon name</label>
+              <FormField label="Salon name">
                 <input
                   value={data.salon.name}
                   onChange={e => update({ ...data, salon: { ...data.salon, name: e.target.value } })}
                   style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
                 />
-              </div>
-              <div className="field" style={{ marginTop: 14 }}>
-                <label>Area / address</label>
+              </FormField>
+              <FormField label="Area / address" style={{ marginTop: 14 }}>
                 <input
                   value={data.salon.area}
                   onChange={e => update({ ...data, salon: { ...data.salon, area: e.target.value } })}
                   style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
                 />
-              </div>
+              </FormField>
               <div className="field-row" style={{ marginTop: 14 }}>
-                <div className="field">
-                  <label>City</label>
+                <FormField label="City">
                   <input
                     value={data.salon.city}
                     onChange={e => update({ ...data, salon: { ...data.salon, city: e.target.value } })}
                     style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
                   />
-                </div>
-                <div className="field">
-                  <label>Salon type</label>
+                </FormField>
+                <FormField label="Salon type">
                   <select
                     value={data.salon.type}
                     onChange={e => update({ ...data, salon: { ...data.salon, type: e.target.value } })}
@@ -689,12 +705,12 @@ export default function SettingsPage() {
                   >
                     <option>Unisex salon</option>
                     <option>Ladies salon</option>
-                    <option>Men's salon</option>
+                    <option>{"Men's salon"}</option>
                     <option>Barbershop</option>
                     <option>Beauty parlour</option>
                     <option>Spa</option>
                   </select>
-                </div>
+                </FormField>
               </div>
             </div>
 
@@ -846,7 +862,7 @@ export default function SettingsPage() {
             <div className="bg-white border border-line rounded-xl p-0">
               {data.team.map(s => (
                 <div key={s.id} className="grid grid-cols-[40px_1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[40px_1fr]">
-                  <div className={`avatar md tone-${s.tone}`}>{s.name[0]}</div>
+                  <Avatar initials={s.name[0]} tone={s.tone} size="md" />
                   <div className="min-w-0">
                     <div className="text-sm font-semibold">{s.name}</div>
                     <div className="text-xs text-ink-3 mt-0.5">{s.role}</div>
@@ -989,9 +1005,9 @@ export default function SettingsPage() {
             <SectionHead title="Current plan" />
             <div className="bg-teal-soft border border-teal-soft-2 rounded-xl p-[20px_22px] flex justify-between items-center gap-6 max-[720px]:flex-col max-[720px]:items-start">
               <div className="flex-1 min-w-0">
-                <span className="badge confirmed no-dot" style={{ marginBottom: 8, padding: "4px 10px" }}>
+                <Badge tone="confirmed" showDot={false} style={{ marginBottom: 8, padding: "4px 10px" }}>
                   {current.name.toUpperCase()} PLAN · ACTIVE
-                </span>
+                </Badge>
                 <div className="text-[32px] font-semibold tracking-[-0.025em] text-teal-ink">
                   ₹{current.price.toLocaleString("en-IN")}<span className="text-sm font-normal text-ink-3"> / month</span>
                 </div>
@@ -1114,27 +1130,24 @@ export default function SettingsPage() {
             <SectionHead title="Your profile" />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
               <div className="field-row">
-                <div className="field">
-                  <label>Name</label>
+                <FormField label="Name">
                   <input
                     value={data.account?.name || ""}
                     onChange={e => update({ ...data, account: { ...data.account, name: e.target.value } })}
                     style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
                   />
-                </div>
-                <div className="field">
-                  <label>Phone (login)</label>
+                </FormField>
+                <FormField label="Phone (login)">
                   <input value="+91 98xxx 12345" disabled style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, background: "var(--bg)", color: "var(--ink-3)", cursor: "not-allowed" }} />
-                </div>
+                </FormField>
               </div>
-              <div className="field" style={{ marginTop: 14 }}>
-                <label>Email (for receipts &amp; reports)</label>
+              <FormField label="Email (for receipts &amp; reports)" style={{ marginTop: 14 }}>
                 <input
                   value={data.account?.email || ""}
                   onChange={e => update({ ...data, account: { ...data.account, email: e.target.value } })}
                   style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
                 />
-              </div>
+              </FormField>
             </div>
 
             <SectionHead title="Preferences" />
@@ -1309,190 +1322,163 @@ export default function SettingsPage() {
 
       {/* SERVICE MODAL (ADD & EDIT) */}
       {showServiceModal && (
-        <div className="modal-back" onClick={() => setShowServiceModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(540px, 100%)" }}>
-            <div className="modal-head">
-              <h3>{editingSvc ? "Edit service" : "Add new service"}</h3>
-              <button className="modal-close" onClick={() => setShowServiceModal(false)}>
-                <I.x style={{ width: 16, height: 16 }} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Service name</label>
-                <input
-                  placeholder="e.g. Hair Color"
-                  value={svcName}
-                  onChange={e => setSvcName(e.target.value)}
-                  autoFocus
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-                />
-              </div>
-              <div className="field" style={{ marginTop: 12 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Category</label>
-                <select
-                  value={svcCategory}
-                  onChange={e => setSvcCategory(e.target.value)}
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%", background: "#fff" }}
-                >
-                  <option value="Hair">Hair</option>
-                  <option value="Skin">Skin</option>
-                  <option value="Hands">Hands</option>
-                  <option value="Nails">Nails</option>
-                  <option value="General">General</option>
-                </select>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Duration (min)</label>
-                  <input
-                    type="number"
-                    value={svcDuration}
-                    onChange={e => setSvcDuration(parseInt(e.target.value) || 30)}
-                    style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-                  />
-                </div>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Price (₹)</label>
-                  <input
-                    type="number"
-                    value={svcPrice}
-                    onChange={e => setSvcPrice(parseInt(e.target.value) || 0)}
-                    style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="modal-foot">
+        <Modal
+          title={editingSvc ? "Edit service" : "Add new service"}
+          onClose={() => setShowServiceModal(false)}
+          width="min(540px, 100%)"
+          footer={
+            <>
               <button className="btn btn-ghost" onClick={() => setShowServiceModal(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={saveService} disabled={!svcName.trim()}>
                 {editingSvc ? "Save changes" : "Add service"}
               </button>
-            </div>
+            </>
+          }
+        >
+          <FormField label="Service name">
+            <input
+              placeholder="e.g. Hair Color"
+              value={svcName}
+              onChange={e => setSvcName(e.target.value)}
+              autoFocus
+              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+            />
+          </FormField>
+          <FormField label="Category" style={{ marginTop: 12 }}>
+            <select
+              value={svcCategory}
+              onChange={e => setSvcCategory(e.target.value)}
+              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%", background: "#fff" }}
+            >
+              <option value="Hair">Hair</option>
+              <option value="Skin">Skin</option>
+              <option value="Hands">Hands</option>
+              <option value="Nails">Nails</option>
+              <option value="General">General</option>
+            </select>
+          </FormField>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+            <FormField label="Duration (min)">
+              <input
+                type="number"
+                value={svcDuration}
+                onChange={e => setSvcDuration(parseInt(e.target.value) || 30)}
+                style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+              />
+            </FormField>
+            <FormField label="Price (₹)">
+              <input
+                type="number"
+                value={svcPrice}
+                onChange={e => setSvcPrice(parseInt(e.target.value) || 0)}
+                style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+              />
+            </FormField>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* STYLIST MODAL (ADD & EDIT) */}
       {showStylistModal && (
-        <div className="modal-back" onClick={() => setShowStylistModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(540px, 100%)" }}>
-            <div className="modal-head">
-              <h3>{editingStylist ? "Edit stylist" : "Add new stylist"}</h3>
-              <button className="modal-close" onClick={() => setShowStylistModal(false)}>
-                <I.x style={{ width: 16, height: 16 }} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Full name</label>
-                <input
-                  placeholder="e.g. Anjali Sharma"
-                  value={stylistName}
-                  onChange={e => setStylistName(e.target.value)}
-                  autoFocus
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-                />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Role / subtitle</label>
-                  <input
-                    placeholder="Senior stylist · 5 yrs"
-                    value={stylistRole}
-                    onChange={e => setStylistRole(e.target.value)}
-                    style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-                  />
-                </div>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Commission %</label>
-                  <input
-                    type="number"
-                    value={stylistCommission}
-                    onChange={e => setStylistCommission(parseInt(e.target.value) || 0)}
-                    min={0}
-                    max={100}
-                    style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="modal-foot">
+        <Modal
+          title={editingStylist ? "Edit stylist" : "Add new stylist"}
+          onClose={() => setShowStylistModal(false)}
+          width="min(540px, 100%)"
+          footer={
+            <>
               <button className="btn btn-ghost" onClick={() => setShowStylistModal(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={saveStylist} disabled={!stylistName.trim()}>
                 {editingStylist ? "Save changes" : "Add stylist"}
               </button>
-            </div>
+            </>
+          }
+        >
+          <FormField label="Full name">
+            <input
+              placeholder="e.g. Anjali Sharma"
+              value={stylistName}
+              onChange={e => setStylistName(e.target.value)}
+              autoFocus
+              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+            />
+          </FormField>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+            <FormField label="Role / subtitle">
+              <input
+                placeholder="Senior stylist · 5 yrs"
+                value={stylistRole}
+                onChange={e => setStylistRole(e.target.value)}
+                style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+              />
+            </FormField>
+            <FormField label="Commission %">
+              <input
+                type="number"
+                value={stylistCommission}
+                onChange={e => setStylistCommission(parseInt(e.target.value) || 0)}
+                min={0}
+                max={100}
+                style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+              />
+            </FormField>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* WHATSAPP CHANGE NUMBER MODAL */}
       {showWaModal && (
-        <div className="modal-back" onClick={() => setShowWaModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(400px, 100%)" }}>
-            <div className="modal-head">
-              <h3>Change WhatsApp number</h3>
-              <button className="modal-close" onClick={() => setShowWaModal(false)}>
-                <I.x style={{ width: 16, height: 16 }} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>Business number</label>
-                <input
-                  placeholder="98xxx 12345"
-                  value={waNumberInput}
-                  onChange={e => setWaNumberInput(e.target.value)}
-                  autoFocus
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-                />
-              </div>
-            </div>
-            <div className="modal-foot">
+        <Modal
+          title="Change WhatsApp number"
+          onClose={() => setShowWaModal(false)}
+          width="min(400px, 100%)"
+          footer={
+            <>
               <button className="btn btn-ghost" onClick={() => setShowWaModal(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={saveWaNumber} disabled={!waNumberInput.trim()}>
                 Update
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <FormField label="Business number">
+            <input
+              placeholder="98xxx 12345"
+              value={waNumberInput}
+              onChange={e => setWaNumberInput(e.target.value)}
+              autoFocus
+              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+            />
+          </FormField>
+        </Modal>
       )}
 
       {/* EDIT MESSAGE TEMPLATE MODAL */}
       {editingTemplateKey && (
-        <div className="modal-back" onClick={() => setEditingTemplateKey(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(500px, 100%)" }}>
-            <div className="modal-head">
-              <h3>Edit message template</h3>
-              <button className="modal-close" onClick={() => setEditingTemplateKey(null)}>
-                <I.x style={{ width: 16, height: 16 }} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-3)", display: "block", marginBottom: 6 }}>
-                  Template text
-                </label>
-                <textarea
-                  rows={4}
-                  value={templateText}
-                  onChange={e => setTemplateText(e.target.value)}
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 13, width: "100%", fontFamily: "monospace", resize: "vertical" }}
-                />
-                <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 6, lineHeight: 1.4 }}>
-                  Use placeholders: <code>{`{name}`}</code>, <code>{`{date}`}</code>, <code>{`{time}`}</code>, <code>{`{stylist}`}</code>, <code>{`{service}`}</code>.
-                </div>
-              </div>
-            </div>
-            <div className="modal-foot">
+        <Modal
+          title="Edit message template"
+          onClose={() => setEditingTemplateKey(null)}
+          width="min(500px, 100%)"
+          footer={
+            <>
               <button className="btn btn-ghost" onClick={() => setEditingTemplateKey(null)}>Cancel</button>
               <button className="btn btn-primary" onClick={saveTemplate}>
                 Save template
               </button>
+            </>
+          }
+        >
+          <FormField label="Template text">
+            <textarea
+              rows={4}
+              value={templateText}
+              onChange={e => setTemplateText(e.target.value)}
+              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 13, width: "100%", fontFamily: "monospace", resize: "vertical" }}
+            />
+            <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 6, lineHeight: 1.4 }}>
+              Use placeholders: <code>{`{name}`}</code>, <code>{`{date}`}</code>, <code>{`{time}`}</code>, <code>{`{stylist}`}</code>, <code>{`{service}`}</code>.
             </div>
-          </div>
-        </div>
+          </FormField>
+        </Modal>
       )}
 
 

@@ -1,17 +1,17 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import { Icons as I } from "@/components/ui/Icons";
-import { toMin, formatTime12h, formatTime12hFromMin, formatDateDisplay, isUUID, mapDbStatusToUi } from "@/lib/utils";
+import { toMin, formatTime12hFromMin, isUUID } from "@/lib/utils";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { useSalonData, useBookings, useTimeUpdate } from "@/hooks";
 import { useToast } from "@/context/ToastContext";
 import { Appointment, Stylist, Service } from "@/types";
+import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
 
 // ===== TYPES =====
 
@@ -24,15 +24,6 @@ const FALLBACK_SERVICES: Service[] = [];
 
 const STATUS_LABEL = { confirmed: "Confirmed", arrived: "Arrived", completed: "Completed", noshow: "No-show", cancelled: "Cancelled" };
 const STATUS_ORDER: ("confirmed" | "arrived" | "completed" | "noshow")[] = ["confirmed", "arrived", "completed", "noshow"];
-
-const toneBgMap: Record<string, string> = {
-  a: 'bg-[#F1EAD9] text-[#8C6A1E]',
-  b: 'bg-teal-soft text-teal',
-  c: 'bg-blue-soft text-blue',
-  d: 'bg-[#F4DCE4] text-[#A03364]',
-  e: 'bg-amber-soft text-amber-ink',
-  f: 'bg-rose-soft text-rose',
-};
 
 // ===== MAIN DASHBOARD PAGE =====
 export default function DashboardPage() {
@@ -166,9 +157,10 @@ export default function DashboardPage() {
         showFlash(`${name} added to schedule`, 2000);
         refreshBookings();
         return;
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error creating walk-in booking:", err);
-        showFlash(`Error: ${err.message || "Failed to save booking"}`, 3000);
+        const errMsg = err instanceof Error ? err.message : "Failed to save booking";
+        showFlash(`Error: ${errMsg}`, 3000);
       }
     }
 
@@ -265,35 +257,20 @@ export default function DashboardPage() {
         {/* Schedule Header */}
         <div className="flex flex-row items-center justify-between gap-4 mb-4 max-[768px]:flex-col max-[768px]:items-stretch max-[768px]:gap-3">
           <div className="flex items-baseline gap-3 max-[768px]:w-full max-[768px]:justify-between">
-            <h2 className="text-lg font-semibold tracking-tight m-0">Today's schedule</h2>
+            <h2 className="text-lg font-semibold tracking-tight m-0">{"Today's schedule"}</h2>
             <span className="text-[13px] text-ink-3 font-mono">{filtered.length} appointments</span>
           </div>
           <div className="flex items-center gap-3 max-[768px]:w-full max-[768px]:justify-between">
-            <div className="inline-flex relative items-center w-[180px] p-[3px] bg-bg-2 rounded-[9px] text-[13px]">
-              <div
-                className="absolute top-[3px] bottom-[3px] left-[3px] bg-white rounded-[7px] transition-transform duration-220 ease-[cubic-bezier(0.16,1,0.3,1)] z-0 shadow-[0_1px_3px_rgba(0,0,0,0.08),_0_1px_0_var(--line)] will-change-transform"
-                style={{
-                  width: "calc(50% - 3px)",
-                  transform: day === "today" ? "translateX(0)" : "translateX(100%)",
-                }}
-              />
-              <button
-                className={`flex-1 text-center py-1.5 px-1 border-0 bg-transparent rounded-[7px] cursor-pointer text-[13px] transition-colors duration-150 relative z-10 ${
-                  day === "today" ? "text-ink font-medium" : "text-ink-3"
-                }`}
-                onClick={() => setDay("today")}
-              >
-                Today
-              </button>
-              <button
-                className={`flex-1 text-center py-1.5 px-1 border-0 bg-transparent rounded-[7px] cursor-pointer text-[13px] transition-colors duration-150 relative z-10 ${
-                  day === "tomorrow" ? "text-ink font-medium" : "text-ink-3"
-                }`}
-                onClick={() => setDay("tomorrow")}
-              >
-                Tomorrow
-              </button>
-            </div>
+            <Toggle
+              options={[
+                { value: "today", label: "Today" },
+                { value: "tomorrow", label: "Tomorrow" },
+              ]}
+              value={day}
+              onChange={(val) => setDay(val)}
+              hasSlider
+              className="w-[180px]"
+            />
             <button
               onClick={() => setShowWalkIn(true)}
               className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg border border-line-2 bg-white text-sm font-semibold text-ink cursor-pointer hover:border-ink-3 hover:bg-bg-2 active:translate-y-[1px] transition-all duration-150"
@@ -312,27 +289,15 @@ export default function DashboardPage() {
         {/* Stylist Filters */}
         <div className="flex gap-2 mb-4 flex-wrap">
           {activeStylists.map((s) => (
-            <button
+            <FilterChip
               key={s.id}
-              className={`h-8 px-3 rounded-full border inline-flex items-center gap-2 text-[13px] cursor-pointer transition-all duration-180 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-ink-3 hover:-translate-y-[1px] active:scale-96 will-change-transform ${
-                filter === s.id
-                  ? "bg-ink text-white border-ink"
-                  : "bg-white border-line-2 text-ink-2"
-              }`}
+              label={s.name}
+              isActive={filter === s.id}
               onClick={() => setFilter(s.id)}
-            >
-              {s.id !== "all" && (
-                <span className={`inline-grid place-items-center font-bold rounded-full w-[18px] h-[18px] text-[9px] mr-1 border-0 shrink-0 ${toneBgMap[(s.tone || "a").replace("tone-", "")] || "bg-bg-2 text-ink-2"}`}>
-                  {s.name[0]}
-                </span>
-              )}
-              {s.name}
-              {s.id !== "all" && (
-                <span className={`text-[11px] ml-1.5 ${filter === s.id ? "text-white/60" : "text-ink-4"}`}>
-                  {appts.filter((a) => a.stylist === s.id).length}
-                </span>
-              )}
-            </button>
+              avatarInitials={s.id !== "all" ? s.name[0] : undefined}
+              avatarTone={s.id !== "all" ? (s.tone ?? undefined) : undefined}
+              count={s.id !== "all" ? appts.filter((a) => a.stylist === s.id).length : undefined}
+            />
           ))}
         </div>
 
@@ -506,9 +471,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
         }`}
         onClick={onToggle}
       >
-        <div className={`w-10 h-10 rounded-full shrink-0 grid place-items-center font-bold text-sm ${toneBgMap[appt.tone] || 'bg-bg-2 text-ink-2'}`}>
-          {appt.initials}
-        </div>
+        <Avatar initials={appt.initials} tone={appt.tone} />
         <div className="flex flex-col flex-1 min-w-0">
           <div className={`text-sm font-semibold tracking-tight ${appt.status === "cancelled" ? "line-through opacity-60 text-ink-3" : "text-ink"}`}>
             <Link
@@ -524,16 +487,9 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className={`inline-flex items-center gap-[4px] text-[9px] font-medium px-[7px] py-[3px] rounded-full tracking-[0.01em] whitespace-nowrap ${
-            appt.status === 'confirmed' ? 'text-[#1957B8] bg-[#E6EEFA]' :
-            appt.status === 'arrived' ? 'text-[#B47A0F] bg-amber-soft' :
-            appt.status === 'completed' ? 'text-[#137A4A] bg-[#DFF1E6]' :
-            appt.status === 'noshow' ? 'text-rose bg-[#FAE2DC]' :
-            appt.status === 'cancelled' ? 'text-ink-3 bg-bg-2' : ''
-          }`}>
-            <span className="w-[5px] h-[5px] rounded-full bg-current inline-block"></span>
+          <Badge tone={appt.status}>
             {STATUS_LABEL[appt.status]}
-          </span>
+          </Badge>
           <div className="text-[13px] text-ink-2 font-mono font-medium">₹{appt.price.toLocaleString("en-IN")}</div>
         </div>
         <div className={`grid place-items-center transition-transform duration-150 ${expanded ? "rotate-180 text-ink-2" : "text-ink-4"}`}>
@@ -657,71 +613,12 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
   const canSubmit = name.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/45 z-100 grid place-items-center p-6 backdrop-blur-[2px] animate-[fadeIn_0.15s_ease]" onClick={onClose}>
-      <div className="w-[min(440px,100%)] max-w-[calc(100vw-32px)] bg-white rounded-2xl border border-line overflow-hidden animate-[pop_0.18s_cubic-bezier(0.2,0.9,0.3,1.2)]" onClick={(e) => e.stopPropagation()}>
-        <div className="p-[20px_24px] border-b border-line flex items-center justify-between">
-          <h3 className="text-[17px] font-semibold tracking-tight m-0">Add walk-in booking</h3>
-          <button className="w-8 h-8 rounded-lg border-0 bg-bg-2 text-ink-2 cursor-pointer grid place-items-center" onClick={onClose}>
-            <I.x className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="p-[20px_24px] flex flex-col gap-3.5">
-          <div className="grid grid-cols-2 max-[480px]:grid-cols-1 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-ink-3 font-medium">Customer name</label>
-              <input
-                placeholder="e.g. Priya Sharma"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-                className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal min-w-0"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-ink-3 font-medium">Phone (optional)</label>
-              <input
-                placeholder="+91 98xxx"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal min-w-0"
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-ink-3 font-medium">Service</label>
-            <div className="grid grid-cols-2 gap-2">
-              {services.slice(0, 6).map((s) => (
-                <button
-                  key={s.id}
-                  className={`p-[10px_12px] border rounded-[10px] cursor-pointer text-[13px] text-left font-sans flex justify-between items-center transition-all duration-150 ${
-                    svcId === s.id ? "border-teal bg-teal-soft text-teal-ink font-medium" : "border-line bg-white text-ink hover:border-ink-3"
-                  }`}
-                  onClick={() => setSvcId(s.id)}
-                >
-                  <span>{s.name}</span>
-                  <small className={`font-mono text-xs ${svcId === s.id ? "text-teal" : "text-ink-3"}`}>
-                    {s.duration}m · ₹{s.price}
-                  </small>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-ink-3 font-medium">Stylist</label>
-            <select
-              value={stylistId}
-              onChange={(e) => setStylistId(e.target.value)}
-              className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal"
-            >
-              {stylists.filter((s) => s.id !== "all").map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="p-[16px_24px] border-t border-line bg-bg flex gap-2.5 justify-end">
+    <Modal
+      title="Add walk-in booking"
+      onClose={onClose}
+      width="min(440px, 100%)"
+      footer={
+        <>
           <button
             className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-transparent text-ink-2 hover:text-ink hover:bg-bg-2 transition-all duration-150"
             onClick={onClose}
@@ -738,8 +635,59 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
           >
             Add to schedule
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 max-[480px]:grid-cols-1 gap-3">
+        <FormField label="Customer name">
+          <input
+            placeholder="e.g. Priya Sharma"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+            className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal min-w-0"
+          />
+        </FormField>
+        <FormField label="Phone (optional)">
+          <input
+            placeholder="+91 98xxx"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal min-w-0"
+          />
+        </FormField>
       </div>
-    </div>
+      <FormField label="Service">
+        <div className="grid grid-cols-2 gap-2">
+          {services.slice(0, 6).map((s) => (
+            <button
+              key={s.id}
+              className={`p-[10px_12px] border rounded-[10px] cursor-pointer text-[13px] text-left font-sans flex justify-between items-center transition-all duration-150 ${
+                svcId === s.id ? "border-teal bg-teal-soft text-teal-ink font-medium" : "border-line bg-white text-ink hover:border-ink-3"
+              }`}
+              onClick={() => setSvcId(s.id)}
+            >
+              <span>{s.name}</span>
+              <small className={`font-mono text-xs ${svcId === s.id ? "text-teal" : "text-ink-3"}`}>
+                {s.duration}m · ₹{s.price}
+              </small>
+            </button>
+          ))}
+        </div>
+      </FormField>
+      <FormField label="Stylist">
+        <select
+          value={stylistId}
+          onChange={(e) => setStylistId(e.target.value)}
+          className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal"
+        >
+          {stylists.filter((s) => s.id !== "all").map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </FormField>
+    </Modal>
   );
 }

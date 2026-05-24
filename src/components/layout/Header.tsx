@@ -26,7 +26,9 @@ export default function Header({
   useEffect(() => {
     const status = localStorage.getItem("cb_salon_open");
     if (status !== null) {
-      setSalonOpen(status === "true");
+      queueMicrotask(() => {
+        setSalonOpen(status === "true");
+      });
     }
   }, []);
 
@@ -106,7 +108,7 @@ export default function Header({
 
                     <div className="bg-[var(--bg-2)] rounded-[10px] p-2.5 flex flex-col gap-1.5">
                       <div className="flex justify-between text-[11px] text-[var(--ink-2)]">
-                        <span className="font-medium">Today's target</span>
+                        <span className="font-medium">{"Today's target"}</span>
                         <span className="font-semibold">₹{todayRevenue.toLocaleString("en-IN")} / ₹{dailyTarget.toLocaleString("en-IN")}</span>
                       </div>
                       <div className="w-full h-1.5 bg-[var(--line)] rounded-[3px] overflow-hidden">

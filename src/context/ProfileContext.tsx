@@ -138,7 +138,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    fetchProfile();
+    queueMicrotask(() => {
+      fetchProfile();
+    });
   }, []);
 
   return (

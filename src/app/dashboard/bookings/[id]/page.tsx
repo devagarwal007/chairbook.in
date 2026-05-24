@@ -1,17 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 import { insertNotification } from "@/lib/notifications";
 import { BookingData } from "@/types";
 import { isUUID } from "@/lib/utils";
+import { Modal, Badge, Avatar, FormField } from "@/components/ui";
 
 // ===== ICONS =====
-interface IconProps extends React.SVGProps<SVGSVGElement> {}
+type IconProps = React.SVGProps<SVGSVGElement>;
 
 const IBD = {
   home: (p?: IconProps) => (
@@ -177,70 +178,63 @@ function RescheduleModal({ booking, onClose, onConfirm }: RescheduleModalProps) 
   const [time, setTime] = useState(booking.time);
   const [note, setNote] = useState("");
   return (
-    <div className="modal-back" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ width: "min(520px, 100%)" }}>
-        <div className="modal-head">
-          <div>
-            <h3>Reschedule booking</h3>
-            <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-              {booking.customer.name} · {booking.services.map(s => s.name).join(" + ")}
-            </div>
-          </div>
-          <button className="modal-close" onClick={onClose}><IBD.x /></button>
-        </div>
-        <div className="modal-body">
-          <div className="field">
-            <label>New date</label>
-            <div className="date-row" style={{ margin: 0, padding: 0, maxWidth: "100%" }}>
-              {RESCH_DAYS.map(d => (
-                <button
-                  key={d.key}
-                  className={`date-pill ${date === d.key ? "on" : ""}`}
-                  onClick={() => setDate(d.key)}
-                >
-                  <span className="date-dow">{d.dow}</span>
-                  <span className="date-dom">{d.dom}</span>
-                  {d.label && <span className="date-lbl">{d.label}</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="field" style={{ marginTop: 14 }}>
-            <label>New time</label>
-            <div className="time-grid" style={{ marginTop: 0 }}>
-              {ALL_SLOTS.map(s => (
-                <button
-                  key={s}
-                  className={`time-pill ${time === s ? "on" : ""}`}
-                  onClick={() => setTime(s)}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="field" style={{ marginTop: 14 }}>
-            <label>Add a note to the customer (optional)</label>
-            <textarea
-              placeholder='e.g. "Sorry, Anjali had a family emergency. Hope this works!"'
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              style={{ minHeight: 64 }}
-            />
-          </div>
-          <div className="trust" style={{ marginTop: 12 }}>
-            <IBD.wa style={{ color: "var(--wa)", width: 18, height: 18, flexShrink: 0 }} />
-            <div>The customer will get a WhatsApp message with the new time and a &ldquo;Reply YES to confirm&rdquo; prompt.</div>
-          </div>
-        </div>
-        <div className="modal-foot">
+    <Modal
+      title="Reschedule booking"
+      onClose={onClose}
+      width="min(520px, 100%)"
+      footer={
+        <>
           <button className="btn btn-ghost" onClick={onClose}>Keep original</button>
           <button className="btn btn-primary" onClick={() => onConfirm({ date, time, note })}>
             Reschedule &amp; notify
           </button>
-        </div>
+        </>
+      }
+    >
+      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: -14, marginBottom: 14 }}>
+        {booking.customer.name} · {booking.services.map(s => s.name).join(" + ")}
       </div>
-    </div>
+      <FormField label="New date">
+        <div className="date-row" style={{ margin: 0, padding: 0, maxWidth: "100%" }}>
+          {RESCH_DAYS.map(d => (
+            <button
+              key={d.key}
+              className={`date-pill ${date === d.key ? "on" : ""}`}
+              onClick={() => setDate(d.key)}
+            >
+              <span className="date-dow">{d.dow}</span>
+              <span className="date-dom">{d.dom}</span>
+              {d.label && <span className="date-lbl">{d.label}</span>}
+            </button>
+          ))}
+        </div>
+      </FormField>
+      <FormField label="New time" style={{ marginTop: 14 }}>
+        <div className="time-grid" style={{ marginTop: 0 }}>
+          {ALL_SLOTS.map(s => (
+            <button
+              key={s}
+              className={`time-pill ${time === s ? "on" : ""}`}
+              onClick={() => setTime(s)}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </FormField>
+      <FormField label="Add a note to the customer (optional)" style={{ marginTop: 14 }}>
+        <textarea
+          placeholder='e.g. "Sorry, Anjali had a family emergency. Hope this works!"'
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          style={{ minHeight: 64 }}
+        />
+      </FormField>
+      <div className="trust" style={{ marginTop: 12 }}>
+        <IBD.wa style={{ color: "var(--wa)", width: 18, height: 18, flexShrink: 0 }} />
+        <div>The customer will get a WhatsApp message with the new time and a &ldquo;Reply YES to confirm&rdquo; prompt.</div>
+      </div>
+    </Modal>
   );
 }
 
@@ -256,62 +250,54 @@ function CancelModal({ booking, onClose, onConfirm }: CancelModalProps) {
   const [note, setNote] = useState("");
   const [notify, setNotify] = useState(true);
   return (
-    <div className="modal-back" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-head">
-          <div>
-            <h3 style={{ color: "var(--rose)" }}>Cancel booking</h3>
-            <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-              {booking.customer.name} · {booking.date} · {booking.time}
-            </div>
-          </div>
-          <button className="modal-close" onClick={onClose}><IBD.x /></button>
-        </div>
-        <div className="modal-body">
-          <div className="field">
-            <label>Reason for cancellation</label>
-            <div className="reason-list">
-              {CANCEL_REASONS.map(r => (
-                <label key={r.id} className={`reason-opt ${reason === r.id ? "on" : ""}`}>
-                  <input
-                    type="radio"
-                    checked={reason === r.id}
-                    onChange={() => setReason(r.id)}
-                  />
-                  <span>{r.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="field" style={{ marginTop: 12 }}>
-            <label>Internal note (optional)</label>
-            <textarea
-              placeholder="For your records — won't be shared with customer"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              style={{ minHeight: 60 }}
-            />
-          </div>
-          <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-2">
-            <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
-            <span>Notify {booking.customer.name.split(" ")[0]} via WhatsApp with an apology + 10% off voucher</span>
-          </label>
-        </div>
-        <div className="modal-foot">
+    <Modal
+      title="Cancel booking"
+      onClose={onClose}
+      footer={
+        <>
           <button className="btn btn-ghost" onClick={onClose}>Keep booking</button>
           <button className="btn btn-danger" onClick={() => onConfirm({ reason, note, notify })}>
             <IBD.trash /> Cancel booking
           </button>
-        </div>
+        </>
+      }
+    >
+      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: -14, marginBottom: 14 }}>
+        {booking.customer.name} · {booking.date} · {booking.time}
       </div>
-    </div>
+      <FormField label="Reason for cancellation">
+        <div className="reason-list">
+          {CANCEL_REASONS.map(r => (
+            <label key={r.id} className={`reason-opt ${reason === r.id ? "on" : ""}`}>
+              <input
+                type="radio"
+                checked={reason === r.id}
+                onChange={() => setReason(r.id)}
+              />
+              <span>{r.label}</span>
+            </label>
+          ))}
+        </div>
+      </FormField>
+      <FormField label="Internal note (optional)" style={{ marginTop: 12 }}>
+        <textarea
+          placeholder="For your records — won't be shared with customer"
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          style={{ minHeight: 60 }}
+        />
+      </FormField>
+      <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-2">
+        <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
+        <span>Notify {booking.customer.name.split(" ")[0]} via WhatsApp with an apology + 10% off voucher</span>
+      </label>
+    </Modal>
   );
 }
 
 // ===== MAIN PAGE COMPONENT =====
 export default function BookingDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const bookingId = params.id as string || "BK-2026-0517";
   const { salonId } = useProfile();
 
@@ -387,10 +373,12 @@ export default function BookingDetailPage() {
     const isUuid = isUUID(bookingId);
 
     if (!isUuid || !supabase) {
-      setBooking(BOOKING);
-      setStatus(BOOKING.status);
-      setActivity(BOOKING.activity);
-      setLoading(false);
+      queueMicrotask(() => {
+        setBooking(BOOKING);
+        setStatus(BOOKING.status);
+        setActivity(BOOKING.activity);
+        setLoading(false);
+      });
       return;
     }
 
@@ -453,7 +441,7 @@ export default function BookingDetailPage() {
               visits = completedBookings.length;
               
               spend = completedBookings.reduce((sum, cb) => {
-                const cbSum = cb.booking_services?.reduce((s: number, bs: any) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
+                const cbSum = cb.booking_services?.reduce((s: number, bs: { price_at_booking: number; qty?: number | null }) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
                 return sum + cbSum;
               }, 0);
 
@@ -543,7 +531,17 @@ export default function BookingDetailPage() {
             tone: "neutral"
           });
 
-          const services = data.booking_services?.map((bs: any) => ({
+          interface DbBookingServiceRow {
+            qty: number | null;
+            price_at_booking: number;
+            service: {
+              id: string;
+              name: string;
+              duration_min: number;
+              price: number;
+            } | null;
+          }
+          const services = (data.booking_services as unknown as DbBookingServiceRow[] | null)?.map((bs) => ({
             name: bs.service?.name || "Unknown Service",
             duration: bs.service?.duration_min || 30,
             price: Number(bs.price_at_booking)
@@ -885,7 +883,7 @@ export default function BookingDetailPage() {
         {/* Hero card */}
         <div className={`bd-hero card ${isCancelled ? "is-cancelled" : ""}`}>
           <div className="bd-hero-l">
-            <span className={`badge ${status}`}>{STATUS_LABEL[status]}</span>
+            <Badge tone={status}>{STATUS_LABEL[status]}</Badge>
             <h1 className="bd-hero-title">
               {b.services.map(s => s.name).join(" + ")}
             </h1>
@@ -908,7 +906,7 @@ export default function BookingDetailPage() {
           </div>
           <div className="bd-hero-r">
             <div className="bd-stylist-card">
-              <div className={`avatar lg tone-${b.stylist.tone}`}>{b.stylist.short}</div>
+              <Avatar initials={b.stylist.short} tone={b.stylist.tone} size="lg" />
               <div>
                 <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>STYLIST</div>
                 <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{b.stylist.name}</div>
@@ -926,7 +924,7 @@ export default function BookingDetailPage() {
               <Link href={`/dashboard/customers/${b.customer.id}`} style={{ marginLeft: "auto", fontSize: 12, color: "var(--teal)", fontWeight: 500 }}>View profile →</Link>
             </div>
             <div className="bd-cust-head">
-              <div className={`avatar lg tone-${b.customer.tone}`}>{b.customer.initials}</div>
+              <Avatar initials={b.customer.initials} tone={b.customer.tone} size="lg" />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="bd-cust-name">{b.customer.name}</div>
                 <div className="bd-cust-phone">{b.customer.phone}</div>

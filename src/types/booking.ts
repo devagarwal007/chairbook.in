@@ -72,3 +72,148 @@ export interface BookingRow {
   duration: number;
   status: string;
 }
+
+export interface DbBookingServiceItem {
+  qty: number | null;
+  price_at_booking: number;
+  service: { id: string | number; name: string } | null;
+}
+
+export interface DbBookingListItem {
+  id: string;
+  customer_id: string | null;
+  date: string;
+  start_time: string | null;
+  duration: number;
+  status: string;
+  notes: string | null;
+  customer: { id: string | number; name: string; phone: string | null } | null;
+  stylist: { id: string | number; name: string; tone: string | null } | null;
+  booking_services: DbBookingServiceItem[] | null;
+}
+
+export interface DbCalBookingRow {
+  id: string;
+  date: string;
+  start_time: string;
+  duration: number;
+  status: string;
+  notes: string | null;
+  customer: { id: string; name: string; phone: string | null } | null;
+  stylist: { id: string; name: string; tone: string | null } | null;
+  booking_services: Array<{
+    service: {
+      name: string;
+    } | null;
+  }> | null;
+}
+
+export interface DbCheckoutServiceItemRow {
+  qty: number | null;
+  price_at_booking: number;
+  service: {
+    id: string;
+    name: string;
+    price: number;
+  } | null;
+}
+
+export interface DbBookingService {
+  price_at_booking: number;
+  qty: number | null;
+  service: { name: string } | null;
+}
+
+export interface DbBooking {
+  id: string;
+  date: string;
+  start_time: string | null;
+  status: string;
+  notes: string | null;
+  booking_services: DbBookingService[] | null;
+  stylist: { name: string } | null;
+  payments: { method: string; amount: number }[] | { method: string; amount: number } | null;
+}
+
+export interface DbCustomerBooking {
+  id: string;
+  customer_id: string;
+  status: string;
+  date: string;
+  booking_services: Array<{
+    price_at_booking: number;
+    qty: number | null;
+    service: {
+      name: string;
+    } | null;
+  }> | null;
+  stylist: { name: string } | null;
+}
+
+export interface DbBookingSimple {
+  id: string;
+  customer_id: string;
+  status: string;
+  date: string;
+  booking_services: { price_at_booking: number; qty: number | null }[] | null;
+}
+
+export interface DbBookingSlotRaw {
+  id: string;
+  start_time: string | null;
+  duration: number | null;
+}
+
+export interface DbBookingStylistRaw {
+  id: string;
+  start_time: string | null;
+  duration: number | null;
+  stylist_id: string | number;
+}
+
+export interface MyDbBooking {
+  id: string;
+  date: string;
+  start_time: string;
+  duration: number;
+  status: string;
+  notes: string | null;
+  customer: { name: string; phone: string } | null;
+  stylist: { name: string } | null;
+  booking_services: Array<{
+    service: {
+      name: string;
+      duration_min: number;
+      price: number;
+    } | null;
+  }> | null;
+}
+
+export interface StylistAppt {
+  id: string;
+  start_time: string;
+  duration: number;
+  status: string;
+  notes: string | null;
+  customer: { name: string } | null;
+  booking_services: Array<{
+    service: {
+      name: string;
+    } | null;
+  }> | null;
+}
+
+export interface DbBlockRow {
+  id: string;
+  reason: string | null;
+  date_from: string;
+  date_to: string | null;
+  time_from: string | null;
+  time_to: string | null;
+  all_day: boolean;
+  recurring: boolean;
+  note: string | null;
+  stylist_id: string | null;
+}
+
+

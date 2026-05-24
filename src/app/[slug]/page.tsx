@@ -16,7 +16,7 @@ interface BookingState {
   bookings: BookingRow[];
 }
 
-import { Icons as I } from "@/components/ui/Icons";
+import { Icons as I, StepBar, Avatar, FormField, PhoneInput } from "@/components/ui";
 
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -94,29 +94,7 @@ function getAvailableStylistId(stylists: Stylist[], bookings: BookingRow[], date
   return stylists.find((stylist) => !activeBookings.some((booking) => booking.stylist_id === stylist.id && overlaps(time, duration, booking)))?.id ?? null;
 }
 
-function StepBar({ step }: { step: Step }) {
-  const steps = ["Service", "When & who", "Your details"];
 
-  return (
-    <div className="step-bar">
-      {steps.map((label, index) => {
-        const n = index + 1;
-        const done = step > n;
-        const active = step === n;
-
-        return (
-          <React.Fragment key={label}>
-            <div className={`step ${active ? "active" : ""} ${done ? "done" : ""}`}>
-              <div className="step-num">{done ? <I.check /> : n}</div>
-              <div className="step-lbl">{label}</div>
-            </div>
-            {index < steps.length - 1 && <div className={`step-line ${done ? "done" : ""}`}></div>}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-}
 
 export default function PublicBookingPage() {
   const params = useParams<{ slug: string }>();
@@ -178,7 +156,7 @@ export default function PublicBookingPage() {
 
       setState({
         salon,
-        services: (services ?? []).map((s: any) => ({
+        services: (services ?? []).map((s: Omit<Service, "duration"> & { duration_min: number }) => ({
           ...s,
           duration: s.duration_min,
         })),
@@ -326,7 +304,7 @@ export default function PublicBookingPage() {
           </header>
         )}
 
-        {step < 4 && <StepBar step={step} />}
+        {step < 4 && <StepBar variant="public" steps={["Service", "When & who", "Your details"]} currentStep={step} />}
 
         <div className="book-body">
           {isLoading && (
@@ -405,13 +383,13 @@ export default function PublicBookingPage() {
               <div className="block-label">Choose a stylist</div>
               <div className="stylist-row">
                 <button className={`stylist-card ${selectedStylist === "any" ? "on" : ""}`} onClick={() => { setSelectedStylist("any"); setSelectedTime(null); }}>
-                  <div className="avatar lg tone-a">?</div>
+                  <Avatar initials="?" tone="a" size="lg" />
                   <div className="stylist-name">No preference</div>
                   <div className="stylist-tag">First available</div>
                 </button>
                 {state.stylists.map((stylist) => (
                   <button key={stylist.id} className={`stylist-card ${selectedStylist === stylist.id ? "on" : ""}`} onClick={() => { setSelectedStylist(stylist.id); setSelectedTime(null); }}>
-                    <div className={`avatar lg ${stylist.tone ?? "tone-b"}`}>{stylist.name[0]}</div>
+                    <Avatar initials={stylist.name[0]} tone={stylist.tone ?? "b"} size="lg" />
                     <div className="stylist-name">{stylist.name}</div>
                     <div className="stylist-tag">{stylist.role_label || "Stylist"}</div>
                   </button>
@@ -471,17 +449,15 @@ export default function PublicBookingPage() {
 
               {message && <div className="form-alert" style={{ marginTop: 16 }}>{message}</div>}
 
-              <div className="field" style={{ marginTop: 20 }}>
-                <label>Your name</label>
+              <FormField label="Your name" style={{ marginTop: 20 }}>
                 <input placeholder="e.g. Priya Sharma" value={customerName} onChange={(event) => setCustomerName(event.target.value)} autoFocus />
-              </div>
-              <div className="field" style={{ marginTop: 14 }}>
-                <label>Phone number</label>
-                <div className="phone-input">
-                  <span className="phone-prefix">+91</span>
-                  <input type="tel" placeholder="98xxx xxxxx" value={phone} onChange={(event) => setPhone(event.target.value.replace(/[^\d ]/g, ""))} maxLength={11} />
-                </div>
-              </div>
+              </FormField>
+              <FormField label="Phone number" style={{ marginTop: 14 }}>
+                <PhoneInput
+                  value={phone}
+                  onChange={setPhone}
+                />
+              </FormField>
 
               <div className="trust">
                 <I.wa />

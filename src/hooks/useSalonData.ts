@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-import { Stylist, Service, Customer } from "@/types";
+import { Stylist, Service, Customer, DbStylistRaw, DbServiceRaw, DbCustomerRaw } from "@/types";
 
 export type DbStylist = Stylist;
 export type DbService = Service;
 export type DbCustomer = Customer;
+
 
 export function useSalonData(salonId: string | null) {
   const [stylists, setStylists] = useState<DbStylist[]>([]);
@@ -18,17 +19,21 @@ export function useSalonData(salonId: string | null) {
 
   useEffect(() => {
     if (!salonId) {
-      setLoading(false);
+      queueMicrotask(() => {
+        setLoading(false);
+      });
       return;
     }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setLoading(false);
+      queueMicrotask(() => {
+        setLoading(false);
+      });
       return;
     }
 
     const loadAll = async () => {
-      setLoading(true);
+      queueMicrotask(() => setLoading(true));
       try {
         const [stRes, svRes, custRes] = await Promise.all([
           supabase.from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true),
@@ -37,27 +42,31 @@ export function useSalonData(salonId: string | null) {
         ]);
 
         if (stRes.data) {
-          setStylists(stRes.data.map((s: any) => ({
+          const rawStylists = stRes.data as unknown as DbStylistRaw[];
+          setStylists(rawStylists.map((s) => ({
             id: s.id,
             name: s.name,
             short: s.name[0],
             tone: (s.tone || "tone-a").replace("tone-", ""),
+            skills: [],
           })));
         }
 
         if (svRes.data) {
-          setServices(svRes.data.map((s: any) => ({
+          const rawServices = svRes.data as unknown as DbServiceRaw[];
+          setServices(rawServices.map((s) => ({
             id: s.id,
             name: s.name,
-            category: s.category || "General",
+            cat: s.category || "General",
             duration: s.duration_min,
             price: Number(s.price),
           })));
         }
 
         if (custRes.data) {
+          const rawCustomers = custRes.data as unknown as DbCustomerRaw[];
           const tones = ["a", "b", "c", "d", "e", "f"];
-          setCustomers(custRes.data.map((c: any, i: number) => ({
+          setCustomers(rawCustomers.map((c, i: number) => ({
             id: c.id,
             name: c.name,
             phone: c.phone || "",
@@ -69,13 +78,15 @@ export function useSalonData(salonId: string | null) {
         }
       } catch (err) {
         console.error("Error loading salon data:", err);
-        setError(true);
+        queueMicrotask(() => setError(true));
       } finally {
-        setLoading(false);
+        queueMicrotask(() => setLoading(false));
       }
     };
 
-    loadAll();
+    queueMicrotask(() => {
+      loadAll();
+    });
   }, [salonId]);
 
   return { stylists, services, customers, loading, error };

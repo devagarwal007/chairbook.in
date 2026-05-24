@@ -9,7 +9,7 @@ import { useToast } from "@/context/ToastContext";
 import { insertNotification } from "@/lib/notifications";
 import { isUUID } from "@/lib/utils";
 import { Icons as IC } from "@/components/ui/Icons";
-import { Customer } from "@/types";
+import { Customer, DbCheckoutServiceItemRow } from "@/types";
 
 interface ServiceItem {
   id: number;
@@ -71,9 +71,11 @@ export default function CheckoutPage() {
     const isUuid = isUUID(bookingId);
 
     if (!isUuid || !supabase) {
-      setBooking(null);
-      setItems([]);
-      setLoading(false);
+      queueMicrotask(() => {
+        setBooking(null);
+        setItems([]);
+        setLoading(false);
+      });
       return;
     }
 
@@ -114,7 +116,8 @@ export default function CheckoutPage() {
             .toUpperCase()
             .slice(0, 2) || "WC";
 
-          const serviceItems: ServiceItem[] = (data.booking_services || []).map((bs: any, idx: number) => ({
+
+          const serviceItems: ServiceItem[] = (data.booking_services as unknown as DbCheckoutServiceItemRow[] || []).map((bs, idx: number) => ({
             id: idx + 1,
             name: bs.service?.name || "Unknown Service",
             qty: bs.qty || 1,
@@ -184,7 +187,7 @@ export default function CheckoutPage() {
     };
 
     loadDbServices();
-  }, [booking?.id]);
+  }, [booking?.id, bookingId]);
 
   const availableServices = dbServices.length > 0
     ? dbServices
@@ -192,16 +195,18 @@ export default function CheckoutPage() {
 
   // Sync state if booking ID changes
   useEffect(() => {
-    if (booking) {
-      setItems(booking.services);
-    } else {
-      setItems([]);
-    }
-    setDiscount(0);
-    setTip(0);
-    setRoundOff(true);
-    setPayment(null);
-    setStage("bill");
+    queueMicrotask(() => {
+      if (booking) {
+        setItems(booking.services);
+      } else {
+        setItems([]);
+      }
+      setDiscount(0);
+      setTip(0);
+      setRoundOff(true);
+      setPayment(null);
+      setStage("bill");
+    });
   }, [booking, bookingId]);
 
   const subtotal = useMemo(() => {
@@ -261,7 +266,13 @@ export default function CheckoutPage() {
           if (p.method.toLowerCase().includes('cash')) paymentMethod = 'Cash';
           else if (p.method.toLowerCase().includes('card')) paymentMethod = 'Card';
 
-          const insertPayload: any = {
+          const insertPayload: {
+            booking_id: string;
+            method: string;
+            amount: number;
+            tip?: number;
+            discount?: number;
+          } = {
             booking_id: bookingId,
             method: paymentMethod,
             amount: total,
@@ -341,7 +352,9 @@ export default function CheckoutPage() {
 
   // Set default cash received value when total updates
   useEffect(() => {
-    setCashReceived(total);
+    queueMicrotask(() => {
+      setCashReceived(total);
+    });
   }, [total]);
 
   // Quick cash options
@@ -359,7 +372,9 @@ export default function CheckoutPage() {
   const [cardWaiting, setCardWaiting] = useState<boolean>(true);
   useEffect(() => {
     if (stage === "pay" && method === "card") {
-      setCardWaiting(true);
+      queueMicrotask(() => {
+        setCardWaiting(true);
+      });
       const timer = setTimeout(() => {
         setCardWaiting(false);
       }, 3000);
@@ -714,7 +729,6 @@ export default function CheckoutPage() {
                   total={total}
                   onDone={finishPayment}
                   cardWaiting={cardWaiting}
-                  setCardWaiting={setCardWaiting}
                 />
               )}
               {method === "split" && (
@@ -858,7 +872,7 @@ function UpiPanel({ total, onDone, customerName }: UpiPanelProps) {
         className="btn btn-primary btn-lg ck-confirm-btn"
         onClick={() => onDone({ method: "UPI · glowsalon@okaxis", received: total })}
       >
-        I've received the payment
+        {"I've received the payment"}
       </button>
     </div>
   );
@@ -933,10 +947,9 @@ interface CardPanelProps {
   total: number;
   onDone: (p: PaymentInfo) => void;
   cardWaiting: boolean;
-  setCardWaiting: (val: boolean) => void;
 }
 
-function CardPanel({ total, onDone, cardWaiting, setCardWaiting }: CardPanelProps) {
+function CardPanel({ total, onDone, cardWaiting }: CardPanelProps) {
   return (
     <div className="ck-pay-panel" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div className="ck-card-illu" style={{ marginBottom: 12 }}>

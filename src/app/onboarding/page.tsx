@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { makeSalonSlug, saveOnboarding } from "@/lib/onboarding";
 
-import { DayHour, HoursData, Stylist, Service, OnboardingData } from "@/types";
+import { DayHour, HoursData, Service, OnboardingData } from "@/types";
 
-import { Icons as IO } from "@/components/ui/Icons";
+import { Icons as IO, StepBar, FormField, Avatar, PhoneInput } from "@/components/ui";
 
 
 const DAYS = [
@@ -41,29 +41,7 @@ const STEPS = [
   { id: "done", label: "Done" },
 ];
 
-// ===== PROGRESS RAIL =====
-function ProgressRail({ stepIdx }: { stepIdx: number }) {
-  return (
-    <div className="ob-rail">
-      <div className="ob-rail-inner">
-        {STEPS.slice(1, -1).map((s, i) => {
-          const realIdx = i + 1; // skip welcome
-          const done = stepIdx > realIdx;
-          const active = stepIdx === realIdx;
-          return (
-            <React.Fragment key={s.id}>
-              <div className={`ob-rail-step ${active ? "active" : ""} ${done ? "done" : ""}`}>
-                <div className="ob-rail-num">{done ? <IO.check /> : realIdx}</div>
-                <div className="ob-rail-lbl">{s.label}</div>
-              </div>
-              {i < STEPS.length - 3 && <div className={`ob-rail-line ${done ? "done" : ""}`}></div>}
-            </React.Fragment>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+
 
 // ===== FOOTER =====
 interface ObFooterProps {
@@ -104,14 +82,14 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
       </div>
       <h1 className="ob-h1">
         Welcome to ChairBook.<br />
-        <span style={{ color: "var(--ink-3)", fontWeight: 500 }}>Let's get you set up.</span>
+        <span style={{ color: "var(--ink-3)", fontWeight: 500 }}>{"Let's get you set up."}</span>
       </h1>
       <p className="ob-sub">
-        We'll do this together in <strong style={{ color: "var(--ink)" }}>5 quick steps</strong> — about 4 minutes. By the end you'll have a booking link you can drop in your WhatsApp status.
+        {"We'll do this together in "}<strong style={{ color: "var(--ink)" }}>5 quick steps</strong>{" — about 4 minutes. By the end you'll have a booking link you can drop in your WhatsApp status."}
       </p>
       <ul className="ob-checklist">
         <li>
-          <span className="ob-check-ic"><IO.check /></span> Add your salon's basics
+          <span className="ob-check-ic"><IO.check /></span> {"Add your salon's basics"}
         </li>
         <li>
           <span className="ob-check-ic"><IO.check /></span> Set your working hours
@@ -124,7 +102,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
         </li>
       </ul>
       <button className="btn btn-primary btn-lg" onClick={onNext}>
-        Let's start <span aria-hidden>→</span>
+        {"Let's start"} <span aria-hidden>→</span>
       </button>
       <div className="ob-skip">
         Already have an account?{" "}
@@ -155,25 +133,22 @@ function StepSalon({ data, onChange, onNext, onBack }: StepSalonProps) {
         <p className="ob-sub">This is what your customers will see on the booking page.</p>
       </div>
 
-      <div className="field">
-        <label>Salon name</label>
+      <FormField label="Salon name">
         <input
           placeholder="e.g. Glow Salon &amp; Spa"
           value={data.name}
           onChange={(e) => onChange({ ...data, name: e.target.value })}
           autoFocus
         />
-      </div>
-      <div className="field" style={{ marginTop: 14 }}>
-        <label>Area / locality</label>
+      </FormField>
+      <FormField label="Area / locality" style={{ marginTop: 14 }}>
         <input
           placeholder="e.g. Andheri West, Mumbai"
           value={data.area}
           onChange={(e) => onChange({ ...data, area: e.target.value })}
         />
-      </div>
-      <div className="field" style={{ marginTop: 14 }}>
-        <label>Salon type</label>
+      </FormField>
+      <FormField label="Salon type" style={{ marginTop: 14 }}>
         <div className="chip-grid">
           {SALON_TYPES.map((type) => (
             <button
@@ -185,7 +160,7 @@ function StepSalon({ data, onChange, onNext, onBack }: StepSalonProps) {
             </button>
           ))}
         </div>
-      </div>
+      </FormField>
 
       <ObFooter onBack={onBack} onNext={onNext} canNext={valid} hint={!valid ? "Add salon name and area to continue" : null} />
     </div>
@@ -300,14 +275,14 @@ function StepTeam({ data, onChange, onNext, onBack }: StepTeamProps) {
       <div className="ob-step-head">
         <div className="ob-eyebrow">STEP 3 OF 5</div>
         <h2 className="ob-h2">Add your team</h2>
-        <p className="ob-sub">You can add more later. Even if it's just you, add yourself.</p>
+        <p className="ob-sub">{"You can add more later. Even if it's just you, add yourself."}</p>
       </div>
 
       {data.stylists.length > 0 && (
         <div className="ob-team-list">
           {data.stylists.map((s) => (
             <div key={s.id} className="ob-team-row">
-              <div className={`avatar md tone-${s.tone}`} style={{ width: 40, height: 40, flexShrink: 0 }}>{s.name[0]}</div>
+              <Avatar initials={s.name[0]} tone={s.tone} size="md" />
               <div className="ob-team-main">
                 <div className="ob-team-name">{s.name}</div>
                 <div className="ob-team-role">{s.role}</div>
@@ -321,17 +296,15 @@ function StepTeam({ data, onChange, onNext, onBack }: StepTeamProps) {
       )}
 
       <div className="ob-add-row">
-        <div className="field" style={{ flex: 1 }}>
-          <label>Name</label>
+        <FormField label="Name" style={{ flex: 1 }}>
           <input
             placeholder="e.g. Anjali"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addStylist()}
           />
-        </div>
-        <div className="field" style={{ width: 160 }}>
-          <label>Role</label>
+        </FormField>
+        <FormField label="Role" style={{ width: 160 }}>
           <select value={role} onChange={(e) => setRole(e.target.value)} style={{ height: 42, background: "#fff", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 10px", width: "100%", outline: 0 }}>
             <option>Stylist</option>
             <option>Senior stylist</option>
@@ -339,7 +312,7 @@ function StepTeam({ data, onChange, onNext, onBack }: StepTeamProps) {
             <option>Beautician</option>
             <option>Owner / Manager</option>
           </select>
-        </div>
+        </FormField>
         <button className="btn btn-outline" style={{ height: 42 }} onClick={addStylist} disabled={!name.trim()}>
           <IO.plus /> Add
         </button>
@@ -432,9 +405,7 @@ function StepServices({ data, onChange, onNext, onBack }: StepServicesProps) {
 
       {customServices.map((s) => (
         <div key={s.id} className="ob-team-row" style={{ marginBottom: 6 }}>
-          <div className="avatar md tone-e" style={{ width: 32, height: 32, fontSize: 11, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "bold" }}>
-            {s.name[0]}
-          </div>
+          <Avatar initials={s.name[0]} tone="e" style={{ width: 32, height: 32, fontSize: 11 }} />
           <div className="ob-team-main">
             <div className="ob-team-name">{s.name}</div>
             <div className="ob-team-role">
@@ -503,21 +474,14 @@ function StepWhatsApp({ data, onChange, onNext, onBack, isSaving, error }: StepW
         <p className="ob-sub">Customers will receive booking confirmations, reminders, and replies from this number.</p>
       </div>
 
-      <div className="field">
-        <label>WhatsApp number</label>
-        <div className="phone-input" style={{ display: "flex", alignItems: "center", border: "1px solid var(--line-2)", borderRadius: "10px", overflow: "hidden", height: "46px" }}>
-          <span className="phone-prefix" style={{ padding: "0 14px", borderRight: "1px solid var(--line-2)", background: "var(--bg-2)", color: "var(--ink-2)", fontSize: "14px", fontWeight: 500 }}>+91</span>
-          <input
-            style={{ border: 0, padding: "0 14px", outline: 0, width: "100%", height: "100%", fontSize: "16px", color: "var(--ink)", fontFamily: "inherit" }}
-            type="tel"
-            placeholder="98xxx xxxxx"
-            value={data.waNumber}
-            onChange={(e) => onChange({ ...data, waNumber: e.target.value.replace(/[^\d ]/g, "") })}
-            maxLength={11}
-            autoFocus
-          />
-        </div>
-      </div>
+      <FormField label="WhatsApp number">
+        <PhoneInput
+          size="lg"
+          value={data.waNumber}
+          onChange={(val) => onChange({ ...data, waNumber: val })}
+          autoFocus
+        />
+      </FormField>
 
       <div className="ob-wa-preview">
         <div className="ob-wa-lbl">Sample reminder customers will receive:</div>
@@ -588,7 +552,7 @@ function StepDone({ data, savedSlug, onCopy, copied }: StepDoneProps) {
         </svg>
       </div>
       <h1 className="ob-h1" style={{ textAlign: "center", fontSize: 32 }}>
-        You're all set 🎉
+        {"You're all set 🎉"}
       </h1>
       <p className="ob-sub" style={{ textAlign: "center", maxWidth: 480, margin: "0 auto 28px" }}>
         <strong style={{ color: "var(--ink)" }}>{data.name}</strong> is live. Share your booking link below — drop it in your WhatsApp status or pin it to your Instagram bio.
@@ -734,7 +698,9 @@ export default function OnboardingPage() {
             </button>
           )}
         </div>
-        {step.id !== "welcome" && step.id !== "done" && <ProgressRail stepIdx={stepIdx} />}
+        {step.id !== "welcome" && step.id !== "done" && (
+          <StepBar variant="onboarding" steps={STEPS.slice(1, -1)} currentStep={stepIdx} />
+        )}
       </header>
 
       <main className="ob-main">

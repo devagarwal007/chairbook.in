@@ -3,19 +3,27 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { StylistAppt } from "@/types";
+
+
 
 function StylistDayContent() {
   const searchParams = useSearchParams();
   const stylistId = searchParams.get("stylist");
   const salonId = searchParams.get("salon");
 
-  const [appts, setAppts] = useState<any[]>([]);
+  const [appts, setAppts] = useState<StylistAppt[]>([]);
   const [stylistName, setStylistName] = useState("Stylist");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || !salonId) { setLoading(false); return; }
+    if (!supabase || !salonId) {
+      queueMicrotask(() => {
+        setLoading(false);
+      });
+      return;
+    }
 
     const loadData = async () => {
       if (stylistId) {
@@ -34,7 +42,7 @@ function StylistDayContent() {
       if (stylistId) q = q.eq("stylist_id", stylistId);
 
       const { data } = await q;
-      setAppts(data || []);
+      setAppts((data as unknown as StylistAppt[]) || []);
       setLoading(false);
     };
 
@@ -54,17 +62,14 @@ function StylistDayContent() {
   return (
     <div style={{ maxWidth: 500, margin: "0 auto", padding: "16px", fontFamily: "system-ui, sans-serif" }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{stylistName}</h1>
-      <p style={{ color: "#666", fontSize: 14 }}>Today's schedule · {appts.length} appointments</p>
+      <p style={{ color: "#666", fontSize: 14 }}>{"Today's schedule"} · {appts.length} appointments</p>
 
       {appts.length === 0 ? (
         <div style={{ textAlign: "center", padding: 40, color: "#999" }}>No appointments today</div>
       ) : (
         <div style={{ marginTop: 20 }}>
           {appts.map(a => {
-            const svcNames = a.booking_services?.map((bs: any) => bs.service?.name).join(", ") || "Service";
-            const statusColors: Record<string, string> = {
-              Confirmed: "#e0f5e9", Arrived: "#fff3e0", Completed: "#e8e8e8", "In Progress": "#dff0d8",
-            };
+            const svcNames = a.booking_services?.map((bs) => bs.service?.name).filter(Boolean).join(", ") || "Service";
             return (
               <div key={a.id} style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "12px 0",

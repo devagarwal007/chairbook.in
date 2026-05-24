@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -8,7 +8,7 @@ import { Icons as I } from "@/components/ui/Icons";
 import { useToast } from "@/context/ToastContext";
 import { isUUID, initialsOf } from "@/lib/utils";
 
-import { Customer } from "@/types";
+import { Customer, DbBooking, DbCustomer } from "@/types";
 
 // ===== TYPES =====
 interface Note {
@@ -50,6 +50,8 @@ interface CustomerProfile extends Customer {
   notes: Note[];
   visitHistory: Visit[];
 }
+
+
 
 // ===== DATA =====
 const MOCK_PROFILE: CustomerProfile = {
@@ -178,35 +180,41 @@ export default function CustomerProfilePage() {
     const isUuid = isUUID(customerId);
 
     if (!isUuid || !supabase) {
-      setProfile(MOCK_PROFILE);
-      setNotes(MOCK_PROFILE.notes);
-      setLoading(false);
+      queueMicrotask(() => {
+        setProfile(MOCK_PROFILE);
+        setNotes(MOCK_PROFILE.notes);
+        setLoading(false);
+      });
       return;
     }
 
     const loadProfile = async () => {
       try {
-        setLoading(true);
+        queueMicrotask(() => setLoading(true));
 
         const cachedProfile = localStorage.getItem("cb_profile");
         if (cachedProfile) {
           try { const p = JSON.parse(cachedProfile); setOwnerName(p.name || "Owner"); } catch {}
         }
 
-        const { data: cust, error } = await supabase
+        const { data: custRaw, error } = await supabase
           .from("customers")
           .select("id, name, phone, member_since, birthday, created_at, pref_stylist_id, stylists:pref_stylist_id(name)")
           .eq("id", customerId)
           .maybeSingle();
 
+        const cust = custRaw as unknown as DbCustomer | null;
+
         if (error || !cust) {
-          setProfile(MOCK_PROFILE);
-          setNotes(MOCK_PROFILE.notes);
-          setLoading(false);
+          queueMicrotask(() => {
+            setProfile(MOCK_PROFILE);
+            setNotes(MOCK_PROFILE.notes);
+            setLoading(false);
+          });
           return;
         }
 
-        const { data: bookings } = await supabase
+        const { data: bookingsRaw } = await supabase
           .from("bookings")
           .select(`id, date, start_time, status, notes,
             booking_services(price_at_booking, qty, service:services(name)),
@@ -215,36 +223,38 @@ export default function CustomerProfilePage() {
           .eq("customer_id", customerId)
           .order("date", { ascending: false });
 
+        const bookings = (bookingsRaw || []) as unknown as DbBooking[];
+
         const today = new Date(); today.setHours(0,0,0,0);
-        const completedBks = (bookings || []).filter((b: any) =>
+        const completedBks = bookings.filter((b) =>
           ["Completed", "Paid"].includes(b.status)
         );
         const visits = completedBks.length;
-        const spend = completedBks.reduce((sum: number, b: any) => {
-          const t = (b.booking_services || []).reduce((s: number, bs: any) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0);
+        const spend = completedBks.reduce((sum: number, b) => {
+          const t = (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0);
           return sum + t;
         }, 0);
 
-        const dates = completedBks.map((b: any) => new Date(b.date).getTime()).filter(Boolean);
+        const dates = completedBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
         const lastMs = dates.length > 0 ? Math.max(...dates) : null;
         const lastDays = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
         const engagement: "active" | "cooling" | "lost" =
           lastDays <= 30 ? "active" : lastDays <= 60 ? "cooling" : "lost";
 
         const svcCount: Record<string, number> = {};
-        (bookings || []).forEach((b: any) =>
-          (b.booking_services || []).forEach((bs: any) => {
+        bookings.forEach((b) =>
+          (b.booking_services || []).forEach((bs) => {
             const sn = bs.service?.name; if (sn) svcCount[sn] = (svcCount[sn] || 0) + 1;
           })
         );
         const fav = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
-        const prefStylist = (bookings as any)?.[0]?.stylist?.name || (cust.stylists as any)?.name || "—";
+        const prefStylist = bookings[0]?.stylist?.name || cust.stylists?.name || "—";
 
         const msDt = cust.member_since ? new Date(cust.member_since) : new Date(cust.created_at || Date.now());
         const memberSince = msDt.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
-        const futureBks = (bookings || []).filter((b: any) => new Date(b.date) >= today && b.status !== "Cancelled");
+        const futureBks = bookings.filter((b) => new Date(b.date) >= today && b.status !== "Cancelled");
         let upcoming: CustomerProfile["upcoming"] = undefined;
         if (futureBks.length > 0) {
           const fb = futureBks[futureBks.length - 1];
@@ -252,22 +262,32 @@ export default function CustomerProfilePage() {
           const [hh, mm] = (fb.start_time || "09:00").split(":");
           const h = parseInt(hh); const ampm = h >= 12 ? "PM" : "AM";
           const fbTime = `${h > 12 ? h - 12 : h}:${mm} ${ampm}`;
-          const fbSvc = ((fb.booking_services?.[0] as any)?.service?.name) || "Service";
-          const fbStylist = (fb.stylist as any)?.name || "—";
+          const fbSvc = (fb.booking_services?.[0]?.service?.name) || "Service";
+          const fbStylist = fb.stylist?.name || "—";
           upcoming = { date: fbDate, time: fbTime, service: fbSvc, stylist: fbStylist };
         }
 
-        const visitHistory: Visit[] = completedBks.map((b: any) => ({
-          id: b.id,
-          date: new Date(b.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-          services: (b.booking_services || []).map((bs: any) => ({
-            name: bs.service?.name || "Service",
-            amt: Number(bs.price_at_booking) * (bs.qty || 1)
-          })),
-          stylist: (b.stylist as any)?.name || "—",
-          amount: (b.booking_services || []).reduce((s: number, bs: any) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0),
-          payment: (b.payments as any)?.[0]?.method || (b.payments as any)?.method || "—"
-        }));
+        const visitHistory: Visit[] = completedBks.map((b) => {
+          let method = "—";
+          if (b.payments) {
+            if (Array.isArray(b.payments)) {
+              method = b.payments[0]?.method || "—";
+            } else {
+              method = (b.payments as { method: string }).method || "—";
+            }
+          }
+          return {
+            id: b.id,
+            date: new Date(b.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+            services: (b.booking_services || []).map((bs) => ({
+              name: bs.service?.name || "Service",
+              amt: Number(bs.price_at_booking) * (bs.qty || 1)
+            })),
+            stylist: b.stylist?.name || "—",
+            amount: (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0),
+            payment: method
+          };
+        });
 
         const tones = ["a","b","c","d","e","f"];
         const nameHash = cust.name.split("").reduce((h: number, ch: string) => h + ch.charCodeAt(0), 0);
@@ -288,18 +308,24 @@ export default function CustomerProfilePage() {
           notes: [],
           visitHistory,
         };
-        setProfile(p);
-        setNotes([]);
+        queueMicrotask(() => {
+          setProfile(p);
+          setNotes([]);
+          setLoading(false);
+        });
       } catch (err) {
         console.error("Error loading customer profile:", err);
-        setProfile(MOCK_PROFILE);
-        setNotes(MOCK_PROFILE.notes);
-      } finally {
-        setLoading(false);
+        queueMicrotask(() => {
+          setProfile(MOCK_PROFILE);
+          setNotes(MOCK_PROFILE.notes);
+          setLoading(false);
+        });
       }
     };
 
-    loadProfile();
+    queueMicrotask(() => {
+      loadProfile();
+    });
   }, [customerId]);
 
   const c = profile || MOCK_PROFILE;
@@ -484,7 +510,7 @@ export default function CustomerProfilePage() {
               </div>
             ))}
             {notes.length === 0 && (
-              <div className="p-6 text-center text-[13px] text-ink-3 bg-bg-2 rounded-[10px]">No notes yet. Tap "Add note" to remember anything about Priya.</div>
+              <div className="p-6 text-center text-[13px] text-ink-3 bg-bg-2 rounded-[10px]">{"No notes yet. Tap \"Add note\" to remember anything about Priya."}</div>
             )}
           </div>
         </section>

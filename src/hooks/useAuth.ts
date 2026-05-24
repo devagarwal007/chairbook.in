@@ -21,7 +21,9 @@ export function useAuthState() {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setAuthState((current) => ({ ...current, isChecking: false }));
+      queueMicrotask(() => {
+        setAuthState((current) => ({ ...current, isChecking: false }));
+      });
       return;
     }
 

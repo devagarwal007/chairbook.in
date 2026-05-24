@@ -10,7 +10,7 @@ import { useToast } from "@/context/ToastContext";
 import { initialsOf } from "@/lib/utils";
 
 
-import { Customer } from "@/types";
+import { Customer, DbCustomerRow, DbCustomerBooking } from "@/types";
 
 const engagementOf = (days: number) => days <= 30 ? "active" : days <= 60 ? "cooling" : "lost";
 
@@ -61,13 +61,17 @@ export default function CustomersPage() {
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !salonId) {
-      setLoadingCustomers(false);
+      queueMicrotask(() => {
+        setLoadingCustomers(false);
+      });
       return;
     }
 
     const loadCustomersData = async () => {
       setLoadingCustomers(true);
       try {
+
+
         // Fetch customers + all bookings with services in parallel
         const [{ data: custData }, { data: bkData }] = await Promise.all([
           supabase.from("customers").select("id, name, phone, pref_stylist_id, member_since, created_at, stylists:pref_stylist_id(name)").eq("salon_id", salonId),
@@ -75,35 +79,37 @@ export default function CustomersPage() {
         ]);
 
         if (!custData || custData.length === 0) {
-          setLoadingCustomers(false);
+          queueMicrotask(() => {
+            setLoadingCustomers(false);
+          });
           return;
         }
 
         const today = new Date(); today.setHours(0,0,0,0);
         const tones = ["a","b","c","d","e","f"];
 
-        const mapped: Customer[] = custData.map((c: any, idx: number) => {
-          const custBks = (bkData || []).filter((b: any) => b.customer_id === c.id);
-          const paidBks = custBks.filter((b: any) => ["Completed","Paid"].includes(b.status));
+        const mapped: Customer[] = (custData as unknown as DbCustomerRow[]).map((c, idx: number) => {
+          const custBks = (bkData as unknown as DbCustomerBooking[] || []).filter((b) => b.customer_id === c.id);
+          const paidBks = custBks.filter((b) => ["Completed","Paid"].includes(b.status));
           const visits = paidBks.length;
-          const spend = paidBks.reduce((sum: number, b: any) => {
-            const bkTotal = (b.booking_services || []).reduce((s: number, bs: any) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0);
+          const spend = paidBks.reduce((sum: number, b) => {
+            const bkTotal = (b.booking_services || []).reduce((s: number, bs) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0);
             return sum + bkTotal;
           }, 0);
 
           // Days since last booking
-          const dates = custBks.map((b: any) => new Date(b.date).getTime()).filter(Boolean);
+          const dates = custBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
           const lastMs = dates.length > 0 ? Math.max(...dates) : null;
           const lastDays = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
 
           // Favourite service by frequency
           const svcCount: Record<string, number> = {};
-          custBks.forEach((b: any) => (b.booking_services || []).forEach((bs: any) => { const sn = bs.service?.name; if (sn) svcCount[sn] = (svcCount[sn] || 0) + 1; }));
+          custBks.forEach((b) => (b.booking_services || []).forEach((bs) => { const sn = bs.service?.name; if (sn) svcCount[sn] = (svcCount[sn] || 0) + 1; }));
           const fav = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
           // Preferred stylist from most recent booking
-          const sortedBks = [...custBks].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          const stylist = (sortedBks[0] as any)?.stylist?.name || (c.stylists as any)?.name || "—";
+          const sortedBks = [...custBks].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          const stylist = sortedBks[0]?.stylist?.name || c.stylists?.name || "—";
 
           return {
             id: c.id,
@@ -529,8 +535,9 @@ export default function CustomersPage() {
                         setCustomers(prev => [newEntry, ...prev]);
                         showFlash("Customer added!", 1800);
                       }
-                    } catch (err: any) {
-                      showFlash(`Error: ${err.message || "Failed to add customer"}`, 3000);
+                    } catch (err) {
+                      const errMsg = err instanceof Error ? err.message : "Failed to add customer";
+                      showFlash(`Error: ${errMsg}`, 3000);
                     }
                   } else {
                     showFlash("Customer added (local preview)", 1800);

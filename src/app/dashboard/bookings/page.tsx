@@ -2,15 +2,12 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import { Icons as I } from "@/components/ui/Icons";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
-
 import { toMinHours, initialsOf, formatDateKey } from "@/lib/utils";
-
-import { Stylist, CalAppt } from "@/types";
+import { Stylist, CalAppt, DbCalBookingRow } from "@/types";
+import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
 
 // ===== CONSTANTS =====
 const START_HOUR = 9;
@@ -116,15 +113,6 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
   const endMin = toMinHours(a.startH, a.startM) + a.duration;
   const endStr = `${String(Math.floor(endMin / 60)).padStart(2,"0")}:${String(endMin % 60).padStart(2,"0")}`;
 
-  const toneBgMap: Record<string, string> = {
-    a: 'bg-[#F1EAD9] text-[#8C6A1E]',
-    b: 'bg-teal-soft text-teal',
-    c: 'bg-blue-soft text-blue',
-    d: 'bg-[#F4DCE4] text-[#A03364]',
-    e: 'bg-amber-soft text-amber-ink',
-    f: 'bg-rose-soft text-rose',
-  };
-
   return (
     <div
       onClick={onClick}
@@ -139,11 +127,7 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
     >
       <div className="flex items-center justify-between gap-1.5">
         {!narrow && (
-          <div
-            className={`inline-grid place-items-center font-semibold rounded-full shrink-0 w-5 h-5 text-[9px] ${toneBgMap[a.tone] || 'bg-bg-2 text-ink-2'}`}
-          >
-            {a.initials}
-          </div>
+        <Avatar initials={a.initials} tone={a.tone} size="sm" style={{ width: 20, height: 20, fontSize: 9 }} />
         )}
         <div className={`font-bold text-[11px] tracking-[-0.005em] whitespace-nowrap overflow-hidden text-ellipsis flex-1 ${a.status === 'noshow' ? 'text-rose line-through' : 'text-ink'}`}>{a.customer}</div>
         <span className="font-mono text-[9px] shrink-0">{start}</span>
@@ -192,66 +176,58 @@ function BlockTimeModal({ onClose, salonId, stylists, baseDate }: { onClose: () 
   const inputCls = "w-full h-[42px] px-[14px] rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-0 transition-[border-color] duration-150 focus:border-teal";
 
   return (
-    <div className="fixed inset-0 bg-[rgba(14,21,18,0.45)] z-100 grid place-items-center p-6 backdrop-blur-[2px] animate-[fadeIn_.15s_ease]" onClick={onClose}>
-      <div className="w-[min(420px,100%)] max-w-[calc(100vw-32px)] bg-white rounded-lg border border-line overflow-hidden animate-[pop_.18s_cubic-bezier(0.2,0.9,0.3,1.2)]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-5 border-b border-line">
-          <h3 className="text-[17px] font-semibold tracking-[-0.01em] m-0">Block time</h3>
-          <button className="w-8 h-8 rounded-lg border-0 bg-bg-2 text-ink-2 cursor-pointer grid place-items-center" onClick={onClose}>✕</button>
-        </div>
-        <div className="flex flex-col gap-[14px] px-6 py-5">
-          <div className="flex flex-col gap-[6px]">
-            <label className="text-xs text-ink-3 font-medium">Stylist</label>
-            <select value={blockStylist} onChange={e => setBlockStylist(e.target.value)} className={inputCls}>
-              <option value="all">All stylists (whole salon)</option>
-              {stylists.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
-            <div className="flex flex-col gap-[6px]">
-              <label className="text-xs text-ink-3 font-medium">From date</label>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-[6px]">
-              <label className="text-xs text-ink-3 font-medium">To date (optional)</label>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={inputCls} />
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-[13px] cursor-pointer">
-            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
-            <span>All-day block</span>
-          </label>
-          {!allDay && (
-            <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
-              <div className="flex flex-col gap-[6px]">
-                <label className="text-xs text-ink-3 font-medium">From</label>
-                <input type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} className={inputCls} />
-              </div>
-              <div className="flex flex-col gap-[6px]">
-                <label className="text-xs text-ink-3 font-medium">To</label>
-                <input type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} className={inputCls} />
-              </div>
-            </div>
-          )}
-          <div className="flex flex-col gap-[6px]">
-            <label className="text-xs text-ink-3 font-medium">Reason</label>
-            <select value={reason} onChange={e => setReason(e.target.value)} className={inputCls}>
-              <option>Lunch</option>
-              <option>Holiday</option>
-              <option>Vacation</option>
-              <option>Other</option>
-            </select>
-          </div>
-        </div>
-        <div className="flex gap-[10px] justify-end px-6 py-4 border-t border-line bg-bg">
+    <Modal
+      title="Block time"
+      onClose={onClose}
+      width="min(420px, 100%)"
+      footer={
+        <>
           <button className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-transparent text-ink-2 hover:text-ink hover:bg-bg-2 transition-all duration-150" onClick={onClose}>Cancel</button>
           <button className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-teal !text-white hover:bg-teal-ink transition-all duration-150" onClick={handleBlock} disabled={saving}>
             {saving ? "Saving..." : "Block time"}
           </button>
-        </div>
+        </>
+      }
+    >
+      <FormField label="Stylist">
+        <select value={blockStylist} onChange={e => setBlockStylist(e.target.value)} className={inputCls}>
+          <option value="all">All stylists (whole salon)</option>
+          {stylists.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+      </FormField>
+      <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
+        <FormField label="From date">
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={inputCls} />
+        </FormField>
+        <FormField label="To date (optional)">
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={inputCls} />
+        </FormField>
       </div>
-    </div>
+      <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+        <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
+        <span>All-day block</span>
+      </label>
+      {!allDay && (
+        <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
+          <FormField label="From">
+            <input type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} className={inputCls} />
+          </FormField>
+          <FormField label="To">
+            <input type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} className={inputCls} />
+          </FormField>
+        </div>
+      )}
+      <FormField label="Reason">
+        <select value={reason} onChange={e => setReason(e.target.value)} className={inputCls}>
+          <option>Lunch</option>
+          <option>Holiday</option>
+          <option>Vacation</option>
+          <option>Other</option>
+        </select>
+      </FormField>
+    </Modal>
   );
 }
 
@@ -356,17 +332,9 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
         <div className="bg-bg border-r border-line relative"></div>
         {visibleStylists.map(s => {
           const cnt = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id).length;
-          const toneBgMap: Record<string, string> = {
-            a: 'bg-[#F1EAD9] text-[#8C6A1E]',
-            b: 'bg-teal-soft text-teal',
-            c: 'bg-blue-soft text-blue',
-            d: 'bg-[#F4DCE4] text-[#A03364]',
-            e: 'bg-amber-soft text-amber-ink',
-            f: 'bg-rose-soft text-rose',
-          };
           return (
             <div key={s.id} className="p-[10px_8px] text-left border-r border-line flex items-center gap-2.5">
-              <div className={`w-10 h-10 rounded-full inline-grid place-items-center font-semibold text-sm shrink-0 ${toneBgMap[s.tone || 'b'] || 'bg-bg-2 text-ink-2'}`}>{s.short}</div>
+              <Avatar initials={s.short || s.name[0]} tone={s.tone ?? undefined} size="md" />
               <div>
                 <div className="text-sm font-semibold">{s.name}</div>
                 <div className="text-[11px] text-ink-3 mt-0.5">{cnt} appointment{cnt !== 1 ? "" : "s"}</div>
@@ -418,7 +386,6 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
 // ===== MAIN PAGE =====
 export default function BookingsPage() {
   const { salonId } = useProfile();
-  const router = useRouter();
   const [view, setView] = useState<"week" | "day">("week");
   const [baseDate, setBaseDate] = useState<Date>(() => new Date());
   const [stylistFilter, setStylistFilter] = useState<string | number>("all");
@@ -466,7 +433,7 @@ export default function BookingsPage() {
       const { data: stylistsData } = await supabase
         .from("stylists").select("id, name, tone").eq("salon_id", sid).eq("active", true);
       if (stylistsData && stylistsData.length > 0) {
-        setStylists(stylistsData.map((s: any) => ({
+        setStylists((stylistsData as unknown as Array<{ id: string; name: string; tone: string | null }>).map((s) => ({
           id: s.id,
           name: s.name,
           short: s.name[0],
@@ -489,14 +456,15 @@ export default function BookingsPage() {
       if (error) throw error;
 
       if (data) {
-        const mapped: CalAppt[] = data.map((b: any) => {
+
+        const mapped: CalAppt[] = (data as unknown as DbCalBookingRow[]).map((b) => {
           const custName = b.customer?.name || "Walk-in";
           const initials = initialsOf(custName);
           const timeParts = (b.start_time || "09:00").split(":");
           const startH = parseInt(timeParts[0]) || 9;
           const startM = parseInt(timeParts[1]) || 0;
           const tone = (b.stylist?.tone || "tone-a").replace("tone-", "");
-          const serviceNames = b.booking_services?.map((bs: any) => bs.service?.name).filter(Boolean).join(" + ") || "Service";
+          const serviceNames = b.booking_services?.map((bs) => bs.service?.name).filter(Boolean).join(" + ") || "Service";
           const mapStatus = (s: string): "confirmed" | "arrived" | "completed" | "noshow" | "cancelled" => {
             const l = (s || "").toLowerCase();
             if (l === "arrived") return "arrived";
@@ -517,7 +485,7 @@ export default function BookingsPage() {
             tone,
             service: serviceNames,
             status: mapStatus(b.status),
-            phone: b.customer?.phone,
+            phone: b.customer?.phone || undefined,
           };
         });
         setAppts(mapped);
@@ -532,7 +500,9 @@ export default function BookingsPage() {
 
   useEffect(() => {
     if (salonId) {
-      loadAppts(salonId, weekDays);
+      queueMicrotask(() => {
+        loadAppts(salonId, weekDays);
+      });
     } else {
       // If no salonId yet, load mock data after short delay to check cache
       const t = setTimeout(() => {
@@ -608,18 +578,14 @@ export default function BookingsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2.5 max-[980px]:justify-between">
-            <div className="inline-flex p-[3px] bg-bg-2 rounded-[9px] text-[13px]">
-              <button className={`border-0 bg-transparent px-3 py-[6px] rounded-[7px] text-[13px] font-sans cursor-pointer transition-all duration-150 ${
-                view === "day"
-                  ? "bg-white text-ink font-medium shadow-[0_1px_0_var(--line)]"
-                  : "text-ink-3"
-              }`} onClick={() => setView("day")}>Day</button>
-              <button className={`border-0 bg-transparent px-3 py-[6px] rounded-[7px] text-[13px] font-sans cursor-pointer transition-all duration-150 ${
-                view === "week"
-                  ? "bg-white text-ink font-medium shadow-[0_1px_0_var(--line)]"
-                  : "text-ink-3"
-              }`} onClick={() => setView("week")}>Week</button>
-            </div>
+            <Toggle
+              options={[
+                { value: "day", label: "Day" },
+                { value: "week", label: "Week" },
+              ]}
+              value={view}
+              onChange={(val) => setView(val as "day" | "week")}
+            />
             <Link href="/dashboard/block-time" className="inline-flex items-center justify-center gap-2 h-8 px-3 rounded-lg border border-transparent font-sans text-sm font-medium text-ink-2 cursor-pointer hover:text-ink hover:bg-bg-2 transition-all duration-150">
               Block time
             </Link>
@@ -631,48 +597,23 @@ export default function BookingsPage() {
 
         {/* Stylist filter chips + legend */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <button
-            className={`h-8 px-3 rounded-full text-sm font-medium border cursor-pointer inline-flex items-center gap-2 transition-all duration-180 ${
-              stylistFilter === "all"
-                ? "bg-ink text-white border-ink"
-                : "bg-white text-ink-2 border-line-2 hover:border-ink-3 hover:-translate-y-0.5 active:scale-96"
-            }`}
+          <FilterChip
+            label="All stylists"
+            isActive={stylistFilter === "all"}
             onClick={() => setStylistFilter("all")}
-          >
-            All stylists
-            <span className={`text-[11px] ${stylistFilter === "all" ? "text-white/60" : "text-ink-4"}`}>
-              {apptCountForFilter("all")}
-            </span>
-          </button>
-          {stylists.map(s => {
-            const toneBgMap: Record<string, string> = {
-              a: 'bg-[#F1EAD9] text-[#8C6A1E]',
-              b: 'bg-teal-soft text-teal',
-              c: 'bg-blue-soft text-blue',
-              d: 'bg-[#F4DCE4] text-[#A03364]',
-              e: 'bg-amber-soft text-amber-ink',
-              f: 'bg-rose-soft text-rose',
-            };
-            return (
-            <button
+            count={apptCountForFilter("all")}
+          />
+          {stylists.map(s => (
+            <FilterChip
               key={s.id}
-              className={`h-8 px-3 rounded-full border cursor-pointer inline-flex items-center gap-2 text-sm transition-all duration-180 hover:border-ink-3 hover:-translate-y-0.5 active:scale-96 ${
-                stylistFilter === s.id
-                  ? "bg-ink text-white border-ink"
-                  : "bg-white text-ink-2 border-line-2"
-              }`}
+              label={s.name}
+              isActive={stylistFilter === s.id}
               onClick={() => setStylistFilter(s.id)}
-            >
-              <span className={`inline-grid place-items-center font-semibold rounded-full shrink-0 w-[18px] h-[18px] text-[9px] ${toneBgMap[s.tone || 'b'] || 'bg-bg-2 text-ink-2'}`}>
-                {s.short}
-              </span>
-              {s.name}
-              <span className={`text-[11px] ${stylistFilter === s.id ? "text-white/60" : "text-ink-4"}`}>
-                {apptCountForFilter(s.id)}
-              </span>
-            </button>
-            );
-          })}
+              avatarInitials={s.short || undefined}
+              avatarTone={s.tone ?? undefined}
+              count={apptCountForFilter(s.id)}
+            />
+          ))}
           <div className="flex-1" />
           <div className="flex items-center gap-2.5 text-[11px] text-ink-3">
             {[
@@ -732,34 +673,16 @@ export default function BookingsPage() {
             >
               {/* Header */}
               <div className="flex items-center gap-3 mb-4">
-                <div
-                  className={`inline-grid place-items-center font-semibold rounded-full shrink-0 w-12 h-12 text-[18px] ${
-                    selected.tone === 'a' ? 'bg-[#F1EAD9] text-[#8C6A1E]' :
-                    selected.tone === 'b' ? 'bg-teal-soft text-teal' :
-                    selected.tone === 'c' ? 'bg-blue-soft text-blue' :
-                    selected.tone === 'd' ? 'bg-[#F4DCE4] text-[#A03364]' :
-                    selected.tone === 'e' ? 'bg-amber-soft text-amber-ink' :
-                    selected.tone === 'f' ? 'bg-rose-soft text-rose' : 'bg-bg-2 text-ink-2'
-                  }`}
-                >
-                  {selected.initials}
-                </div>
+                <Avatar initials={selected.initials} tone={selected.tone} size="lg" style={{ width: 48, height: 48, fontSize: 18 }} />
                 <div className="flex-1">
                   <div className="text-base font-bold text-ink">{selected.customer}</div>
                   <div className="text-xs text-ink-3 mt-0.5">
                      {selected.service} · {String(selected.startH).padStart(2,"0")}:{String(selected.startM).padStart(2,"0")} · {selected.duration} min
                   </div>
                 </div>
-                <span className={`inline-flex items-center gap-[5px] text-[11px] font-medium px-[9px] py-[3px] rounded-full tracking-[0.005em] leading-[1.4] whitespace-nowrap ${
-                  selected.status === 'confirmed' ? 'text-blue bg-blue-soft' :
-                  selected.status === 'arrived' ? 'text-amber-ink bg-amber-soft' :
-                  selected.status === 'completed' ? 'text-green bg-green-soft' :
-                  selected.status === 'noshow' ? 'text-rose bg-rose-soft' :
-                  selected.status === 'cancelled' ? 'text-ink-3 bg-bg-2' : ''
-                }`}>
-                  <span className="w-[5px] h-[5px] rounded-full bg-current inline-block"></span>
+                <Badge tone={selected.status} showDot>
                   {STATUS_LABEL[selected.status]}
-                </span>
+                </Badge>
                 <button onClick={() => setSelected(null)} className="border-0 bg-bg-2 rounded-full w-8 h-8 cursor-pointer grid place-items-center">
                   <I.x />
                 </button>

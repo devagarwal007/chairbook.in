@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuthState } from "@/hooks/useAuth";
 
 export default function Home() {
@@ -100,8 +101,8 @@ export default function Home() {
               </>
             ) : (
               <>
-                <a className="btn btn-ghost" href="/signin">Sign in</a>
-                <a className="btn btn-primary" href="/auth">Start free</a>
+                <Link className="btn btn-ghost" href="/signin">Sign in</Link>
+                <Link className="btn btn-primary" href="/auth">Start free</Link>
               </>
             )}
           </div>
@@ -162,7 +163,7 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="ps-section">
-                  <span>Today's schedule</span>
+                  <span>{"Today's schedule"}</span>
                   <span className="pill">3 confirmed</span>
                 </div>
                 <div className="ps-appts">
@@ -240,10 +241,10 @@ export default function Home() {
       <section className="block" id="problem">
         <div className="wrap">
           <div className="sec-head">
-            <span className="sec-eyebrow">// The problem</span>
+            <span className="sec-eyebrow">{"// The problem"}</span>
             <h2 className="sec-title">Most salons run on guesswork, sticky notes, and a thousand WhatsApp messages.</h2>
             <p className="sec-sub">
-              Stylists forget who's coming. Customers ghost. The diary is in three places. You can't tell if Tuesday was actually a good day. We've spoken to 200+ owners — here's what we heard.
+              {"Stylists forget who's coming. Customers ghost. The diary is in three places. You can't tell if Tuesday was actually a good day. We've spoken to 200+ owners — here's what we heard."}
             </p>
           </div>
 
@@ -251,7 +252,7 @@ export default function Home() {
             <div className="p-card">
               <div className="num">01 / Bookings</div>
               <h3>Double-booked. Again.</h3>
-              <p>One stylist, two appointments, one angry customer in the waiting area scrolling their phone.</p>
+              <p>{"One stylist, two appointments, one angry customer in the waiting area scrolling their phone."}</p>
               <div className="strike">
                 <s>Paper diary</s><span className="arrow">→</span><strong>Real-time calendar</strong>
               </div>
@@ -259,14 +260,14 @@ export default function Home() {
             <div className="p-card">
               <div className="num">02 / Customers</div>
               <h3>You know the face, not the spend.</h3>
-              <p>Regulars feel anonymous. You can't remember what Priya got last time, let alone her preferred stylist.</p>
+              <p>{"Regulars feel anonymous. You can't remember what Priya got last time, let alone her preferred stylist."}</p>
               <div className="strike">
                 <s>Memory</s><span className="arrow">→</span><strong>Customer profiles</strong>
               </div>
             </div>
             <div className="p-card">
               <div className="num">03 / Revenue</div>
-              <h3>You feel busy, but where's the money?</h3>
+              <h3>{"You feel busy, but where's the money?"}</h3>
               <p>Cash flows in and out. Some weeks are great, some empty — and you have no idea why.</p>
               <div className="strike">
                 <s>Gut feel</s><span className="arrow">→</span><strong>Daily dashboard</strong>
@@ -280,7 +281,7 @@ export default function Home() {
       <section className="block" id="features">
         <div className="wrap">
           <div className="sec-head">
-            <span className="sec-eyebrow">// What's inside</span>
+            <span className="sec-eyebrow">{"// What's inside"}</span>
             <h2 className="sec-title">Three tools, one app, zero learning curve.</h2>
             <p className="sec-sub">
               Built around the way Indian salons already work — WhatsApp first, cash and UPI, walk-ins and regulars all in the same chair.
@@ -293,14 +294,16 @@ export default function Home() {
               <div className="num">01 — Bookings</div>
               <h2>Share a link. Get the booking.</h2>
               <p className="lede2">
-                Every salon gets a clean booking page at <span className="mono" style={{ color: "var(--teal)", fontWeight: 500 }}>chairbook.in/yours</span>. Drop it in your WhatsApp status, Instagram bio, or a customer's chat — they pick a service, stylist, and slot in under a minute.
+                {"Every salon gets a clean booking page at "}
+                <span className="mono" style={{ color: "var(--teal)", fontWeight: 500 }}>{"chairbook.in/yours"}</span>
+                {". Drop it in your WhatsApp status, Instagram bio, or a customer's chat — they pick a service, stylist, and slot in under a minute."}
               </p>
               <ul className="f-bullets">
                 <li>
                   <span className="b">✓</span>
                   <div>
-                    Live availability across stylists, no double-booking{" "}
-                    <small>— synced to your phone the moment you tap "accept"</small>
+                    {"Live availability across stylists, no double-booking "}
+                    <small>{"— synced to your phone the moment you tap \"accept\""}</small>
                   </div>
                 </li>
                 <li>
@@ -314,7 +317,7 @@ export default function Home() {
               </ul>
             </div>
             <div className="f-visual">
-              <div className="label">// Booking flow</div>
+              <div className="label">{"// Booking flow"}</div>
               <div className="wa-mock">
                 <div className="wa-bubble out">
                   Hi Priya 🙏 You can book your next appointment here:
@@ -335,7 +338,7 @@ export default function Home() {
           {/* Feature 2: CRM */}
           <div className="feature flip">
             <div className="f-visual">
-              <div className="label">// Customer list</div>
+              <div className="label">{"// Customer list"}</div>
               <div className="crm-mock">
                 <div className="crm-search">🔍 Search customers…</div>
                 <div className="crm-row">
@@ -376,7 +379,7 @@ export default function Home() {
               <div className="num">02 — Customers</div>
               <h2>Every regular, remembered.</h2>
               <p className="lede2">
-                A real CRM for your salon. See who's a regular, who's cooling off, and who's about to leave you for the place down the street — and win them back with one tap.
+                {"A real CRM for your salon. See who's a regular, who's cooling off, and who's about to leave you for the place down the street — and win them back with one tap."}
               </p>
               <ul className="f-bullets">
                 <li>
@@ -419,7 +422,7 @@ export default function Home() {
               </ul>
             </div>
             <div className="f-visual">
-              <div className="label">// Interactive Insights Demo</div>
+              <div className="label">{"// Interactive Insights Demo"}</div>
               <div className="an-mock">
                 <div className="an-toggle">
                   <span 
@@ -528,7 +531,7 @@ export default function Home() {
       <section className="block" id="pricing">
         <div className="wrap">
           <div className="sec-head" style={{ textAlign: "center", margin: "0 auto 56px" }}>
-            <span className="sec-eyebrow">// Pricing</span>
+            <span className="sec-eyebrow">{"// Pricing"}</span>
             <h2 className="sec-title">Honest pricing. No per-booking fee. Ever.</h2>
             <p className="sec-sub" style={{ margin: "0 auto" }}>
               First 30 days are free, no card needed. Pay monthly, cancel anytime.
@@ -586,7 +589,7 @@ export default function Home() {
       <section className="block" id="stories">
         <div className="wrap">
           <div className="sec-head">
-            <span className="sec-eyebrow">// Stories</span>
+            <span className="sec-eyebrow">{"// Stories"}</span>
             <h2 className="sec-title">From the diary to the dashboard.</h2>
             <p className="sec-sub">Salon owners who run their day from one screen.</p>
           </div>
@@ -595,7 +598,7 @@ export default function Home() {
             <div className="testi">
               <div className="badge-loc">→ ANDHERI, MUMBAI · 3 stylists</div>
               <p className="q">
-                "The first month we saw 14 customers we hadn't messaged in two months — sent them an offer and 9 came back. That alone paid for the year."
+                {"\"The first month we saw 14 customers we hadn't messaged in two months — sent them an offer and 9 came back. That alone paid for the year.\""}
               </p>
               <div className="who">
                 <div className="av">RV</div>
@@ -608,20 +611,20 @@ export default function Home() {
             <div className="testi">
               <div className="badge-loc">→ KORAMANGALA, BENGALURU · 2 stylists</div>
               <p className="q">
-                "I used to fight with my staff over the physical diary. Now bookings just come in on WhatsApp. My Saturdays are full and I haven't double-booked once in 4 months."
+                {"\"I used to fight with my staff over the physical diary. Now bookings just come in on WhatsApp. My Saturdays are full and I haven't double-booked once in 4 months.\""}
               </p>
               <div className="who">
                 <div className="av">AS</div>
                 <div>
                   <div className="n">Anita Sharma</div>
-                  <div className="r">Owner, Anita's Studio</div>
+                  <div className="r">{"Owner, Anita's Studio"}</div>
                 </div>
               </div>
             </div>
             <div className="testi">
               <div className="badge-loc">→ JUBILEE HILLS, HYDERABAD · 5 stylists</div>
               <p className="q">
-                "I finally know that Saturdays bring in 38% of the week and color services are 40% of revenue. We rearranged staff around it. Up ₹40k in two months."
+                {"\"I finally know that Saturdays bring in 38% of the week and color services are 40% of revenue. We rearranged staff around it. Up ₹40k in two months.\""}
               </p>
               <div className="who">
                 <div className="av">SK</div>
@@ -639,7 +642,7 @@ export default function Home() {
       <section className="block" id="faq">
         <div className="wrap faq-grid">
           <div>
-            <span className="sec-eyebrow">// FAQ</span>
+            <span className="sec-eyebrow">{"// FAQ"}</span>
             <h2 className="sec-title" style={{ fontSize: "32px" }}>Questions, answered.</h2>
             <p className="sec-sub" style={{ fontSize: "15px" }}>
               Still curious? WhatsApp us at{" "}
@@ -653,11 +656,11 @@ export default function Home() {
             <details className="faq-item" open>
               <summary className="faq-q">Do my customers need to download an app? <span className="ic">+</span></summary>
               <div className="faq-a">
-                No. Your customers only need WhatsApp. They tap your booking link, pick a slot, and they're done. You're the only one who needs ChairBook.
+                {"No. Your customers only need WhatsApp. They tap your booking link, pick a slot, and they're done. You're the only one who needs ChairBook."}
               </div>
             </details>
             <details className="faq-item">
-              <summary className="faq-q">What if my staff don't speak English? <span className="ic">+</span></summary>
+              <summary className="faq-q">{"What if my staff don't speak English? "} <span className="ic">+</span></summary>
               <div className="faq-a">
                 The owner app and customer booking page are available in English and Hindi today, with Tamil, Telugu and Marathi shipping this quarter.
               </div>

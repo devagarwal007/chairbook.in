@@ -8,7 +8,7 @@ import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
 import { Icons as I } from "@/components/ui/Icons";
-import type { Actor, NotificationItem } from "@/types";
+import type { NotificationItem, DbNotification } from "@/types";
 
 
 const KINDS: Record<string, { icon: keyof typeof I; tone: string; label: string }> = {
@@ -57,14 +57,18 @@ export default function NotificationsPage() {
   // Load notifications from DB
   useEffect(() => {
     if (!salonId) {
-      setNotifs(INITIAL_NOTIFS);
-      setLoading(false);
+      queueMicrotask(() => {
+        setNotifs(INITIAL_NOTIFS);
+        setLoading(false);
+      });
       return;
     }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setNotifs(INITIAL_NOTIFS);
-      setLoading(false);
+      queueMicrotask(() => {
+        setNotifs(INITIAL_NOTIFS);
+        setLoading(false);
+      });
       return;
     }
 
@@ -79,7 +83,8 @@ export default function NotificationsPage() {
           .limit(50);
 
         if (data && data.length > 0) {
-          const mappedNotifs: NotificationItem[] = data.map((n: any, i: number) => {
+
+          const mappedNotifs: NotificationItem[] = (data as unknown as DbNotification[]).map((n, i: number) => {
             const created = new Date(n.created_at);
             const now = new Date();
             const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
@@ -316,7 +321,7 @@ export default function NotificationsPage() {
               <I.bell />
             </div>
             <div>
-              <strong style={{ display: "block", fontSize: 15, fontWeight: 600 }}>You're all caught up</strong>
+              <strong style={{ display: "block", fontSize: 15, fontWeight: 600 }}>{"You're all caught up"}</strong>
               <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
                 No {filter !== 'all' ? filter + ' ' : ''}notifications right now.
               </div>

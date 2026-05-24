@@ -3,19 +3,26 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { MyDbBooking } from "@/types";
+
 
 export default function MyBookingPage() {
   const params = useParams();
   const bookingId = params?.id as string;
 
-  const [booking, setBooking] = useState<any>(null);
+  const [booking, setBooking] = useState<MyDbBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookingId) return;
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) { setLoading(false); return; }
+    if (!supabase) {
+      queueMicrotask(() => {
+        setLoading(false);
+      });
+      return;
+    }
 
     supabase
       .from("bookings")
@@ -23,9 +30,10 @@ export default function MyBookingPage() {
       .eq("id", bookingId)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) {
-          setBooking(data);
-          setStatus(data.status);
+        const typedData = data as unknown as MyDbBooking | null;
+        if (typedData) {
+          setBooking(typedData);
+          setStatus(typedData.status);
         }
         setLoading(false);
       });
@@ -44,12 +52,12 @@ export default function MyBookingPage() {
 
   const custName = booking.customer?.name || "Customer";
   const stylistName = booking.stylist?.name || "Unassigned";
-  const serviceNames = booking.booking_services?.map((bs: any) => bs.service?.name).join(", ") || "Service";
+  const serviceNames = booking.booking_services?.map((bs) => bs.service?.name).filter(Boolean).join(", ") || "Service";
   const date = new Date(booking.date).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: "24px 16px", fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700 }}>{custName}'s Booking</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700 }}>{custName}{"'s Booking"}</h1>
       <p style={{ color: "#666", marginTop: 4 }}>{serviceNames} with {stylistName}</p>
 
       <div style={{ background: "#f5f5f5", borderRadius: 12, padding: 16, marginTop: 20 }}>

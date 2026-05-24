@@ -8,3 +8,5 @@ export * from "./settings";
 export * from "./header";
 export * from "./notification";
 export * from "./user";
+export * from "./revenue";
+

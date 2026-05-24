@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
+import { DbBlockRow } from "@/types";
 
 import { Icons as IBT } from "@/components/ui/Icons";
 
@@ -107,7 +108,7 @@ function BlockRow({ block, onEdit, onDelete, stylists }: BlockRowProps) {
           {" · "}
           <strong className="text-ink-2 font-medium">{stylistNamesOf(block.stylists)}</strong>
         </div>
-        {block.note && <div className="text-xs text-ink-3 italic mt-1.5 pl-2.5 border-l-2 border-line-2">"{block.note}"</div>}
+        {block.note && <div className="text-xs text-ink-3 italic mt-1.5 pl-2.5 border-l-2 border-line-2">{"\""}{block.note}{"\""}</div>}
       </div>
       <div className="flex gap-6">
         <button className="cust-action wa" style={{ opacity: 1, background: "transparent", borderColor: "var(--line)" }} onClick={() => onEdit(block)}>
@@ -220,7 +221,7 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
 
           {/* Stylists */}
           <div className="field" style={{ marginTop: 16 }}>
-            <label>Who's affected?</label>
+            <label>{"Who's affected?"}</label>
             <div className="flex gap-1.5 flex-wrap">
               {stylistsToDisplay.map(s => {
                 const on = stylists.includes(s.id);
@@ -356,7 +357,7 @@ export default function BlockTimePage() {
 
       let loadedStylists = fallbackStylists;
       if (stylistsData && stylistsData.length > 0) {
-        loadedStylists = stylistsData.map((s: any) => ({
+        loadedStylists = (stylistsData as unknown as Array<{ id: string; name: string; tone: string | null }>).map((s) => ({
           id: s.id,
           name: s.name,
           short: s.name[0],
@@ -386,7 +387,8 @@ export default function BlockTimePage() {
       if (error) throw error;
 
       if (blocksData) {
-        const mapped: UIBlock[] = blocksData.map((row: any) => {
+
+        const mapped: UIBlock[] = (blocksData as unknown as DbBlockRow[]).map((row) => {
           let note = row.note || "";
           let rec: "once" | "daily" | "weekly" = "once";
           if (row.recurring) {
@@ -435,7 +437,9 @@ export default function BlockTimePage() {
 
   useEffect(() => {
     if (salonId) {
-      loadBlocks();
+      queueMicrotask(() => {
+        loadBlocks();
+      });
     } else {
       // preview state or before auth loads
       const t = setTimeout(() => {

@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { initialsOf } from "@/lib/utils";
 import { useToast } from "@/context/ToastContext";
 
-import { Customer, Service, Stylist } from "@/types";
-import { Icons as IN } from "@/components/ui/Icons";
+import { Customer, Service, Stylist, NewCustInput, DbBookingSimple, DbStylistRaw, DbServiceRaw, DbBookingSlotRaw, DbBookingStylistRaw } from "@/types";
+import { Icons as IN, FormField, PhoneInput, Avatar, Badge } from "@/components/ui";
+
+
 
 // ===== DATA LOADING FROM SUPABASE =====
 function generateDays(baseDate: Date) {
@@ -66,9 +67,9 @@ function StepBar({ step }: { step: number }) {
 interface StepCustomerProps {
   customer: Customer | null;
   onSelect: (c: Customer) => void;
-  onAddNew: (n: any) => void;
-  newCust: any;
-  setNewCust: any;
+  onAddNew: (n: NewCustInput) => void;
+  newCust: NewCustInput;
+  setNewCust: React.Dispatch<React.SetStateAction<NewCustInput>>;
   mode: string;
   setMode: (m: string) => void;
   dbCustomers: Customer[];
@@ -98,7 +99,7 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
 
   return (
     <div className="nb-step-content">
-      <h1 className="nb-title">Who's the booking for?</h1>
+      <h1 className="nb-title">{"Who's the booking for?"}</h1>
       <p className="nb-sub">Search your existing customers, or add someone new in 2 fields.</p>
 
       <div className="nb-mode-toggle">
@@ -148,7 +149,7 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
                 className={`nb-cust-row ${customer?.id === c.id ? "on" : ""}`}
                 onClick={() => onSelect(c)}
               >
-                <div className={`avatar md tone-${c.tone}`}>{initialsOf(c.name)}</div>
+                <Avatar initials={initialsOf(c.name)} tone={c.tone} size="md" />
                 <div className="nb-cust-main">
                   <div className="nb-cust-name">{c.name}</div>
                   <div className="nb-cust-meta">
@@ -167,31 +168,22 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
 
       {mode === "new" && (
         <div className="nb-new-form">
-          <div className="field">
-            <label>Full name</label>
+          <FormField label="Full name">
             <input
               placeholder="e.g. Priya Sharma"
               value={newCust.name}
               onChange={e => setNewCust({ ...newCust, name: e.target.value })}
               autoFocus
             />
-          </div>
+          </FormField>
           <div className="field-row" style={{ marginTop: 14 }}>
-            <div className="field">
-              <label>Phone (optional for walk-ins)</label>
-              <div className="phone-input">
-                <span className="phone-prefix">+91</span>
-                <input
-                  type="tel"
-                  placeholder="98xxx xxxxx"
-                  value={newCust.phone}
-                  onChange={e => setNewCust({ ...newCust, phone: e.target.value.replace(/[^\d ]/g, "") })}
-                  maxLength={11}
-                />
-              </div>
-            </div>
-            <div className="field">
-              <label>How did they hear about us?</label>
+            <FormField label="Phone (optional for walk-ins)">
+              <PhoneInput
+                value={newCust.phone}
+                onChange={val => setNewCust({ ...newCust, phone: val })}
+              />
+            </FormField>
+            <FormField label="How did they hear about us?">
               <select value={newCust.source} onChange={e => setNewCust({ ...newCust, source: e.target.value })} style={{ width: "100%", height: 42, background: "#fff", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 10px", outline: 0 }}>
                 <option value="">— Optional —</option>
                 <option>Walk-in</option>
@@ -201,7 +193,7 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
                 <option>Google</option>
                 <option>Existing customer</option>
               </select>
-            </div>
+            </FormField>
           </div>
           <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-3">
             <input type="checkbox" checked={newCust.noPhone} onChange={e => setNewCust({ ...newCust, noPhone: e.target.checked })} className="accent-teal w-4 h-4 shrink-0" />
@@ -376,7 +368,22 @@ function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onD
               cursor: "pointer"
             }}
           >
-            <div className={`avatar lg tone-${s.tone}`} style={{ width: 40, height: 40, borderRadius: "50%", background: stylist === s.id ? "var(--teal-soft)" : "var(--bg-2)", color: stylist === s.id ? "var(--teal)" : "var(--ink-2)", display: "grid", placeItems: "center", fontWeight: "bold", fontSize: 16 }}>{s.short}</div>
+            <Avatar
+              initials={s.short || s.name[0]}
+              tone={s.tone ?? undefined}
+              size="lg"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                background: stylist === s.id ? "var(--teal-soft)" : "var(--bg-2)",
+                color: stylist === s.id ? "var(--teal)" : "var(--ink-2)",
+                display: "grid",
+                placeItems: "center",
+                fontWeight: "bold",
+                fontSize: 16,
+              }}
+            />
             <div className="stylist-name" style={{ fontSize: 13, fontWeight: 500, marginTop: 8, color: "var(--ink)", textAlign: "center", whiteSpace: "nowrap" }}>{s.name}</div>
           </button>
         ))}
@@ -486,11 +493,11 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
 
       <div className="nb-summary">
         <div className="nb-summary-head">
-          <div className={`avatar lg tone-${customer.tone}`}>{initialsOf(customer.name)}</div>
+          <Avatar initials={initialsOf(customer.name)} tone={customer.tone} size="lg" />
           <div style={{ flex: 1 }}>
             <div className="nb-summary-name">{customer.name}</div>
             {customer.phone && <div className="nb-summary-phone">{customer.phone}</div>}
-            {customer.isNew && <span className="badge confirmed no-dot" style={{ marginTop: 6 }}>NEW CUSTOMER</span>}
+            {customer.isNew && <Badge tone="confirmed" showDot={false} style={{ marginTop: 6 }}>NEW CUSTOMER</Badge>}
           </div>
         </div>
 
@@ -517,15 +524,14 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
         </div>
       </div>
 
-      <div className="field" style={{ marginTop: 18 }}>
-        <label>Note (internal)</label>
+      <FormField label="Note (internal)" style={{ marginTop: 18 }}>
         <textarea
           placeholder="e.g. Customer prefers ammonia-free color. Will come 10 min late."
           value={note}
           onChange={e => setNote(e.target.value)}
           style={{ minHeight: 64, width: "100%", padding: 12, borderRadius: 10, border: "1px solid var(--line-2)", outline: 0, resize: "vertical", fontFamily: "inherit" }}
         />
-      </div>
+      </FormField>
 
       <div className="nb-toggles">
         <label className={`flex items-center gap-2.5 text-[13px] ${customer.phone ? "cursor-pointer" : "cursor-not-allowed"}`}>
@@ -544,14 +550,15 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
   );
 }
 
+
+
 // ===== MAIN PAGE COMPONENT =====
 export default function NewBookingPage() {
-  const router = useRouter();
   const { salonId } = useProfile();
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState("existing");
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [newCust, setNewCust] = useState({ name: "", phone: "", source: "", noPhone: false });
+  const [newCust, setNewCust] = useState<NewCustInput>({ name: "", phone: "", source: "", noPhone: false });
   const [services, setServices] = useState<Service[]>([]);
   const [stylist, setStylist] = useState<string | number>("");
   const [date, setDate] = useState("");
@@ -568,20 +575,11 @@ export default function NewBookingPage() {
   const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
   const [dbServices, setDbServices] = useState<Service[]>([]);
   const [dbStylists, setDbStylists] = useState<Stylist[]>([]);
-  const [loadError, setLoadError] = useState(false);
   const [loadingCust, setLoadingCust] = useState(true);
   const [loadingSvcs, setLoadingSvcs] = useState(true);
   const [loadingBookings, setLoadingBookings] = useState(false);
 
   const days = useMemo(() => generateDays(new Date()), []);
-
-  // Compute slot availability from real bookings
-  const slots = useMemo(() => {
-    if (date && dbStylists.some(s => s.id === stylist || stylist === "any")) {
-      return ALL_SLOTS.map(s => ({ time: s, taken: false }));
-    }
-    return ALL_SLOTS.map(s => ({ time: s, taken: false }));
-  }, [date, stylist, dbStylists]);
 
   const totalDuration = services.reduce((s, x) => s + x.duration, 0);
   const totalPrice = services.reduce((s, x) => s + x.price, 0);
@@ -589,14 +587,18 @@ export default function NewBookingPage() {
   // Load customers, services, stylists from DB
   useEffect(() => {
     if (!salonId) {
-      setLoadingCust(false);
-      setLoadingSvcs(false);
+      queueMicrotask(() => {
+        setLoadingCust(false);
+        setLoadingSvcs(false);
+      });
       return;
     }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setLoadingCust(false);
-      setLoadingSvcs(false);
+      queueMicrotask(() => {
+        setLoadingCust(false);
+        setLoadingSvcs(false);
+      });
       return;
     }
 
@@ -632,17 +634,19 @@ export default function NewBookingPage() {
           .order("date", { ascending: false });
 
         if (bkData) {
+          const bkList = bkData as unknown as DbBookingSimple[];
           const visitsMap: Record<string, number> = {};
           const spendMap: Record<string, number> = {};
           const lastDateMap: Record<string, string> = {};
           const now = new Date();
-          bkData.forEach((b: any) => {
-            if (!visitsMap[b.customer_id]) visitsMap[b.customer_id] = 0;
-            visitsMap[b.customer_id]++;
-            const spend = b.booking_services?.reduce((s: number, bs: any) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
-            spendMap[b.customer_id] = (spendMap[b.customer_id] || 0) + spend;
-            if (!lastDateMap[b.customer_id] || b.date > lastDateMap[b.customer_id]) {
-              lastDateMap[b.customer_id] = b.date;
+          bkList.forEach((b) => {
+            const customerIdKey = b.customer_id;
+            if (!visitsMap[customerIdKey]) visitsMap[customerIdKey] = 0;
+            visitsMap[customerIdKey]++;
+            const spend = b.booking_services?.reduce((s: number, bs) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
+            spendMap[customerIdKey] = (spendMap[customerIdKey] || 0) + spend;
+            if (!lastDateMap[customerIdKey] || b.date > lastDateMap[customerIdKey]) {
+              lastDateMap[customerIdKey] = b.date;
             }
           });
 
@@ -662,20 +666,27 @@ export default function NewBookingPage() {
         }
       } catch (err) {
         console.error("Error loading customers:", err);
-        setLoadError(true);
       } finally {
-        setLoadingCust(false);
+        queueMicrotask(() => {
+          setLoadingCust(false);
+        });
       }
     };
 
     const loadStylistsAndServices = async () => {
-      const supabase = getSupabaseBrowserClient();
-      if (!supabase) { setLoadingSvcs(false); return; }
+      const supabaseClient = getSupabaseBrowserClient();
+      if (!supabaseClient) {
+        queueMicrotask(() => {
+          setLoadingSvcs(false);
+        });
+        return;
+      }
       try {
-        const { data: stylistsData } = await supabase
+        const { data: stylistsData } = await supabaseClient
           .from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true);
         if (stylistsData && stylistsData.length > 0) {
-          setDbStylists(stylistsData.map((s: any) => ({
+          const rawStylists = stylistsData as unknown as DbStylistRaw[];
+          setDbStylists(rawStylists.map((s) => ({
             id: s.id,
             name: s.name,
             short: s.name[0],
@@ -684,11 +695,12 @@ export default function NewBookingPage() {
           })));
         }
 
-        const { data: servicesData } = await supabase
+        const { data: servicesData } = await supabaseClient
           .from("services").select("id, name, category, duration_min, price")
           .eq("salon_id", salonId).eq("active", true);
         if (servicesData && servicesData.length > 0) {
-          setDbServices(servicesData.map((s: any) => ({
+          const rawServices = servicesData as unknown as DbServiceRaw[];
+          setDbServices(rawServices.map((s) => ({
             id: s.id,
             name: s.name,
             cat: s.category || "General",
@@ -698,14 +710,17 @@ export default function NewBookingPage() {
         }
       } catch (err) {
         console.error("Error loading services:", err);
-        setLoadError(true);
       } finally {
-        setLoadingSvcs(false);
+        queueMicrotask(() => {
+          setLoadingSvcs(false);
+        });
       }
     };
 
-    loadData();
-    loadStylistsAndServices();
+    queueMicrotask(() => {
+      loadData();
+      loadStylistsAndServices();
+    });
   }, [salonId]);
 
   // Load real slot availability when date or stylist changes
@@ -715,7 +730,7 @@ export default function NewBookingPage() {
     if (!supabase) return;
 
     const loadSlots = async () => {
-      setLoadingBookings(true);
+      queueMicrotask(() => setLoadingBookings(true));
       try {
         let query = supabase
           .from("bookings")
@@ -732,7 +747,8 @@ export default function NewBookingPage() {
 
         const takenSlots = new Set<string>();
         if (data) {
-          data.forEach((b: any) => {
+          const slotList = data as unknown as DbBookingSlotRaw[];
+          slotList.forEach((b) => {
             const [h, m] = (b.start_time || "00:00").split(":").map(Number);
             const startMin = h * 60 + m;
             const endMin = startMin + (b.duration || 30);
@@ -756,11 +772,13 @@ export default function NewBookingPage() {
             .in("status", ["Confirmed", "Arrived"]);
 
           if (allBookings && dbStylists.length > 0) {
+            const bookingsList = allBookings as unknown as DbBookingStylistRaw[];
             // A slot is only completely taken if ALL stylists are booked
             const stylistSlotMap: Record<string, Set<string>> = {};
             dbStylists.forEach(s => { stylistSlotMap[s.id] = new Set(); });
-            allBookings.forEach((b: any) => {
-              if (stylistSlotMap[b.stylist_id]) {
+            bookingsList.forEach((b) => {
+              const stylistIdKey = String(b.stylist_id);
+              if (stylistSlotMap[stylistIdKey]) {
                 const [h, m] = (b.start_time || "00:00").split(":").map(Number);
                 const startMin = h * 60 + m;
                 const endMin = startMin + (b.duration || 30);
@@ -768,13 +786,13 @@ export default function NewBookingPage() {
                   const [sh, sm] = s.split(":").map(Number);
                   const slotMin = sh * 60 + sm;
                   if (slotMin >= startMin && slotMin < endMin) {
-                    stylistSlotMap[b.stylist_id].add(s);
+                    stylistSlotMap[stylistIdKey].add(s);
                   }
                 });
               }
             });
             // Slot is taken only if ALL stylists have it booked
-            const allStylistIds = dbStylists.map(s => s.id);
+            const allStylistIds = dbStylists.map(s => String(s.id));
             if (allStylistIds.length > 0) {
               ALL_SLOTS.forEach(s => {
                 const allBusy = allStylistIds.every(sid => stylistSlotMap[sid]?.has(s));
@@ -786,11 +804,15 @@ export default function NewBookingPage() {
       } catch (err) {
         console.error("Error loading slot availability:", err);
       } finally {
-        setLoadingBookings(false);
+        queueMicrotask(() => {
+          setLoadingBookings(false);
+        });
       }
     };
 
-    loadSlots();
+    queueMicrotask(() => {
+      loadSlots();
+    });
   }, [salonId, date, stylist, dbStylists]);
 
   // Recompute slots with taken info
@@ -805,7 +827,7 @@ export default function NewBookingPage() {
   };
 
   const selectCustomer = (c: Customer) => setCustomer(c);
-  const addNewCustomer = (n: any) => {
+  const addNewCustomer = (n: NewCustInput) => {
     const tones = ["a", "b", "c", "d", "e", "f"];
     const tone = tones[(n.name.length || 0) % tones.length];
     const customerObj = {
@@ -918,9 +940,10 @@ export default function NewBookingPage() {
           setNewBookingId(bookingData.id);
           setCreated(true);
           showFlash(`Booking created · ${customer.name} · ${date} · ${time}`);
-        } catch (err: any) {
-          console.error("Error creating booking:", err);
-          showFlash(`Error: ${err.message || "Failed to create booking"}`, 3000);
+        } catch (err) {
+          const error = err as Error;
+          console.error("Error creating booking:", error);
+          showFlash(`Error: ${error.message || "Failed to create booking"}`, 3000);
           return;
         }
       } else {

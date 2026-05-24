@@ -24,3 +24,20 @@ export interface NotificationItem {
   actor: Actor | null;
   link: string;
 }
+
+export interface DbNotification {
+  id: string;
+  created_at: string;
+  type: string;
+  title: string;
+  body: string | null;
+  read: boolean;
+  meta?: {
+    actor?: {
+      name: string;
+      initials?: string;
+      tone?: string;
+    } | null;
+  } | null;
+}
+

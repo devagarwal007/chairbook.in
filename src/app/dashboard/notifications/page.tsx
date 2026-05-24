@@ -21,11 +21,21 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState('all');
   const { show: flashMsg } = useToast();
 
-  // Load notifications from DB
+  // Load notifications from DB or localStorage fallback
   useEffect(() => {
     if (!salonId) {
       queueMicrotask(() => {
-        setNotifs(INITIAL_NOTIFS);
+        const stored = localStorage.getItem("cb_notifications");
+        if (stored) {
+          try {
+            setNotifs(JSON.parse(stored));
+          } catch (e) {
+            setNotifs(INITIAL_NOTIFS);
+          }
+        } else {
+          setNotifs(INITIAL_NOTIFS);
+          localStorage.setItem("cb_notifications", JSON.stringify(INITIAL_NOTIFS));
+        }
         setLoading(false);
       });
       return;
@@ -33,7 +43,17 @@ export default function NotificationsPage() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       queueMicrotask(() => {
-        setNotifs(INITIAL_NOTIFS);
+        const stored = localStorage.getItem("cb_notifications");
+        if (stored) {
+          try {
+            setNotifs(JSON.parse(stored));
+          } catch (e) {
+            setNotifs(INITIAL_NOTIFS);
+          }
+        } else {
+          setNotifs(INITIAL_NOTIFS);
+          localStorage.setItem("cb_notifications", JSON.stringify(INITIAL_NOTIFS));
+        }
         setLoading(false);
       });
       return;
@@ -113,7 +133,11 @@ export default function NotificationsPage() {
   }, [notifs]);
 
   const markRead = async (id: number) => {
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+    setNotifs(prev => {
+      const next = prev.map(n => n.id === id ? { ...n, unread: false } : n);
+      localStorage.setItem("cb_notifications", JSON.stringify(next));
+      return next;
+    });
     if (salonId) {
       const supabase = getSupabaseBrowserClient();
       if (supabase) {
@@ -147,7 +171,11 @@ export default function NotificationsPage() {
   })();
 
   const markAllRead = async () => {
-    setNotifs(prev => prev.map(n => ({ ...n, unread: false })));
+    setNotifs(prev => {
+      const next = prev.map(n => ({ ...n, unread: false }));
+      localStorage.setItem("cb_notifications", JSON.stringify(next));
+      return next;
+    });
     flashMsg('All marked as read');
     if (salonId) {
       const supabase = getSupabaseBrowserClient();
@@ -168,7 +196,11 @@ export default function NotificationsPage() {
   const dismiss = (id: number, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setNotifs(prev => prev.filter(n => n.id !== id));
+    setNotifs(prev => {
+      const next = prev.filter(n => n.id !== id);
+      localStorage.setItem("cb_notifications", JSON.stringify(next));
+      return next;
+    });
     flashMsg('Dismissed');
   };
 

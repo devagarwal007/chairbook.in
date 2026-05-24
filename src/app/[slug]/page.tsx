@@ -190,7 +190,7 @@ export default function PublicBookingPage() {
 
   const selectedDateLabel = dates.find((date) => date.key === selectedDate);
   const selectedStylistName = selectedStylist === "any" ? "First available" : state.stylists.find((stylist) => stylist.id === selectedStylist)?.name ?? "Stylist";
-  const canAdvance = (step === 1 && selectedServices.length > 0) || (step === 2 && selectedTime) || (step === 3 && customerName.trim().length > 1 && phone.replace(/\D/g, "").length >= 10);
+  const canAdvance = (step === 1 && selectedServices.length > 0) || (step === 2 && selectedTime) || (step === 3 && customerName.trim().length > 1 && phone.replace(/\D/g, "").length === 10);
 
   const toggleService = (service: Service) => {
     setSelectedServices((current) => (current.some((item) => item.id === service.id) ? current.filter((item) => item.id !== service.id) : [...current, service]));

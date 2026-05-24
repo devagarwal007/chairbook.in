@@ -436,7 +436,7 @@ interface StepWhatsAppProps {
 }
 
 function StepWhatsApp({ data, onChange, onNext, onBack, isSaving, error }: StepWhatsAppProps) {
-  const valid = data.waNumber.replace(/\s/g, "").length >= 10;
+  const valid = data.waNumber.length === 10;
   return (
     <div className="ob-step">
       <div className="ob-step-head">

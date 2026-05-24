@@ -232,8 +232,12 @@ function StepCustomer({ customer, onSelect, onAddNew, newCust, setNewCust, mode,
           {newCust.name.trim() && (
             <button
               className="btn btn-primary"
-              style={{ marginTop: 18, opacity: duplicateCustomer ? 0.5 : 1, cursor: duplicateCustomer ? "not-allowed" : "pointer" }}
-              disabled={!!duplicateCustomer}
+              style={{ 
+                marginTop: 18, 
+                opacity: duplicateCustomer || (!newCust.noPhone && newCust.phone.length > 0 && newCust.phone.length !== 10) ? 0.5 : 1, 
+                cursor: duplicateCustomer || (!newCust.noPhone && newCust.phone.length > 0 && newCust.phone.length !== 10) ? "not-allowed" : "pointer" 
+              }}
+              disabled={!!duplicateCustomer || (!newCust.noPhone && newCust.phone.length > 0 && newCust.phone.length !== 10)}
               onClick={() => onAddNew(newCust)}
             >
               <IN.check /> Use {newCust.name}

@@ -5,13 +5,16 @@ import Link from "next/link";
 import { Icons } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
+import { useBookings } from "@/hooks";
 import type { HeaderProps } from "@/types";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { INITIAL_NOTIFS } from "@/constants/notifications";
 
 export default function Header({
   title,
   subtitle,
   brandMark = "C",
-  todayRevenue = 4200,
+  todayRevenue: propTodayRevenue,
   dailyTarget = 6000,
   showSearch = false,
   actions,
@@ -20,7 +23,15 @@ export default function Header({
   const [salonOpen, setSalonOpen] = useState(true);
   const { show: showFlash } = useToast();
   
-  const { profile } = useProfile();
+  const { profile, salonId } = useProfile();
+  
+  // Dynamically calculate today's revenue if not explicitly provided as a prop
+  const shouldFetch = propTodayRevenue === undefined;
+  const { bookings: todayBookings } = useBookings(shouldFetch ? salonId : null, "today");
+  
+  const todayRevenue = propTodayRevenue !== undefined
+    ? propTodayRevenue
+    : todayBookings.filter((a) => a.status === "completed" || a.status === "arrived").reduce((s, a) => s + a.price, 0);
 
   // Sync salon status with localStorage
   useEffect(() => {
@@ -38,6 +49,83 @@ export default function Header({
     localStorage.setItem("cb_salon_open", String(nextState));
     showFlash(nextState ? "Salon marked OPEN for today" : "Salon marked CLOSED for today");
   };
+
+  const [hasUnread, setHasUnread] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let channel: any = null;
+
+    const checkUnread = async () => {
+      if (!salonId) {
+        const stored = localStorage.getItem("cb_notifications");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            const unread = parsed.some((n: any) => n.unread);
+            if (active) setHasUnread(unread);
+          } catch (e) {
+            if (active) setHasUnread(false);
+          }
+        } else {
+          const initialUnread = INITIAL_NOTIFS.some((n) => n.unread);
+          if (active) setHasUnread(initialUnread);
+        }
+        return;
+      }
+
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("notifications")
+          .select("id")
+          .eq("salon_id", salonId)
+          .eq("read", false)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          if (active) setHasUnread(true);
+        } else {
+          if (active) setHasUnread(false);
+        }
+      } catch (err) {
+        console.error("Error checking unread notifications:", err);
+      }
+    };
+
+    checkUnread();
+
+    if (salonId) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        channel = supabase
+          .channel(`public:notifications:${salonId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "notifications",
+              filter: `salon_id=eq.${salonId}`,
+            },
+            () => {
+              checkUnread();
+            }
+          )
+          .subscribe();
+      }
+    }
+
+    return () => {
+      active = false;
+      if (channel) {
+        const supabase = getSupabaseBrowserClient();
+        if (supabase) supabase.removeChannel(channel);
+      }
+    };
+  }, [salonId]);
 
 
   return (
@@ -64,7 +152,9 @@ export default function Header({
             )}
             <Link href="/dashboard/notifications" aria-label="Notifications" className="w-10 h-10 rounded-[10px] border border-line bg-white grid place-items-center text-ink-2 cursor-pointer hover:bg-bg-2 transition-all duration-150 relative inline-grid no-underline text-inherit">
               <Icons.bell />
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber border-2 border-white box-content"></span>
+              {hasUnread && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber border-2 border-white box-content"></span>
+              )}
             </Link>
             <div className="relative">
               <button

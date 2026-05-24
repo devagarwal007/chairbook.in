@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import { Icons as I } from "@/components/ui/Icons";
+import { Icons as I, PhoneInput, Modal, FormField } from "@/components/ui";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
@@ -85,9 +85,18 @@ export default function CustomersPage() {
           }, 0);
 
           // Days since last booking
-          const dates = custBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
-          const lastMs = dates.length > 0 ? Math.max(...dates) : null;
-          const lastDays = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
+          const completedDates = paidBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
+          const lastMs = completedDates.length > 0 ? Math.max(...completedDates) : null;
+          const lastDaysBaseline = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
+
+          const hasUpcoming = custBks.some(b => {
+            const bkDate = new Date(b.date);
+            const bkDateZero = new Date(bkDate);
+            bkDateZero.setHours(0, 0, 0, 0);
+            return bkDateZero >= today && ["Pending", "Confirmed", "Arrived"].includes(b.status);
+          });
+
+          const lastDays = hasUpcoming ? 0 : lastDaysBaseline;
 
           // Favourite service by frequency
           const svcCount: Record<string, number> = {};
@@ -206,7 +215,7 @@ export default function CustomersPage() {
   }, [newCustPhone, customers]);
 
   return (
-    <div className="app animate-fade-in">
+    <div className="min-h-screen pb-[calc(var(--bottom-nav-h)+32px)] animate-[fadeIn_0.22s_cubic-bezier(0.16,1,0.3,1)_forwards]">
       <Header
         title="Customers"
         subtitle={`${customers.length} TOTAL · ₹${(customers.reduce((s, c) => s + (c.spend ?? 0), 0) / 100000).toFixed(1)}L LIFETIME`}
@@ -221,7 +230,7 @@ export default function CustomersPage() {
       />
 
       {/* App Main */}
-      <main className="app-main pb-[100px]">
+      <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-6 md:py-7 pb-24">
         {/* Search bar */}
         <div className="flex items-center gap-2.5 bg-white border border-line-2 rounded-[var(--radius)] px-3.5 py-2.5 mb-4">
           <I.search />
@@ -240,71 +249,75 @@ export default function CustomersPage() {
         </div>
 
         {/* Engagement tabs & Sort */}
-        <div className="flex items-center gap-2 pb-1.5 mb-4 max-[720px]:mx-[-16px] max-[720px]:px-4">
-          {FILTER_TABS.map(f => (
-            <button
-              key={f.id}
-              className={`flex items-center gap-1.5 py-2 px-3 rounded-sm border text-[13px] font-medium cursor-pointer whitespace-nowrap transition-all duration-150 ${
-                tab === f.id 
-                  ? "border-teal bg-teal-soft text-teal" 
-                  : "border-line bg-white text-ink-2 hover:border-line-2"
-              }`}
-              onClick={() => setTab(f.id)}
-            >
-              {f.id !== "all" && (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                    f.id === "active" ? "bg-green" : f.id === "cooling" ? "bg-amber" : "bg-rose"
-                  }`}
-                />
-              )}
-              {f.label}
-              <span className="text-[11px] text-ink-3 ml-0.5">{counts[f.id as keyof typeof counts]}</span>
-            </button>
-          ))}
-
-          <div className="flex-1" />
-
-          {/* Sort Menu Component */}
-          <div className="sort-menu relative">
-            <button
-              className="flex items-center gap-1.5 px-3 py-2 rounded-sm border border-line bg-white text-[13px] font-medium text-ink cursor-pointer whitespace-nowrap"
-              onClick={() => setSortOpen(!sortOpen)}
-            >
-              <I.sort />
-              <span className="text-ink-3">Sort:</span>
-              <span>{currentSort.label}</span>
-              <I.chev className="text-ink-3" />
-            </button>
-            {sortOpen && (
-              <div className="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-[var(--radius)] shadow-[0_8px_16px_-4px_rgba(0,0,0,0.1)] z-50 min-w-[180px] overflow-hidden">
-                {SORT_OPTIONS.map(s => (
-                  <button
-                    key={s.id}
-                    className={`flex items-center justify-between w-full px-3.5 py-2.5 border-0 text-[13px] text-left cursor-pointer ${
-                      sort === s.id ? "bg-teal-soft text-teal" : "bg-transparent text-ink"
+        <div className="flex flex-col gap-3.5 sm:flex-row sm:items-center justify-between pb-1.5 mb-4">
+          {/* Tabs - horizontal scrolling on mobile */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {FILTER_TABS.map(f => (
+              <button
+                key={f.id}
+                className={`flex items-center gap-1.5 py-2 px-3 rounded-sm border text-[13px] font-medium cursor-pointer whitespace-nowrap transition-all duration-150 ${
+                  tab === f.id 
+                    ? "border-teal bg-teal-soft text-teal" 
+                    : "border-line bg-white text-ink-2 hover:border-line-2"
+                }`}
+                onClick={() => setTab(f.id)}
+              >
+                {f.id !== "all" && (
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      f.id === "active" ? "bg-green" : f.id === "cooling" ? "bg-amber" : "bg-rose"
                     }`}
-                    onClick={() => {
-                      setSort(s.id);
-                      setSortOpen(false);
-                    }}
-                  >
-                    {s.label}
-                    {sort === s.id && <span className="text-teal">✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
+                  />
+                )}
+                {f.label}
+                <span className="text-[11px] text-ink-3 ml-0.5">{counts[f.id as keyof typeof counts]}</span>
+              </button>
+            ))}
           </div>
 
-          {/* Add customer button */}
-          <button
-            onClick={() => setShowCreateCust(true)}
-            className="h-[34px] rounded-[10px] border border-line-2 bg-teal text-white inline-flex items-center gap-1.5 px-3 cursor-pointer flex-shrink-0 hover:bg-[var(--teal-ink)] transition-all duration-150 text-[13px] font-medium"
-          >
-            <I.plus />
-            Add Customer
-          </button>
+          {/* Sort & Add Customer */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+            {/* Sort Menu Component */}
+            <div className="sort-menu relative">
+              <button
+                className="flex items-center gap-1.5 px-3 py-2 rounded-sm border border-line bg-white text-[13px] font-medium text-ink cursor-pointer whitespace-nowrap"
+                onClick={() => setSortOpen(!sortOpen)}
+              >
+                <I.sort />
+                <span className="text-ink-3">Sort:</span>
+                <span>{currentSort.label}</span>
+                <I.chev className="text-ink-3" />
+              </button>
+              {sortOpen && (
+                <div className="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-[var(--radius)] shadow-[0_8px_16px_-4px_rgba(0,0,0,0.1)] z-50 min-w-[180px] overflow-hidden">
+                  {SORT_OPTIONS.map(s => (
+                    <button
+                      key={s.id}
+                      className={`flex items-center justify-between w-full px-3.5 py-2.5 border-0 text-[13px] text-left cursor-pointer ${
+                        sort === s.id ? "bg-teal-soft text-teal" : "bg-transparent text-ink"
+                      }`}
+                      onClick={() => {
+                        setSort(s.id);
+                        setSortOpen(false);
+                      }}
+                    >
+                      {s.label}
+                      {sort === s.id && <span className="text-teal">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add customer button */}
+            <button
+              onClick={() => setShowCreateCust(true)}
+              className="h-[34px] rounded-[10px] border border-line-2 bg-teal text-white inline-flex items-center gap-1.5 px-3 cursor-pointer flex-shrink-0 hover:bg-[var(--teal-ink)] transition-all duration-150 text-[13px] font-medium"
+            >
+              <I.plus />
+              Add Customer
+            </button>
+          </div>
         </div>
 
         {/* Result Head / Winback Broadcast */}
@@ -388,23 +401,28 @@ export default function CustomersPage() {
                     <div className="font-semibold text-[15px] text-ink truncate">
                       {c.name}
                     </div>
-                    <div className="flex items-center gap-1.5 text-[12px] text-ink-3 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-ink-3 mt-0.5">
                       <span>{c.phone}</span>
                       <span>·</span>
                       <span>Seen {formatLast(c.lastDays ?? 999)}</span>
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="text-right mr-4 flex-shrink-0">
+                  {/* Stats - Hidden on mobile */}
+                  <div className="hidden md:block text-right mr-4 flex-shrink-0">
                     <div className="text-[13px] font-semibold text-ink-2">{c.visits ?? 0} visits</div>
                     <div className="text-[11px] text-ink-3 mt-0.5">Likes {c.fav ?? "—"}</div>
                   </div>
 
                   {/* Spend */}
-                  <div className="text-right mr-4 flex-shrink-0">
+                  <div className="text-right mr-3 sm:mr-4 flex-shrink-0">
                     <div className="text-[14px] font-semibold text-teal">₹{(c.spend ?? 0).toLocaleString("en-IN")}</div>
-                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.02em] mt-0.5">Lifetime</div>
+                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.02em] mt-0.5 block md:hidden">
+                      {c.visits ?? 0} visit{c.visits === 1 ? "" : "s"}
+                    </div>
+                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.02em] mt-0.5 hidden md:block">
+                      Lifetime
+                    </div>
                   </div>
 
                   {/* Actions */}
@@ -426,137 +444,126 @@ export default function CustomersPage() {
       </main>
 
       {/* Create Customer Modal */}
-      {showCreateCust && (
-        <div className="modal-back" onClick={() => setShowCreateCust(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>Add new customer</h3>
-              <button className="modal-close" onClick={() => setShowCreateCust(false)}>
-                <I.x />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="field">
-                <label>Customer name</label>
-                <input
-                  placeholder="e.g. Priya Sharma"
-                  value={newCustName}
-                  onChange={e => setNewCustName(e.target.value)}
-                  autoFocus
-                  className="p-2.5 border border-line-2 rounded-[8px] outline-0 text-[14px] w-full"
-                />
-              </div>
-              <div className="field mt-3">
-                <label>Phone number</label>
-                <input
-                  type="tel"
-                  placeholder="+91 98xxx xxxxx"
-                  value={newCustPhone}
-                  onChange={e => setNewCustPhone(e.target.value.replace(/[^\d+]/g, ""))}
-                  className="p-2.5 border border-line-2 rounded-[8px] outline-0 text-[14px] w-full"
-                />
-              </div>
+      <Modal
+        isOpen={showCreateCust}
+        onClose={() => setShowCreateCust(false)}
+        title="Add new customer"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setShowCreateCust(false)}>Cancel</button>
+            <button
+              className="btn btn-primary"
+              disabled={!newCustName.trim() || saving || !!duplicateCustomer || (newCustPhone.length > 0 && newCustPhone.length !== 10)}
+              style={{ opacity: !newCustName.trim() || saving || !!duplicateCustomer || (newCustPhone.length > 0 && newCustPhone.length !== 10) ? 0.5 : 1 }}
+              onClick={async () => {
+                if (!newCustName.trim()) return;
+                if (newCustPhone.length > 0 && newCustPhone.length !== 10) return;
+                setSaving(true);
+                const supabase = getSupabaseBrowserClient();
+                if (supabase && salonId) {
+                  try {
+                    const phoneFormatted = newCustPhone && newCustPhone.trim()
+                      ? `+91${newCustPhone.replace(/\D/g, "")}`
+                      : null;
 
-              {duplicateCustomer && (
-                <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "var(--amber-soft)", border: "1px solid var(--amber)", color: "var(--ink)", fontSize: 13 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, color: "var(--amber-ink)" }}>
-                    ⚠️ Phone number already in use
-                  </div>
-                  <p style={{ margin: "6px 0 0 0", fontSize: 13, color: "var(--ink-2)", lineHeight: "1.4" }}>
-                    This number is already linked to <strong>{duplicateCustomer.name}</strong>. You cannot create a duplicate customer profile with this number.
-                  </p>
-                  <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{ background: "var(--teal)", color: "#fff", border: 0, height: 28, fontSize: 12, padding: "0 10px", borderRadius: 6, cursor: "pointer" }}
-                      onClick={() => {
-                        setShowCreateCust(false);
-                        router.push(`/dashboard/customers/${duplicateCustomer.id}`);
-                      }}
-                    >
-                      View {duplicateCustomer.name}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={() => setShowCreateCust(false)}>Cancel</button>
-              <button
-                className="btn btn-primary"
-                disabled={!newCustName.trim() || saving || !!duplicateCustomer}
-                style={{ opacity: !newCustName.trim() || saving || !!duplicateCustomer ? 0.5 : 1 }}
-                onClick={async () => {
-                  if (!newCustName.trim()) return;
-                  setSaving(true);
-                  const supabase = getSupabaseBrowserClient();
-                  if (supabase && salonId) {
-                    try {
-                      const phoneFormatted = newCustPhone && newCustPhone.trim()
-                        ? newCustPhone.trim()
-                        : null;
+                    const { data: newCust, error } = await supabase
+                      .from("customers")
+                      .insert({
+                        salon_id: salonId,
+                        name: newCustName.trim(),
+                        phone: phoneFormatted,
+                      })
+                      .select("id, name, phone, created_at")
+                      .single();
 
-                      const { data: newCust, error } = await supabase
-                        .from("customers")
-                        .insert({
-                          salon_id: salonId,
-                          name: newCustName.trim(),
-                          phone: phoneFormatted,
-                        })
-                        .select("id, name, phone, created_at")
-                        .single();
+                    if (error) throw error;
 
-                      if (error) throw error;
-
-                      if (newCust) {
-                        const tone = ["a", "b", "c", "d", "e", "f"][Math.floor(Math.random() * 6)];
-                        const newEntry: Customer = {
-                          id: newCust.id,
-                          name: newCust.name,
-                          phone: newCust.phone || "",
-                          tone,
-                          visits: 0,
-                          lastDays: 0,
-                          spend: 0,
-                          fav: "—",
-                          stylist: "—",
-                        };
-                        setCustomers(prev => [newEntry, ...prev]);
-                        showFlash("Customer added!", 1800);
-                      }
-                    } catch (err) {
-                      const errMsg = err instanceof Error ? err.message : "Failed to add customer";
-                      showFlash(`Error: ${errMsg}`, 3000);
+                    if (newCust) {
+                      const tone = ["a", "b", "c", "d", "e", "f"][Math.floor(Math.random() * 6)];
+                      const newEntry: Customer = {
+                        id: newCust.id,
+                        name: newCust.name,
+                        phone: newCust.phone || "",
+                        tone,
+                        visits: 0,
+                        lastDays: 0,
+                        spend: 0,
+                        fav: "—",
+                        stylist: "—",
+                      };
+                      setCustomers(prev => [newEntry, ...prev]);
+                      showFlash("Customer added!", 1800);
                     }
-                  } else {
-                    showFlash("Customer added (local preview)", 1800);
-                    const tone = ["a", "b", "c", "d", "e", "f"][Math.floor(Math.random() * 6)];
-                    const newEntry: Customer = {
-                      id: Date.now(),
-                      name: newCustName.trim(),
-                      phone: newCustPhone || "",
-                      tone,
-                      visits: 0,
-                      lastDays: 0,
-                      spend: 0,
-                      fav: "—",
-                      stylist: "—",
-                    };
-                    setCustomers(prev => [newEntry, ...prev]);
+                  } catch (err) {
+                    const errMsg = err instanceof Error ? err.message : "Failed to add customer";
+                    showFlash(`Error: ${errMsg}`, 3000);
                   }
-                  setNewCustName("");
-                  setNewCustPhone("");
+                } else {
+                  showFlash("Customer added (local preview)", 1800);
+                  const tone = ["a", "b", "c", "d", "e", "f"][Math.floor(Math.random() * 6)];
+                  const newEntry: Customer = {
+                    id: Date.now(),
+                    name: newCustName.trim(),
+                    phone: newCustPhone ? `+91${newCustPhone.replace(/\D/g, "")}` : "",
+                    tone,
+                    visits: 0,
+                    lastDays: 0,
+                    spend: 0,
+                    fav: "—",
+                    stylist: "—",
+                  };
+                  setCustomers(prev => [newEntry, ...prev]);
+                }
+                setNewCustName("");
+                setNewCustPhone("");
+                setShowCreateCust(false);
+                setSaving(false);
+              }}
+            >
+              {saving ? "Saving..." : "Add customer"}
+            </button>
+          </>
+        }
+      >
+        <FormField label="Customer name">
+          <input
+            placeholder="e.g. Priya Sharma"
+            value={newCustName}
+            onChange={e => setNewCustName(e.target.value)}
+            autoFocus
+            className="p-2.5 border border-line-2 rounded-[8px] outline-0 text-[14px] w-full"
+          />
+        </FormField>
+        <FormField label="Phone number" className="mt-3">
+          <PhoneInput
+            value={newCustPhone}
+            onChange={setNewCustPhone}
+          />
+        </FormField>
+
+        {duplicateCustomer && (
+          <div className="mt-3.5 p-3 rounded-[10px] bg-amber-soft border border-amber text-ink text-[13px]">
+            <div className="flex items-center gap-1.5 font-semibold text-amber-ink">
+              ⚠️ Phone number already in use
+            </div>
+            <p className="m-0 mt-1.5 text-[13px] text-ink-2 leading-relaxed">
+              This number is already linked to <strong>{duplicateCustomer.name}</strong>. You cannot create a duplicate customer profile with this number.
+            </p>
+            <div className="flex gap-2.5 mt-2.5">
+              <button
+                type="button"
+                className="btn btn-sm !bg-teal !text-white h-7 text-xs px-2.5 rounded-md cursor-pointer border-0"
+                onClick={() => {
                   setShowCreateCust(false);
-                  setSaving(false);
+                  router.push(`/dashboard/customers/${duplicateCustomer.id}`);
                 }}
               >
-                {saving ? "Saving..." : "Add customer"}
+                View {duplicateCustomer.name}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
 
     </div>

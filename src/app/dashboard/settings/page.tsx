@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
-import { Icons as I, Modal, FormField, Avatar, Badge } from "@/components/ui";
+import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/components/ui";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
-import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow } from "@/types";
+import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice } from "@/types";
 
 import { DAYS, TABS, PLANS, INITIAL_DATA } from "@/constants/settings";
 
@@ -91,7 +91,11 @@ export default function SettingsPage() {
   const [editingTemplateKey, setEditingTemplateKey] = useState<keyof WhatsAppTemplates | null>(null);
   const [templateText, setTemplateText] = useState("");
 
-
+  // Dynamic Invoices and Delete Modal state
+  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -118,7 +122,7 @@ export default function SettingsPage() {
 
         const { data: userProfile } = await supabase
           .from("users")
-          .select("name, email, role, org_id")
+          .select("name, email, role, phone, org_id")
           .eq("id", session.user.id)
           .maybeSingle();
 
@@ -131,6 +135,17 @@ export default function SettingsPage() {
 
         const userName = userProfile.name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Owner";
         const userEmail = userProfile.email || session.user.email || "";
+        let userPhone = userProfile.phone || "";
+        let cleaned = userPhone.replace(/\s+/g, "");
+        if (cleaned === "+91" || cleaned === "91" || cleaned === "+") {
+          userPhone = "";
+        } else if (cleaned.startsWith("+91")) {
+          userPhone = cleaned.slice(3);
+        } else if (cleaned.startsWith("91") && cleaned.length > 10) {
+          userPhone = cleaned.slice(2);
+        } else {
+          userPhone = userPhone.trim();
+        }
 
         let salonName = "GLOW SALON";
         let salonArea = "ANDHERI";
@@ -139,6 +154,13 @@ export default function SettingsPage() {
         let salonHours = INITIAL_DATA.hours;
         let salonWa = INITIAL_DATA.wa.number;
         let orgPlan = INITIAL_DATA.plan;
+        let salonTimezone = "Asia/Kolkata";
+        let salonCurrency = "INR";
+        let salonLanguage = "en";
+        let salonIsActive = true;
+        let salonPhotos: string[] = [];
+        let salonWaSettings = INITIAL_DATA.wa;
+        let salonNotifSettings = INITIAL_DATA.notifs;
         let selectedSalon: DbSalon | null = null;
 
         if (userProfile.org_id) {
@@ -152,7 +174,7 @@ export default function SettingsPage() {
 
           const { data: salon } = await supabase
             .from("salons")
-            .select("id, name, area, city, type, hours, wa_number")
+            .select("id, name, area, city, type, hours, wa_number, timezone, currency, language, wa_settings, notification_settings, is_active, photos")
             .eq("org_id", userProfile.org_id)
             .eq("is_primary", true)
             .maybeSingle();
@@ -161,7 +183,7 @@ export default function SettingsPage() {
           if (!selectedSalon) {
             const { data: firstSalon } = await supabase
               .from("salons")
-              .select("id, name, area, city, type, hours, wa_number")
+              .select("id, name, area, city, type, hours, wa_number, timezone, currency, language, wa_settings, notification_settings, is_active, photos")
               .eq("org_id", userProfile.org_id)
               .limit(1)
               .maybeSingle();
@@ -174,8 +196,36 @@ export default function SettingsPage() {
             salonArea = selectedSalon.area || "";
             salonCity = selectedSalon.city || "";
             salonType = selectedSalon.type || "Unisex salon";
-            salonHours = selectedSalon.hours ? (selectedSalon.hours as HoursData) : INITIAL_DATA.hours;
-            salonWa = selectedSalon.wa_number || "";
+            const rawWa = selectedSalon.wa_number || "";
+            let cleaned = rawWa.replace(/\s+/g, "");
+            if (cleaned.startsWith("+91")) {
+              salonWa = cleaned.slice(3);
+            } else if (cleaned.startsWith("91") && cleaned.length > 10) {
+              salonWa = cleaned.slice(2);
+            } else {
+              salonWa = rawWa;
+            }
+            salonTimezone = selectedSalon.timezone || "Asia/Kolkata";
+            salonCurrency = selectedSalon.currency || "INR";
+            salonLanguage = selectedSalon.language || "en";
+            salonIsActive = selectedSalon.is_active !== false;
+            salonPhotos = selectedSalon.photos || [];
+            if (selectedSalon.wa_settings) {
+              salonWaSettings = {
+                ...INITIAL_DATA.wa,
+                ...selectedSalon.wa_settings,
+                templates: {
+                  ...INITIAL_DATA.wa.templates,
+                  ...(selectedSalon.wa_settings.templates || {})
+                }
+              };
+            }
+            if (selectedSalon.notification_settings) {
+              salonNotifSettings = {
+                ...INITIAL_DATA.notifs,
+                ...selectedSalon.notification_settings
+              };
+            }
           }
         }
 
@@ -221,24 +271,35 @@ export default function SettingsPage() {
           }
         }
 
-        // Load extra settings (wa, notifs) from localStorage if available
-        let localWa = INITIAL_DATA.wa;
-        let localNotifs = INITIAL_DATA.notifs;
-
-        if (currentSalonId) {
-          const storedWa = localStorage.getItem("cb_settings_wa_" + currentSalonId);
-          const storedNotifs = localStorage.getItem("cb_settings_notifs_" + currentSalonId);
-          if (storedWa) {
-            try {
-              localWa = { ...localWa, ...JSON.parse(storedWa) };
-            } catch {}
-          }
-          if (storedNotifs) {
-            try {
-              localNotifs = { ...localNotifs, ...JSON.parse(storedNotifs) };
-            } catch {}
+        // Load Billing Invoices
+        let dbInvoices: BillingInvoice[] = [];
+        if (userProfile.org_id) {
+          const { data: invoicesData } = await supabase
+            .from("billing_invoices")
+            .select("id, date, plan_name, amount, payment_method")
+            .eq("org_id", userProfile.org_id)
+            .order("date", { ascending: false });
+          if (invoicesData && invoicesData.length > 0) {
+            dbInvoices = invoicesData.map((inv) => {
+              let formattedDate = inv.date;
+              try {
+                formattedDate = new Date(inv.date).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric"
+                });
+              } catch {}
+              return {
+                id: inv.id,
+                date: formattedDate,
+                plan_name: inv.plan_name,
+                amount: Number(inv.amount),
+                payment_method: inv.payment_method
+              };
+            });
           }
         }
+        setInvoices(dbInvoices);
 
         setData({
           salon: {
@@ -246,19 +307,25 @@ export default function SettingsPage() {
             area: salonArea,
             city: salonCity,
             type: salonType,
+            timezone: salonTimezone,
+            currency: salonCurrency,
+            language: salonLanguage,
+            is_active: salonIsActive,
+            photos: salonPhotos,
           },
           hours: salonHours,
           services: dbServices,
           team: dbTeam,
           plan: orgPlan,
           wa: {
-            ...localWa,
-            number: salonWa || localWa.number,
+            ...salonWaSettings,
+            number: salonWa || salonWaSettings.number,
           },
-          notifs: localNotifs,
+          notifs: salonNotifSettings,
           account: {
             name: userName,
-            email: userEmail
+            email: userEmail,
+            phone: userPhone,
           }
         });
 
@@ -278,14 +345,28 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
+    if (data.account?.phone) {
+      const cleanPhone = data.account.phone.trim().replace(/\D/g, "");
+      if (cleanPhone.length > 0 && cleanPhone.length !== 10) {
+        showFlash("Please enter a valid 10-digit phone number");
+        return;
+      }
+    }
+
     const supabase = getSupabaseBrowserClient();
     if (supabase && supabaseUserId) {
       showFlash("Saving changes...", 10000);
       try {
         if (data.account) {
+          const cleanPhone = data.account.phone ? data.account.phone.trim().replace(/\D/g, "") : "";
+          const dbPhone = cleanPhone ? `+91 ${cleanPhone}` : null;
           const { error: userError } = await supabase
             .from("users")
-            .update({ name: data.account.name })
+            .update({
+              name: data.account.name,
+              email: data.account.email,
+              phone: dbPhone
+            })
             .eq("id", supabaseUserId);
           if (userError) throw userError;
         }
@@ -300,26 +381,38 @@ export default function SettingsPage() {
               city: data.salon.city,
               type: data.salon.type,
               hours: data.hours,
-              wa_number: data.wa.number
+              wa_number: data.wa.number ? (data.wa.number.startsWith("+91") ? data.wa.number : `+91${data.wa.number.replace(/\D/g, "")}`) : null,
+              timezone: data.salon.timezone || "Asia/Kolkata",
+              currency: data.salon.currency || "INR",
+              language: data.salon.language || "en",
+              is_active: data.salon.is_active !== false,
+              wa_settings: {
+                reminder: data.wa.reminder,
+                autoConfirm: data.wa.autoConfirm,
+                sendOffers: data.wa.sendOffers,
+                verified: data.wa.verified ?? true,
+                templates: data.wa.templates
+              },
+              notification_settings: data.notifs,
+              photos: data.salon.photos || []
             })
             .eq("id", supabaseSalonId);
           if (salonError) throw salonError;
 
           // 2. Delete removed services
-          const currentSvcIds = data.services
-            .map(s => s.id)
-            .filter((id): id is string => typeof id === "string");
-          if (currentSvcIds.length > 0) {
-            await supabase
+          const { data: dbServicesList } = await supabase
+            .from("services")
+            .select("id")
+            .eq("salon_id", supabaseSalonId);
+          const dbSvcIds = dbServicesList?.map(s => s.id) || [];
+          const currentSvcIds = data.services.map(s => s.id);
+          const svcIdsToDelete = dbSvcIds.filter(id => typeof id === "string" && !currentSvcIds.includes(id));
+          if (svcIdsToDelete.length > 0) {
+            const { error: svcDeleteErr } = await supabase
               .from("services")
               .delete()
-              .eq("salon_id", supabaseSalonId)
-              .not("id", "in", currentSvcIds);
-          } else {
-            await supabase
-              .from("services")
-              .delete()
-              .eq("salon_id", supabaseSalonId);
+              .in("id", svcIdsToDelete);
+            if (svcDeleteErr) throw svcDeleteErr;
           }
 
           // 3. Save services
@@ -340,7 +433,7 @@ export default function SettingsPage() {
               price: svc.price,
               active: svc.active ?? true,
             };
-            if (typeof svc.id === "string") {
+            if (typeof svc.id === "string" && !svc.id.startsWith("temp-")) {
               svcPayload.id = svc.id;
             }
             await supabase
@@ -349,20 +442,19 @@ export default function SettingsPage() {
           }
 
           // 4. Delete removed stylists
-          const currentTeamIds = data.team
-            .map(t => t.id)
-            .filter((id): id is string => typeof id === "string");
-          if (currentTeamIds.length > 0) {
-            await supabase
+          const { data: dbStylistsList } = await supabase
+            .from("stylists")
+            .select("id")
+            .eq("salon_id", supabaseSalonId);
+          const dbStylistIds = dbStylistsList?.map(s => s.id) || [];
+          const currentTeamIds = data.team.map(t => t.id);
+          const stylistIdsToDelete = dbStylistIds.filter(id => typeof id === "string" && !currentTeamIds.includes(id));
+          if (stylistIdsToDelete.length > 0) {
+            const { error: stylistDeleteErr } = await supabase
               .from("stylists")
               .delete()
-              .eq("salon_id", supabaseSalonId)
-              .not("id", "in", currentTeamIds);
-          } else {
-            await supabase
-              .from("stylists")
-              .delete()
-              .eq("salon_id", supabaseSalonId);
+              .in("id", stylistIdsToDelete);
+            if (stylistDeleteErr) throw stylistDeleteErr;
           }
 
           // 5. Save team
@@ -383,7 +475,7 @@ export default function SettingsPage() {
               commission_pct: stylist.commission ?? 0,
               active: true,
             };
-            if (typeof stylist.id === "string") {
+            if (typeof stylist.id === "string" && !stylist.id.startsWith("temp-")) {
               stylistPayload.id = stylist.id;
             }
             await supabase
@@ -393,11 +485,58 @@ export default function SettingsPage() {
 
           // 6. Save Organization Plan if changed
           if (supabaseOrgId && data.plan) {
-            const { error: orgError } = await supabase
+            const capitalizedPlan = data.plan.charAt(0).toUpperCase() + data.plan.slice(1).toLowerCase();
+            const { data: currentOrg } = await supabase
               .from("organizations")
-              .update({ plan: data.plan.toUpperCase() })
-              .eq("id", supabaseOrgId);
-            if (orgError) throw orgError;
+              .select("plan")
+              .eq("id", supabaseOrgId)
+              .maybeSingle();
+
+            if (currentOrg && currentOrg.plan !== capitalizedPlan) {
+              const { error: orgError } = await supabase
+                .from("organizations")
+                .update({ plan: capitalizedPlan })
+                .eq("id", supabaseOrgId);
+              if (orgError) throw orgError;
+
+              // Insert billing invoice for the plan change
+              const planPrice = data.plan === "solo" ? 499 : data.plan === "salon" ? 999 : 2499;
+              await supabase
+                .from("billing_invoices")
+                .insert({
+                  org_id: supabaseOrgId,
+                  date: new Date().toISOString().split("T")[0],
+                  plan_name: `${capitalizedPlan} · monthly (upgrade)`,
+                  amount: planPrice,
+                  payment_method: "UPI · payment simulated"
+                });
+
+              // Reload invoices list
+              const { data: invoicesData } = await supabase
+                .from("billing_invoices")
+                .select("id, date, plan_name, amount, payment_method")
+                .eq("org_id", supabaseOrgId)
+                .order("date", { ascending: false });
+              if (invoicesData) {
+                setInvoices(invoicesData.map(inv => {
+                  let formattedDate = inv.date;
+                  try {
+                    formattedDate = new Date(inv.date).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric"
+                    });
+                  } catch {}
+                  return {
+                    id: inv.id,
+                    date: formattedDate,
+                    plan_name: inv.plan_name,
+                    amount: Number(inv.amount),
+                    payment_method: inv.payment_method
+                  };
+                }));
+              }
+            }
           }
 
           // 7. Save extra config to LocalStorage
@@ -557,20 +696,31 @@ export default function SettingsPage() {
   };
 
   const openWaChange = () => {
-    setWaNumberInput(data.wa.number);
+    let raw = data.wa.number.replace(/\s+/g, "");
+    if (raw.startsWith("+91")) {
+      raw = raw.slice(3);
+    } else if (raw.startsWith("91") && raw.length > 10) {
+      raw = raw.slice(2);
+    }
+    setWaNumberInput(raw);
     setShowWaModal(true);
   };
 
   const saveWaNumber = () => {
+    const digits = waNumberInput.trim().replace(/\D/g, "");
+    if (digits.length !== 10) {
+      showFlash("Please enter a valid 10-digit phone number");
+      return;
+    }
     update({
       ...data,
       wa: {
         ...data.wa,
-        number: waNumberInput.trim()
+        number: digits
       }
     });
     setShowWaModal(false);
-    showFlash("WhatsApp number updated locally");
+    showFlash("WhatsApp number updated");
   };
 
   const openEditTemplate = (key: keyof WhatsAppTemplates) => {
@@ -592,6 +742,68 @@ export default function SettingsPage() {
     });
     setEditingTemplateKey(null);
     showFlash("Message template updated");
+  };
+
+  const deletePhoto = (url: string) => {
+    const updated = (data.salon.photos || []).filter(p => p !== url);
+    update({
+      ...data,
+      salon: {
+        ...data.salon,
+        photos: updated
+      }
+    });
+    showFlash("Photo removed (click Save to persist)");
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showFlash("File size must be less than 5 MB");
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !supabaseSalonId) {
+      showFlash("Database configuration is missing.");
+      return;
+    }
+
+    showFlash("Uploading photo...", 10000);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${supabaseSalonId}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('salon-photos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('salon-photos')
+        .getPublicUrl(fileName);
+
+      // Append to local state list
+      const updatedPhotos = [...(data.salon.photos || []), publicUrl];
+      update({
+        ...data,
+        salon: {
+          ...data.salon,
+          photos: updatedPhotos
+        }
+      });
+      showFlash("Photo uploaded! Click Save to persist changes.");
+    } catch (err) {
+      console.error("Error uploading photo:", err);
+      showFlash("Failed to upload photo.", 2500);
+    }
   };
 
   // ----- RENDER TAB CONTENT -----
@@ -644,8 +856,21 @@ export default function SettingsPage() {
             <SectionHead title="Photos" desc="At least one photo helps customers trust the salon. 3:2 aspect, < 5 MB each." />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
               <div className="grid grid-cols-4 gap-2.5 max-[720px]:grid-cols-2">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="relative aspect-[3/2] rounded-lg overflow-hidden border border-line">
+                {(data.salon.photos || []).map((url, i) => (
+                  <div key={url || i} className="relative aspect-[3/2] rounded-lg overflow-hidden border border-line group">
+                    <img src={url} alt={`Salon photo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <button
+                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 hover:bg-rose text-white flex items-center justify-center border-0 cursor-pointer transition-colors duration-150"
+                      onClick={() => deletePhoto(url)}
+                      title="Remove photo"
+                      style={{ border: 0, padding: 0 }}
+                    >
+                      <I.trash style={{ width: 12, height: 12 }} />
+                    </button>
+                  </div>
+                ))}
+                {(data.salon.photos || []).length === 0 && [1, 2, 3].map(i => (
+                  <div key={i} className="relative aspect-[3/2] rounded-lg overflow-hidden border border-line opacity-60">
                     <svg viewBox="0 0 100 70" width="100%" height="100%">
                       <defs>
                         <pattern id={`stripes-${i}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -655,13 +880,19 @@ export default function SettingsPage() {
                       <rect width="100" height="70" fill="var(--teal-soft)" />
                       <rect width="100" height="70" fill={`url(#stripes-${i})`} />
                     </svg>
-                    <div className="absolute bottom-1.5 left-2 font-mono text-[10px] text-teal-ink bg-white/80 py-0.5 px-1.5 rounded">photo {i}</div>
+                    <div className="absolute bottom-1.5 left-2 font-mono text-[10px] text-teal-ink bg-white/80 py-0.5 px-1.5 rounded">example {i}</div>
                   </div>
                 ))}
-                <button className="aspect-[3/2] rounded-lg bg-bg-2 border border-dashed border-line-2 flex flex-col items-center justify-center gap-1.5 font-inherit text-xs text-ink-3 cursor-pointer transition-colors duration-150 hover:bg-bg hover:border-ink-3 hover:text-ink" onClick={() => showFlash("Photo upload is a mockup")}>
+                <label className="aspect-[3/2] rounded-lg bg-bg-2 border border-dashed border-line-2 flex flex-col items-center justify-center gap-1.5 font-inherit text-xs text-ink-3 cursor-pointer transition-colors duration-150 hover:bg-bg hover:border-ink-3 hover:text-ink">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={handlePhotoUpload}
+                  />
                   <span className="w-7 h-7 rounded-full bg-white grid place-items-center text-lg font-light border border-line">+</span>
                   Add photo
-                </button>
+                </label>
               </div>
             </div>
 
@@ -972,21 +1203,23 @@ export default function SettingsPage() {
 
             <SectionHead title="Billing history" />
             <div className="bg-white border border-line rounded-xl p-0">
-              {[
-                { date: "1 May 2026", plan: "Salon · monthly", amount: 1179, method: "UPI · ravi@okhdfc" },
-                { date: "1 Apr 2026", plan: "Salon · monthly", amount: 1179, method: "UPI · ravi@okhdfc" },
-                { date: "1 Mar 2026", plan: "Solo · monthly",  amount: 589,  method: "Card · ****4527" },
-              ].map((b, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto]">
-                  <div>
-                    <div className="text-[13px] font-semibold mono">{b.date}</div>
-                    <div className="text-xs text-ink-3 mt-0.5">{b.plan}</div>
+              {invoices.length > 0 ? (
+                invoices.map((b, i) => (
+                  <div key={b.id || i} className="grid grid-cols-[1fr_1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto]">
+                    <div>
+                      <div className="text-[13px] font-semibold mono">{b.date}</div>
+                      <div className="text-xs text-ink-3 mt-0.5">{b.plan_name}</div>
+                    </div>
+                    <div className="text-xs text-ink-3 max-[720px]:col-span-full">{b.payment_method}</div>
+                    <div className="text-sm font-semibold font-mono">₹{b.amount.toLocaleString("en-IN")}</div>
+                    <button className="btn btn-ghost btn-sm max-[720px]:col-start-2" onClick={() => showFlash("Downloading receipt...")}>Receipt</button>
                   </div>
-                  <div className="text-xs text-ink-3 max-[720px]:col-span-full">{b.method}</div>
-                  <div className="text-sm font-semibold font-mono">₹{b.amount.toLocaleString("en-IN")}</div>
-                  <button className="btn btn-ghost btn-sm max-[720px]:col-start-2" onClick={() => showFlash("Downloading receipt...")}>Receipt</button>
+                ))
+              ) : (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--ink-3)", fontSize: 13, fontStyle: "italic" }}>
+                  No billing history available.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         );
@@ -1061,27 +1294,30 @@ export default function SettingsPage() {
                   <input
                     value={data.account?.name || ""}
                     onChange={e => update({ ...data, account: { ...data.account, name: e.target.value } })}
-                    style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
+                    className="p-[10px_12px] border border-line-2 rounded-lg outline-none text-sm w-full"
                   />
                 </FormField>
-                <FormField label="Phone (login)">
-                  <input value="+91 98xxx 12345" disabled style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, background: "var(--bg)", color: "var(--ink-3)", cursor: "not-allowed" }} />
+                <FormField label="Phone (contact)">
+                  <PhoneInput
+                    value={data.account?.phone || ""}
+                    onChange={val => update({ ...data, account: { ...data.account, phone: val } })}
+                  />
                 </FormField>
               </div>
-              <FormField label="Email (for receipts &amp; reports)" style={{ marginTop: 14 }}>
+              <FormField label="Email (for receipts &amp; reports)" className="mt-3.5">
                 <input
                   value={data.account?.email || ""}
                   onChange={e => update({ ...data, account: { ...data.account, email: e.target.value } })}
-                  style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
+                  className="p-[10px_12px] border border-line-2 rounded-lg outline-none text-sm w-full"
                 />
               </FormField>
             </div>
 
             <SectionHead title="Preferences" />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
-              <RowField label="Language" value="English" action={<button className="btn btn-ghost btn-sm" onClick={() => showFlash("Language preferences is a mockup")}>Edit</button>} />
-              <RowField label="Timezone" value="Asia/Kolkata (IST)" hint="Used for booking times and reports." action={<button className="btn btn-ghost btn-sm" onClick={() => showFlash("Timezone settings is a mockup")}>Edit</button>} />
-              <RowField label="Currency" value="Indian Rupee · ₹" action={<button className="btn btn-ghost btn-sm" onClick={() => showFlash("Currency settings is a mockup")}>Edit</button>} />
+              <RowField label="Language" value="English" action={<span className="text-xs text-ink-3 font-semibold uppercase tracking-wider bg-bg-2 p-[3px_8px] rounded border border-line">Fixed</span>} />
+              <RowField label="Timezone" value="Asia/Kolkata (IST)" hint="Used for booking times and reports." action={<span className="text-xs text-ink-3 font-semibold uppercase tracking-wider bg-bg-2 p-[3px_8px] rounded border border-line">Fixed</span>} />
+              <RowField label="Currency" value="Indian Rupee · ₹" action={<span className="text-xs text-ink-3 font-semibold uppercase tracking-wider bg-bg-2 p-[3px_8px] rounded border border-line">Fixed</span>} />
             </div>
 
             <SectionHead title="Danger zone" desc="Be careful here." />
@@ -1092,26 +1328,42 @@ export default function SettingsPage() {
                 action={<button className="btn btn-outline btn-sm" onClick={() => showFlash("Exporting data ZIP...")}>Request export</button>}
               />
               <RowField
-                label="Pause salon"
-                value="Stops new bookings without deleting data."
+                label={data.salon.is_active !== false ? "Pause salon" : "Resume salon"}
+                value={data.salon.is_active !== false ? "Stops new bookings without deleting data." : "Allows customers to book appointments again."}
                 action={
                   <button
                     className="btn btn-outline btn-sm"
-                    style={{ color: "var(--amber-ink)", borderColor: "var(--amber-soft)" }}
-                    onClick={() => showFlash("Salon paused")}
+                    style={{
+                      color: data.salon.is_active !== false ? "var(--amber-ink)" : "var(--green)",
+                      borderColor: data.salon.is_active !== false ? "var(--amber-soft)" : "var(--green-soft)"
+                    }}
+                    onClick={() => {
+                      const nextActiveState = data.salon.is_active !== false ? false : true;
+                      update({
+                        ...data,
+                        salon: {
+                          ...data.salon,
+                          is_active: nextActiveState
+                        }
+                      });
+                      showFlash(nextActiveState ? "Salon paused (click Save to persist)" : "Salon resumed (click Save to persist)");
+                    }}
                   >
-                    Pause
+                    {data.salon.is_active !== false ? "Pause" : "Resume"}
                   </button>
                 }
               />
               <RowField
                 label="Delete account"
-                value="Permanent. We'll send a 30-day grace email first."
+                value="Permanent. This will cascade delete all salons, stylists, services, and bookings."
                 action={
                   <button
                     className="btn btn-outline btn-sm"
                     style={{ color: "var(--rose)", borderColor: "var(--rose-soft)" }}
-                    onClick={() => showFlash("Account deletion requested")}
+                    onClick={() => {
+                      setDeleteConfirmName("");
+                      setShowDeleteModal(true);
+                    }}
                   >
                     Delete
                   </button>
@@ -1171,6 +1423,17 @@ export default function SettingsPage() {
       <Header title="Settings" subtitle="CONFIGURE YOUR SALON" />
 
       <main className="app-main set-main">
+        {/* Sticky save bar relocated above settings tabs */}
+        {dirty && (
+          <div className="mb-6 bg-ink text-white rounded-xl p-[14px_18px] flex justify-between items-center gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.15)] animate-pop">
+            <div className="text-[13px] font-medium">You have unsaved changes.</div>
+            <div className="flex gap-2">
+              <button className="btn btn-ghost text-white/70 hover:bg-white/8 hover:text-white" style={{ cursor: "pointer" }} onClick={discard}>Discard</button>
+              <button className="btn btn-primary" style={{ cursor: "pointer" }} onClick={handleSave}>Save changes</button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-[240px_1fr] gap-7 items-start max-[860px]:grid-cols-1">
           {/* Sidebar tabs */}
           <aside className="flex flex-col gap-0.5 bg-white border border-line rounded-xl p-2 sticky top-[100px] max-[860px]:flex-row max-[860px]:overflow-x-auto max-[860px]:static max-[860px]:flex-nowrap max-[860px]:p-1.5 max-[860px]:gap-1 max-[860px]:[&::-webkit-scrollbar]:hidden">
@@ -1206,15 +1469,64 @@ export default function SettingsPage() {
         </div>
       </main>
 
-      {/* Sticky save bar */}
-      {dirty && (
-        <div className="fixed bottom-[calc(var(--bottom-nav-h)+18px)] left-1/2 -translate-x-1/2 w-[min(720px,calc(100%-32px))] bg-ink text-white rounded-[14px] p-[14px_18px] flex justify-between items-center gap-4 shadow-[0_20px_40px_-20px_rgba(14,21,18,0.4)] z-50 animate-pop">
-          <div className="text-[13px]">You have unsaved changes.</div>
-          <div className="flex gap-2">
-            <button className="btn btn-ghost text-white/70 hover:bg-white/8 hover:text-white" style={{ cursor: "pointer" }} onClick={discard}>Discard</button>
-            <button className="btn btn-primary" style={{ cursor: "pointer" }} onClick={handleSave}>Save changes</button>
+      {/* DELETE ACCOUNT CONFIRMATION MODAL */}
+      {showDeleteModal && (
+        <Modal
+          title="Delete Salon Account"
+          onClose={() => setShowDeleteModal(false)}
+          width="min(450px, 100%)"
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
+              <button
+                className="btn"
+                style={{ background: "var(--rose)", color: "#fff", border: 0 }}
+                onClick={async () => {
+                  if (deleteConfirmName.trim() !== data.salon.name) return;
+                  setIsDeleting(true);
+                  try {
+                    const supabase = getSupabaseBrowserClient();
+                    if (supabase && supabaseOrgId) {
+                      const { error } = await supabase
+                        .from("organizations")
+                        .delete()
+                        .eq("id", supabaseOrgId);
+                      if (error) throw error;
+                      
+                      showFlash("Account deleted successfully");
+                      localStorage.removeItem("cb_profile");
+                      localStorage.removeItem("cb_salon_id");
+                      await supabase.auth.signOut();
+                      router.push("/signin");
+                    }
+                  } catch (err) {
+                    console.error("Error deleting account:", err);
+                    showFlash("Failed to delete account.", 2500);
+                  } finally {
+                    setIsDeleting(false);
+                    setShowDeleteModal(false);
+                  }
+                }}
+                disabled={deleteConfirmName.trim() !== data.salon.name || isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Permanently Delete"}
+              </button>
+            </>
+          }
+        >
+          <div style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5, marginBottom: 16 }}>
+            <span style={{ fontWeight: 600, color: "var(--rose)" }}>WARNING:</span> This action is permanent and cannot be undone. Deleting this account will instantly purge the salon, stylists, services, customer list, and all booking histories.
           </div>
-        </div>
+          <FormField label={`To confirm, type your salon name: "${data.salon.name}"`}>
+            <input
+              placeholder="Type salon name to confirm"
+              value={deleteConfirmName}
+              onChange={e => setDeleteConfirmName(e.target.value)}
+              autoFocus
+              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
+            />
+          </FormField>
+        </Modal>
       )}
 
       {/* Save Success Alert */}
@@ -1368,13 +1680,18 @@ export default function SettingsPage() {
           }
         >
           <FormField label="Business number">
-            <input
-              placeholder="98xxx 12345"
-              value={waNumberInput}
-              onChange={e => setWaNumberInput(e.target.value)}
-              autoFocus
-              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-            />
+            <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--line-2)", borderRadius: 8, overflow: "hidden" }}>
+              <span style={{ padding: "10px 12px", background: "var(--bg-2)", borderRight: "1px solid var(--line-2)", fontSize: 14, color: "var(--ink-3)", fontWeight: 500, userSelect: "none" }}>
+                +91
+              </span>
+              <input
+                placeholder="98765 43210"
+                value={waNumberInput}
+                onChange={e => setWaNumberInput(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                autoFocus
+                style={{ padding: "10px 12px", border: 0, outline: 0, fontSize: 14, width: "100%", flex: 1 }}
+              />
+            </div>
           </FormField>
         </Modal>
       )}

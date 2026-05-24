@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
 import { useToast } from "@/context/ToastContext";
 import { isUUID, initialsOf } from "@/lib/utils";
+import BottomNav from "@/components/layout/BottomNav";
+import { Modal } from "@/components/ui";
 
 import { Customer, DbBooking, DbCustomer } from "@/types";
 
@@ -74,44 +75,12 @@ function MessageModal({ customer, onClose, onSend }: MessageModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-[100] grid place-items-center" onClick={onClose}>
-      <div className="w-[min(500px,92%)] bg-white rounded-[var(--radius-lg)] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()} style={{animation: "pop .2s ease"}}>
-        <div className="flex justify-between items-start p-[18px] border-b border-line">
-          <div>
-            <h3 className="text-[17px] font-semibold m-0">WhatsApp {customer.name}</h3>
-            <div className="text-[12px] text-ink-3 mt-0.5">{customer.phone}</div>
-          </div>
-          <button className="border-0 bg-transparent cursor-pointer grid place-items-center" onClick={onClose}><I.x /></button>
-        </div>
-        <div className="flex flex-col gap-3.5 p-[18px]">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-medium text-ink-3">Pick a template</label>
-            <div className="flex flex-col gap-1.5">
-              {TEMPLATES.map(t => (
-                <button
-                  key={t.id}
-                  className={`text-left p-[10px_14px] rounded-[10px] border font-inherit text-[13px] text-ink-2 cursor-pointer font-medium transition-[border-color,background,color] duration-150 ${
-                    tpl === t.id ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white hover:border-line-2"
-                  }`}
-                  onClick={() => select(t.id)}
-                >
-                  {t.title}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-medium text-ink-3">Message preview</label>
-            <textarea
-              value={body}
-              onChange={e => setBody(e.target.value)}
-              placeholder="Type your message…"
-              className="w-full h-[110px] rounded-[8px] border border-line-2 p-[12px_14px] text-[14px] font-sans resize-y outline-0 focus:border-teal"
-            />
-            <div className="text-[11px] text-ink-3 mt-1">{body.length} characters</div>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2.5 p-[12px_18px] border-t border-line bg-bg">
+    <Modal
+      title={`WhatsApp ${customer.name}`}
+      onClose={onClose}
+      width="min(500px, 92%)"
+      footer={
+        <>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button
             className="bg-wa text-[#052B11] border-0 rounded-[10px] px-4 h-10 font-medium inline-flex items-center gap-2 cursor-pointer hover:bg-[#1FBA5A]"
@@ -120,9 +89,38 @@ function MessageModal({ customer, onClose, onSend }: MessageModalProps) {
           >
             <I.wa /> Send on WhatsApp
           </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3.5">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[12px] font-medium text-ink-3">Pick a template</label>
+          <div className="flex flex-col gap-1.5">
+            {TEMPLATES.map(t => (
+              <button
+                key={t.id}
+                className={`text-left p-[10px_14px] rounded-[10px] border font-inherit text-[13px] text-ink-2 cursor-pointer font-medium transition-[border-color,background,color] duration-150 ${
+                  tpl === t.id ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white hover:border-line-2"
+                }`}
+                onClick={() => select(t.id)}
+              >
+                {t.title}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[12px] font-medium text-ink-3">Message preview</label>
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            placeholder="Type your message…"
+            className="w-full h-[110px] rounded-[8px] border border-line-2 p-[12px_14px] text-[14px] font-sans resize-y outline-0 focus:border-teal"
+          />
+          <div className="text-[11px] text-ink-3 mt-1">{body.length} characters</div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -204,7 +202,16 @@ export default function CustomerProfilePage() {
         const dates = completedBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
         const lastMs = dates.length > 0 ? Math.max(...dates) : null;
         const lastDays = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
+
+        const hasUpcoming = bookings.some(b => {
+          const bkDate = new Date(b.date);
+          const bkDateZero = new Date(bkDate);
+          bkDateZero.setHours(0, 0, 0, 0);
+          return bkDateZero >= today && ["Pending", "Confirmed", "Arrived"].includes(b.status);
+        });
+
         const engagement: "active" | "cooling" | "lost" =
+          hasUpcoming ? "active" :
           lastDays <= 30 ? "active" : lastDays <= 60 ? "cooling" : "lost";
 
         const svcCount: Record<string, number> = {};
@@ -335,7 +342,7 @@ export default function CustomerProfilePage() {
   const engPillBg = engColor === "green" ? "bg-[#DFF1E6] text-[#137A4A]" : engColor === "amber" ? "bg-amber-soft text-amber-ink" : "bg-rose-soft text-rose";
   const engDotBg = engColor === "green" ? "bg-[#2DA76C]" : engColor === "amber" ? "bg-amber" : "bg-rose";
   return (
-    <div className="pb-[calc(72px+120px)] bg-bg">
+    <div className="min-h-screen pb-[calc(var(--bottom-nav-h)+32px)] bg-bg animate-[fadeIn_0.22s_cubic-bezier(0.16,1,0.3,1)_forwards]">
       {/* Sticky Top Bar */}
       <div className="sticky top-0 z-10 bg-bg/85 backdrop-blur-md border-b border-line">
         <div className="max-w-[760px] mx-auto flex items-center h-14 px-6 max-[640px]:px-4 max-[640px]:h-[52px]">
@@ -346,8 +353,8 @@ export default function CustomerProfilePage() {
           >
             <I.back />
           </button>
-          <div className="flex-1 text-[14px] font-semibold tracking-[-0.005em]">Customer profile</div>
-          <button className="icon-btn"><I.more /></button>
+          <div className="flex-1 text-[14px] font-semibold tracking-[-0.005em] ml-1">Customer profile</div>
+          <button className="grid place-items-center w-9 h-9 rounded-[10px] text-ink-2 cursor-pointer border border-line bg-white hover:bg-bg-2" aria-label="More"><I.more /></button>
         </div>
       </div>
 
@@ -355,7 +362,7 @@ export default function CustomerProfilePage() {
       {loading && (
         <main className="max-w-[760px] mx-auto p-[22px_24px_32px] flex flex-col gap-[18px] max-[640px]:p-[18px_16px_28px] max-[640px]:gap-3.5">
           {[160, 100, 200, 180].map((h, i) => (
-            <div key={i} className="pulse rounded-radius bg-bg-2" style={{ height: h }} />
+            <div key={i} className="animate-pulse bg-bg-2 rounded-xl" style={{ height: h }} />
           ))}
         </main>
       )}
@@ -522,28 +529,7 @@ export default function CustomerProfilePage() {
       </main>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav className="bottom-nav">
-        <Link href="/dashboard" className="bn-item">
-          <I.home />
-          <span>Home</span>
-        </Link>
-        <Link href="/dashboard/bookings" className="bn-item">
-          <I.calendar />
-          <span>Bookings</span>
-        </Link>
-        <Link href="/dashboard/customers" className="bn-item active">
-          <I.users />
-          <span>Customers</span>
-        </Link>
-        <Link href="/dashboard/revenue" className="bn-item">
-          <I.insights />
-          <span>Insights</span>
-        </Link>
-        <Link href="/dashboard/settings" className="bn-item">
-          <I.settings />
-          <span>Settings</span>
-        </Link>
-      </nav>
+      <BottomNav />
 
       {/* ─── MESSAGE MODAL ─── */}
       {showMsg && <MessageModal customer={c} onClose={() => setShowMsg(false)} onSend={sendMsg} />}

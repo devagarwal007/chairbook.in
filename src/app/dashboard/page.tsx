@@ -11,7 +11,7 @@ import { insertNotification } from "@/lib/notifications";
 import { useSalonData, useBookings, useTimeUpdate } from "@/hooks";
 import { useToast } from "@/context/ToastContext";
 import { Appointment, Stylist, Service } from "@/types";
-import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
+import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip, PhoneInput } from "@/components/ui";
 
 // ===== TYPES =====
 
@@ -35,13 +35,21 @@ export default function DashboardPage() {
   const [showWalkIn, setShowWalkIn] = useState(false);
 
   // Custom Hooks Extraction
-  const { bookings: appts, setBookings: setAppts, loading: loadingBookings, refresh: refreshBookings } = useBookings(salonId, day);
+  const { bookings: todayAppts, setBookings: setTodayAppts, loading: loadingToday, refresh: refreshToday } = useBookings(salonId, "today");
+  const { bookings: tomorrowAppts, setBookings: setTomorrowAppts, loading: loadingTomorrow, refresh: refreshTomorrow } = useBookings(day === "tomorrow" ? salonId : null, "tomorrow");
+
+  const appts = day === "today" ? todayAppts : tomorrowAppts;
+  const setAppts = day === "today" ? setTodayAppts : setTomorrowAppts;
+  const loadingBookings = day === "today" ? loadingToday : loadingTomorrow;
+  const refreshBookings = day === "today" ? refreshToday : refreshTomorrow;
+
   const { nowTimeMin, dateDisplayStr } = useTimeUpdate(!!salonId);
   const { show: showFlash } = useToast();
 
   const { stylists: dbStylists, services: dbServices, loading: salonDataLoading } = useSalonData(salonId);
 
   const pageLoading = profileLoading || salonDataLoading || loadingBookings;
+  const metricsLoading = profileLoading || salonDataLoading || loadingToday;
 
 
 
@@ -70,9 +78,9 @@ export default function DashboardPage() {
   }, [appts, filter]);
 
   // Metrics
-  const todayRevenue = appts.filter((a) => a.status === "completed" || a.status === "arrived").reduce((s, a) => s + a.price, 0);
-  const totalAppts = appts.length;
-  const noShows = appts.filter((a) => a.status === "noshow").length;
+  const todayRevenue = todayAppts.filter((a) => a.status === "completed" || a.status === "arrived").reduce((s, a) => s + a.price, 0);
+  const totalAppts = todayAppts.length;
+  const noShows = todayAppts.filter((a) => a.status === "noshow").length;
 
   const unrepliedCount = useMemo(() => {
     if (day !== "today") return 0;
@@ -136,7 +144,7 @@ export default function DashboardPage() {
         const { error } = await supabase.rpc("create_public_booking", {
           p_salon_id: salonId,
           p_customer_name: name,
-          p_phone: phone || "+91 99999 99999",
+          p_phone: phone ? `+91 ${phone}` : "+91 99999 99999",
           p_stylist_id: stylistId,
           p_date: dateStr,
           p_start_time: startTimeStr,
@@ -155,7 +163,10 @@ export default function DashboardPage() {
         });
 
         showFlash(`${name} added to schedule`, 2000);
-        refreshBookings();
+        refreshToday();
+        if (day === "tomorrow") {
+          refreshTomorrow();
+        }
         return;
       } catch (err) {
         console.error("Error creating walk-in booking:", err);
@@ -185,11 +196,11 @@ export default function DashboardPage() {
       price: svc.price,
       status: "arrived",
       visits: 0,
-      phone: phone || "+91 99xxx xxxxx",
+      phone: phone ? `+91 ${phone}` : "+91 99xxx xxxxx",
       note: "Walk-in registration",
     };
 
-    setAppts([...appts, newAppt]);
+    setTodayAppts(prev => [...prev, newAppt]);
     showFlash(`${name} added to schedule`, 2000);
   };
 
@@ -215,10 +226,10 @@ export default function DashboardPage() {
         todayRevenue={todayRevenue}
       />
 
-      <main className="max-w-[1200px] mx-auto px-8 py-7">
+      <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-7">
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 min-[521px]:grid-cols-3 gap-2.5 min-[521px]:max-[768px]:gap-2 md:gap-4 mb-[28px]">
-          {pageLoading ? (
+          {metricsLoading ? (
             [1, 2, 3].map(i => (
               <div key={i} className="animate-pulse bg-bg-2 rounded-xl min-h-[90px]" />
             ))
@@ -257,10 +268,10 @@ export default function DashboardPage() {
         {/* Schedule Header */}
         <div className="flex flex-row items-center justify-between gap-4 mb-4 max-[768px]:flex-col max-[768px]:items-stretch max-[768px]:gap-3">
           <div className="flex items-baseline gap-3 max-[768px]:w-full max-[768px]:justify-between">
-            <h2 className="text-lg font-semibold tracking-tight m-0">{"Today's schedule"}</h2>
+            <h2 className="text-lg font-semibold tracking-tight m-0">{day === "today" ? "Today's schedule" : "Tomorrow's schedule"}</h2>
             <span className="text-[13px] text-ink-3 font-mono">{filtered.length} appointments</span>
           </div>
-          <div className="flex items-center gap-3 max-[768px]:w-full max-[768px]:justify-between">
+          <div className="flex items-center gap-3 max-[768px]:w-full max-[768px]:justify-between max-[480px]:flex-wrap max-[480px]:gap-2">
             <Toggle
               options={[
                 { value: "today", label: "Today" },
@@ -269,20 +280,22 @@ export default function DashboardPage() {
               value={day}
               onChange={(val) => setDay(val)}
               hasSlider
-              className="w-[180px]"
+              className="w-[180px] shrink-0 max-[480px]:w-full"
             />
-            <button
-              onClick={() => setShowWalkIn(true)}
-              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg border border-line-2 bg-white text-sm font-semibold text-ink cursor-pointer hover:border-ink-3 hover:bg-bg-2 active:translate-y-[1px] transition-all duration-150"
-            >
-              Walk-in
-            </button>
-            <Link
-              href="/dashboard/new-booking"
-              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-teal !text-white text-sm font-semibold cursor-pointer hover:bg-teal-ink active:translate-y-[1px] transition-all duration-150 no-underline"
-            >
-              + New booking
-            </Link>
+            <div className="flex items-center gap-2 max-[480px]:w-full max-[480px]:flex-1">
+              <button
+                onClick={() => setShowWalkIn(true)}
+                className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg border border-line-2 bg-white text-sm font-semibold text-ink cursor-pointer hover:border-ink-3 hover:bg-bg-2 active:translate-y-[1px] transition-all duration-150 whitespace-nowrap max-[480px]:flex-1"
+              >
+                Walk-in
+              </button>
+              <Link
+                href="/dashboard/new-booking"
+                className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-teal !text-white text-sm font-semibold cursor-pointer hover:bg-teal-ink active:translate-y-[1px] transition-all duration-150 no-underline whitespace-nowrap max-[480px]:flex-1"
+              >
+                + New booking
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -580,13 +593,13 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
 // "Now" timeline indicator
 function NowLine({ nowTimeMin, formatTime }: { nowTimeMin: number; formatTime: (min: number) => string }) {
   return (
-    <div className="relative h-6 mb-2 pointer-events-none flex items-center z-20">
+    <div className="relative h-10 mb-4 pointer-events-none flex items-center z-20">
       <div className="absolute left-[-88px] top-0 w-16 text-right font-mono text-xs font-medium text-rose">
         {formatTime(nowTimeMin).replace(" AM", "").replace(" PM", "")}
         <small className="block text-[10px] text-rose/70 mt-0.5 font-normal">now</small>
       </div>
-      <div className="absolute left-[-16px] top-2 w-[11px] h-[11px] rounded-full bg-rose shadow-[0_0_0_4px_rgba(196,69,43,0.15)] z-20"></div>
-      <div className="absolute left-[-5px] right-0 top-[13px] h-[1px] bg-rose opacity-35"></div>
+      <div className="absolute left-[-16px] top-[14.5px] w-[11px] h-[11px] rounded-full bg-rose shadow-[0_0_0_4px_rgba(196,69,43,0.15)] z-20"></div>
+      <div className="absolute left-[-5px] right-0 top-[20px] h-[1px] bg-rose opacity-35"></div>
     </div>
   );
 }
@@ -602,6 +615,7 @@ interface WalkInModalProps {
 function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [svcQuery, setSvcQuery] = useState("");
   
   const defaultSvcId = services[0]?.id || "s1";
   const defaultStylistId = stylists.filter((s) => s.id !== "all")[0]?.id || "anjali";
@@ -609,8 +623,17 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
   const [svcId, setSvcId] = useState(defaultSvcId);
   const [stylistId, setStylistId] = useState(defaultStylistId);
 
+  const filteredServices = React.useMemo(() => {
+    if (!svcQuery.trim()) return services;
+    const q = svcQuery.toLowerCase();
+    return services.filter(
+      (s) => s.name.toLowerCase().includes(q) || (s.cat && s.cat.toLowerCase().includes(q))
+    );
+  }, [svcQuery, services]);
+
   const selectedSvc = services.find((s) => s.id === svcId) || services[0];
-  const canSubmit = name.trim().length > 0;
+  const isPhoneValid = !phone || phone.length === 10;
+  const canSubmit = name.trim().length > 0 && isPhoneValid && selectedSvc;
 
   return (
     <Modal
@@ -649,17 +672,29 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
           />
         </FormField>
         <FormField label="Phone (optional)">
-          <input
-            placeholder="+91 98xxx"
+          <PhoneInput
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full h-[42px] px-3.5 rounded-[10px] border border-line-2 bg-white font-sans text-sm text-ink outline-none transition-colors duration-150 focus:border-teal min-w-0"
+            onChange={setPhone}
           />
         </FormField>
       </div>
       <FormField label="Service">
-        <div className="grid grid-cols-2 gap-2">
-          {services.slice(0, 6).map((s) => (
+        <div className="flex items-center gap-2 border border-line-2 rounded-[10px] px-3.5 py-2 mb-3 bg-white">
+          <I.search className="text-ink-3 shrink-0 w-4 h-4" />
+          <input
+            placeholder="Search service..."
+            value={svcQuery}
+            onChange={(e) => setSvcQuery(e.target.value)}
+            className="flex-1 border-0 outline-0 text-sm font-sans bg-transparent min-w-0"
+          />
+          {svcQuery && (
+            <button className="border-0 bg-transparent cursor-pointer grid place-items-center text-ink-3 hover:text-ink" onClick={() => setSvcQuery("")}>
+              <I.x className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 max-h-[180px] overflow-y-auto pr-1">
+          {filteredServices.map((s) => (
             <button
               key={s.id}
               className={`p-[10px_12px] border rounded-[10px] cursor-pointer text-[13px] text-left font-sans flex justify-between items-center transition-all duration-150 ${
@@ -667,12 +702,15 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
               }`}
               onClick={() => setSvcId(s.id)}
             >
-              <span>{s.name}</span>
-              <small className={`font-mono text-xs ${svcId === s.id ? "text-teal" : "text-ink-3"}`}>
+              <span className="truncate mr-1">{s.name}</span>
+              <small className={`font-mono text-xs shrink-0 ${svcId === s.id ? "text-teal" : "text-ink-3"}`}>
                 {s.duration}m · ₹{s.price}
               </small>
             </button>
           ))}
+          {filteredServices.length === 0 && (
+            <div className="col-span-2 text-center text-xs text-ink-3 py-4">No services match your search.</div>
+          )}
         </div>
       </FormField>
       <FormField label="Stylist">

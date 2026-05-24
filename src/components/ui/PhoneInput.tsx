@@ -16,11 +16,19 @@ export function PhoneInput({
   size = "md",
   containerClassName = "",
   placeholder = "98xxx xxxxx",
-  maxLength = 11,
   ...props
 }: PhoneInputProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const clean = e.target.value.replace(/[^\d ]/g, "");
+    const raw = e.target.value;
+    let clean = raw.replace(/\D/g, "");
+    
+    if (clean.startsWith("91") && clean.length > 10) {
+      clean = clean.substring(2);
+    } else if (clean.startsWith("0")) {
+      clean = clean.substring(1);
+    }
+    
+    clean = clean.substring(0, 10);
     onChange(clean);
   };
 
@@ -42,7 +50,6 @@ export function PhoneInput({
         placeholder={placeholder}
         value={value}
         onChange={handleChange}
-        maxLength={maxLength}
         {...props}
       />
     </div>

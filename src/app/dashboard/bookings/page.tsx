@@ -535,7 +535,7 @@ export default function BookingsPage() {
       {/* Reusable Header */}
       <Header title="Bookings" subtitle={dateRangeStr} />
 
-      <main className="max-w-[1200px] mx-auto px-8 py-7 pb-20">
+      <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-7 pb-20">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 mb-3.5 flex-wrap max-[980px]:flex-col max-[980px]:items-stretch">
           <div className="flex items-center gap-4 max-[980px]:justify-between">
@@ -553,7 +553,7 @@ export default function BookingsPage() {
               {view === "week" && <span className="text-xs text-ink-3 font-mono tracking-[0.04em]">Week {getWeekNumber(weekDays[0])}</span>}
             </div>
           </div>
-          <div className="flex items-center gap-2.5 max-[980px]:justify-between">
+          <div className="flex items-center gap-2.5 max-[980px]:justify-between max-[480px]:flex-wrap max-[480px]:gap-2">
             <Toggle
               options={[
                 { value: "day", label: "Day" },
@@ -561,13 +561,22 @@ export default function BookingsPage() {
               ]}
               value={view}
               onChange={(val) => setView(val as "day" | "week")}
+              className="w-[120px] shrink-0 max-[480px]:w-full"
             />
-            <Link href="/dashboard/block-time" className="inline-flex items-center justify-center gap-2 h-8 px-3 rounded-lg border border-transparent font-sans text-sm font-medium text-ink-2 cursor-pointer hover:text-ink hover:bg-bg-2 transition-all duration-150">
-              Block time
-            </Link>
-            <Link href="/dashboard/new-booking" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg font-sans text-sm font-semibold bg-teal !text-white hover:bg-teal-ink transition-all duration-150 no-underline">
-              <I.plus className="w-3.5 h-3.5" /> New booking
-            </Link>
+            <div className="flex items-center gap-2 max-[480px]:w-full max-[480px]:flex-1">
+              <Link
+                href="/dashboard/block-time"
+                className="inline-flex items-center justify-center gap-2 h-8 px-3 rounded-lg border border-transparent font-sans text-sm font-medium text-ink-2 cursor-pointer hover:text-ink hover:bg-bg-2 transition-all duration-150 whitespace-nowrap max-[480px]:flex-1 max-[480px]:border-line-2 max-[480px]:bg-white"
+              >
+                Block time
+              </Link>
+              <Link
+                href="/dashboard/new-booking"
+                className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-teal !text-white font-sans text-sm font-semibold hover:bg-teal-ink transition-all duration-150 no-underline whitespace-nowrap max-[480px]:flex-1"
+              >
+                <I.plus className="w-3.5 h-3.5" /> New booking
+              </Link>
+            </div>
           </div>
         </div>
 

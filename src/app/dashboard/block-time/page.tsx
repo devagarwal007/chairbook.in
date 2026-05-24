@@ -643,16 +643,16 @@ export default function BlockTimePage() {
       <main className="app-main" style={{ paddingBottom: 100 }}>
         {/* Filter pills */}
         <div className="flex gap-1.5 items-center mb-4.5 flex-wrap max-[720px]:overflow-x-auto max-[720px]:flex-nowrap max-[720px]:mx-[-16px] max-[720px]:mb-4 max-[720px]:px-4 [&::-webkit-scrollbar]:hidden">
-          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "upcoming" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("upcoming")}>
+          <button className={`h-[34px] px-3.5 rounded-full border inline-flex items-center gap-2 font-inherit text-[13px] cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "upcoming" ? "bg-ink border-ink text-white" : "bg-white border-line text-ink-2"}`} onClick={() => setFilter("upcoming")}>
             Upcoming <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "upcoming" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{counts.upcoming}</span>
           </button>
-          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "recurring" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("recurring")}>
+          <button className={`h-[34px] px-3.5 rounded-full border inline-flex items-center gap-2 font-inherit text-[13px] cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "recurring" ? "bg-ink border-ink text-white" : "bg-white border-line text-ink-2"}`} onClick={() => setFilter("recurring")}>
             Recurring <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "recurring" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{counts.recurring}</span>
           </button>
-          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "past" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("past")}>
+          <button className={`h-[34px] px-3.5 rounded-full border inline-flex items-center gap-2 font-inherit text-[13px] cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "past" ? "bg-ink border-ink text-white" : "bg-white border-line text-ink-2"}`} onClick={() => setFilter("past")}>
             Past <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "past" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{counts.past}</span>
           </button>
-          <button className={`h-[34px] px-3.5 rounded-full border border-line bg-white inline-flex items-center gap-2 font-inherit text-[13px] text-ink-2 cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "all" ? "bg-ink border-ink text-white" : ""}`} onClick={() => setFilter("all")}>
+          <button className={`h-[34px] px-3.5 rounded-full border inline-flex items-center gap-2 font-inherit text-[13px] cursor-pointer transition-all duration-150 hover:border-line-2 ${filter === "all" ? "bg-ink border-ink text-white" : "bg-white border-line text-ink-2"}`} onClick={() => setFilter("all")}>
             All <span className={`text-[11px] py-0.5 px-1.75 rounded-full font-mono font-medium ${filter === "all" ? "bg-[rgba(255,255,255,0.18)] text-white" : "bg-bg-2 text-ink-3"}`}>{blocks.length}</span>
           </button>
         </div>

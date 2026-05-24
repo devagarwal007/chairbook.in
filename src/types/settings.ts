@@ -5,6 +5,19 @@ export interface SalonInfo {
   area: string;
   type: string;
   city: string;
+  timezone?: string;
+  currency?: string;
+  language?: string;
+  is_active?: boolean;
+  photos?: string[];
+}
+
+export interface BillingInvoice {
+  id: string;
+  date: string;
+  plan_name: string;
+  amount: number;
+  payment_method: string;
 }
 
 export interface WhatsAppTemplates {
@@ -35,6 +48,7 @@ export interface Notifications {
 export interface AccountInfo {
   name: string;
   email: string;
+  phone?: string;
 }
 
 export interface SettingsData {

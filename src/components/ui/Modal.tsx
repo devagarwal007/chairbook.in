@@ -23,7 +23,10 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-back" onClick={onClose}>
+    <div
+      className="modal-back fixed inset-0 w-screen h-screen flex items-center justify-center bg-[#0e1512]/45 backdrop-blur-[2px] z-[1000] p-6 box-border"
+      onClick={onClose}
+    >
       <div
         className="modal"
         onClick={(e) => e.stopPropagation()}

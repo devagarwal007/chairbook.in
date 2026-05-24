@@ -26,5 +26,12 @@ export interface DbSalon {
   type: string | null;
   hours: HoursData | null;
   wa_number: string | null;
+  timezone?: string | null;
+  currency?: string | null;
+  language?: string | null;
+  wa_settings?: any | null;
+  notification_settings?: any | null;
+  is_active?: boolean | null;
+  photos?: string[] | null;
 }
 

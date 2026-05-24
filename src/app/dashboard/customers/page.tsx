@@ -23,20 +23,7 @@ const formatLast = (days: number) => {
   return `${Math.floor(days / 365)} yr ago`;
 };
 
-const SORT_OPTIONS = [
-  { id: "recent",  label: "Most recent visit" },
-  { id: "name",    label: "Name (A → Z)" },
-  { id: "visits",  label: "Most visits" },
-  { id: "spend",   label: "Highest spend" },
-  { id: "lost",    label: "Longest absent" },
-];
-
-const FILTER_TABS = [
-  { id: "all",     label: "All",     match: () => true },
-  { id: "active",  label: "Active",  match: (c: Customer) => engagementOf(c.lastDays ?? 999) === "active" },
-  { id: "cooling", label: "Cooling", match: (c: Customer) => engagementOf(c.lastDays ?? 999) === "cooling" },
-  { id: "lost",    label: "Lost",    match: (c: Customer) => engagementOf(c.lastDays ?? 999) === "lost" },
-];
+import { SORT_OPTIONS, FILTER_TABS } from "@/constants/customers";
 
 // ===== EXPORT COMPONENT =====
 export default function CustomersPage() {
@@ -150,8 +137,11 @@ export default function CustomersPage() {
   // Filtered + sorted customers
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
-    const activeFilter = FILTER_TABS.find(f => f.id === tab)?.match || (() => true);
-    let list = customers.filter(activeFilter as (c: Customer) => boolean);
+    const activeFilter = (c: Customer) => {
+      if (tab === "all") return true;
+      return engagementOf(c.lastDays ?? 999) === tab;
+    };
+    let list = customers.filter(activeFilter);
 
     if (query) {
       list = list.filter(c =>

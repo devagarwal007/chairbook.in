@@ -3,15 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Icons } from "@/components/ui/Icons";
 
-const navItems = [
-  { href: "/dashboard", label: "Home", icon: Icons.home, exact: true },
-  { href: "/dashboard/bookings", label: "Bookings", icon: Icons.calendar },
-  { href: "/dashboard/customers", label: "Customers", icon: Icons.users },
-  { href: "/dashboard/revenue", label: "Insights", icon: Icons.chart },
-  { href: "/dashboard/settings", label: "Settings", icon: Icons.settings },
-];
+import { navItems } from "@/constants/common";
 
 export default function BottomNav() {
   const pathname = usePathname();

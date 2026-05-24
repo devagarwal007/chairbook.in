@@ -9,31 +9,7 @@ import { toMinHours, initialsOf, formatDateKey } from "@/lib/utils";
 import { Stylist, CalAppt, DbCalBookingRow } from "@/types";
 import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
 
-// ===== CONSTANTS =====
-const START_HOUR = 9;
-const END_HOUR = 21;
-const SLOT_HEIGHT = 28; // px per 30-min slot
-const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const DOW_FULL = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
-
-const STATUS_LABEL: Record<string, string> = {
-  confirmed: "Confirmed",
-  arrived: "Arrived",
-  completed: "Done",
-  noshow: "No-show",
-  cancelled: "Cancelled",
-};
-
-// Time labels: 9 AM – 9 PM
-const TIME_LABELS: string[] = [];
-for (let h = START_HOUR; h < END_HOUR; h++) {
-  const hh = h > 12 ? h - 12 : h;
-  const ampm = h >= 12 ? "PM" : "AM";
-  TIME_LABELS.push(`${hh} ${ampm}`);
-}
-
-// ===== FALLBACK DATA (only used when Supabase is unavailable) =====
-const FALLBACK_STYLISTS: Stylist[] = [];
+import { START_HOUR, SLOT_HEIGHT, MONTH_NAMES, DOW_FULL, STATUS_LABEL, TIME_LABELS, FALLBACK_STYLISTS } from "@/constants/bookings";
 
 // Helpers
 const getWeekStart = (date: Date): Date => {

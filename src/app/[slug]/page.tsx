@@ -19,7 +19,7 @@ interface BookingState {
 import { Icons as I, StepBar, Avatar, FormField, PhoneInput } from "@/components/ui";
 
 
-const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+import { DAY_KEYS } from "@/constants/common";
 
 
 

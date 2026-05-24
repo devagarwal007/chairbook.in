@@ -1,0 +1,76 @@
+import { SettingsData } from "@/types";
+import { Icons as I } from "@/components/ui/Icons";
+
+export const DAYS = [
+  { id: "mon", name: "Monday" },
+  { id: "tue", name: "Tuesday" },
+  { id: "wed", name: "Wednesday" },
+  { id: "thu", name: "Thursday" },
+  { id: "fri", name: "Friday" },
+  { id: "sat", name: "Saturday" },
+  { id: "sun", name: "Sunday" },
+];
+
+export const TABS = [
+  { id: "salon",    label: "Salon profile", icon: I.store },
+  { id: "services", label: "Services",      icon: I.scissors },
+  { id: "team",     label: "Team",          icon: I.team },
+  { id: "whatsapp", label: "WhatsApp",      icon: I.wa },
+  { id: "plan",     label: "Subscription",  icon: I.card },
+  { id: "notifs",   label: "Notifications", icon: I.bell },
+  { id: "account",  label: "Account",       icon: I.user },
+];
+
+export const PLANS = [
+  { id: "solo",  name: "Solo",  price: 499,  desc: "For independent stylists" },
+  { id: "salon", name: "Salon", price: 999,  desc: "Up to 5 stylists" },
+  { id: "chain", name: "Chain", price: 2499, desc: "Multi-branch" },
+];
+
+export const INITIAL_DATA: SettingsData = {
+  account: { name: "Ravi Varma", email: "ravi@glowsalon.in" },
+  salon: { name: "Glow Salon & Spa", area: "Andheri West, near Lokhandwala", type: "Unisex salon", city: "Mumbai" },
+  hours: {
+    mon: { open: true,  from: "10:00", to: "20:00" },
+    tue: { open: true,  from: "10:00", to: "20:00" },
+    wed: { open: true,  from: "10:00", to: "20:00" },
+    thu: { open: true,  from: "10:00", to: "20:00" },
+    fri: { open: true,  from: "10:00", to: "21:00" },
+    sat: { open: true,  from: "09:00", to: "21:00" },
+    sun: { open: false, from: "10:00", to: "18:00" },
+  },
+  services: [
+    { id: 1, name: "Haircut",       cat: "Hair",  duration: 30, price: 300,  active: true },
+    { id: 2, name: "Hair Color",    cat: "Hair",  duration: 90, price: 1800, active: true },
+    { id: 3, name: "Hair Spa",      cat: "Hair",  duration: 60, price: 900,  active: true },
+    { id: 4, name: "Facial — Gold", cat: "Skin",  duration: 75, price: 1400, active: true },
+    { id: 5, name: "Threading",     cat: "Skin",  duration: 15, price: 80,   active: true },
+    { id: 6, name: "Manicure",      cat: "Hands", duration: 30, price: 350,  active: true },
+    { id: 7, name: "Pedicure",      cat: "Hands", duration: 45, price: 500,  active: false },
+  ],
+  team: [
+    { id: 1, name: "Anjali", role: "Senior stylist · 9 yrs",     tone: "b", commission: 30 },
+    { id: 2, name: "Pooja",  role: "Beautician · Skin specialist", tone: "d", commission: 25 },
+    { id: 3, name: "Kiran",  role: "Senior stylist · 12 yrs",    tone: "c", commission: 35 },
+    { id: 4, name: "Rekha",  role: "Threading & nails · 4 yrs",  tone: "e", commission: 25 },
+  ],
+  wa: {
+    number: "98xxx 12345",
+    verified: true,
+    reminder: 24,
+    autoConfirm: true,
+    sendOffers: false,
+    templates: {
+      confirmation: "Hi {name} 🙏 Your booking at Glow Salon is confirmed for {date} at {time} with {stylist}.",
+      reminder: "Hi {name}, reminder: {service} with {stylist} tomorrow at {time}. Reply YES to confirm.",
+      reengagement: "Hey {name}! It's been a while. Book now and get 10% off your next visit."
+    }
+  },
+  plan: "salon",
+  notifs: {
+    newBooking: { push: true,  sms: false, wa: true },
+    cancel:     { push: true,  sms: false, wa: true },
+    noshow:     { push: true,  sms: false, wa: false },
+    daily:      { push: false, sms: false, wa: true },
+  },
+};

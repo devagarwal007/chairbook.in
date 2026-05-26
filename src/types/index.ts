@@ -9,4 +9,5 @@ export * from "./header";
 export * from "./notification";
 export * from "./user";
 export * from "./revenue";
+export * from "./stylistAccount";
 

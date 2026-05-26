@@ -4,6 +4,8 @@ export interface AvatarProps {
   initials: string;
   tone?: string | null;
   size?: "sm" | "md" | "lg";
+  src?: string | null;
+  alt?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -12,6 +14,8 @@ export function Avatar({
   initials,
   tone = "a",
   size = "md",
+  src,
+  alt,
   className = "",
   style,
 }: AvatarProps) {
@@ -38,8 +42,12 @@ export function Avatar({
 
   return (
     <div
-      className={`avatar rounded-full shrink-0 grid place-items-center font-bold font-sans ${sizeClass} ${bgClass} ${className}`}
-      style={style}
+      aria-label={alt || initials}
+      className={`avatar rounded-full shrink-0 grid place-items-center font-bold font-sans ${sizeClass} ${bgClass} ${src ? "bg-cover bg-center text-transparent" : ""} ${className}`}
+      style={{
+        ...style,
+        ...(src ? { backgroundImage: `url("${src}")` } : null),
+      }}
     >
       {initials}
     </div>

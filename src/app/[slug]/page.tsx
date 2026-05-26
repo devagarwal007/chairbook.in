@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
 import { formatDateKey, formatPhone } from "@/lib/utils";
 
@@ -98,7 +98,9 @@ function getAvailableStylistId(stylists: Stylist[], bookings: BookingRow[], date
 
 export default function PublicBookingPage() {
   const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
   const slug = params.slug;
+  const stylistParam = searchParams.get("stylist");
   const dates = useMemo(() => getDates(), []);
 
   const [state, setState] = useState<BookingState>({ salon: null, services: [], stylists: [], bookings: [] });
@@ -143,7 +145,7 @@ export default function PublicBookingPage() {
       const [{ data: services, error: serviceError }, { data: stylists, error: stylistError }, { data: bookings, error: bookingError }] =
         await Promise.all([
           supabase.from("services").select("id,name,category,duration_min,price").eq("salon_id", salon.id).eq("active", true).order("category").order("name"),
-          supabase.from("stylists").select("id,name,role_label,tone").eq("salon_id", salon.id).eq("active", true).order("name"),
+          supabase.from("stylists").select("id,name,role_label,tone,booking_slug").eq("salon_id", salon.id).eq("active", true).order("name"),
           supabase.from("bookings").select("id,stylist_id,date,start_time,duration,status").eq("salon_id", salon.id).gte("date", dates[0].key).lte("date", endDate),
         ]);
 
@@ -154,20 +156,27 @@ export default function PublicBookingPage() {
         return;
       }
 
+      const loadedStylists = stylists ?? [];
       setState({
         salon,
         services: (services ?? []).map((s: Omit<Service, "duration"> & { duration_min: number }) => ({
           ...s,
           duration: s.duration_min,
         })),
-        stylists: stylists ?? [],
+        stylists: loadedStylists,
         bookings: bookings ?? [],
       });
+      if (stylistParam) {
+        const matchedStylist = loadedStylists.find((stylist) => stylist.booking_slug === stylistParam || stylist.id === stylistParam);
+        if (matchedStylist) {
+          setSelectedStylist(matchedStylist.id);
+        }
+      }
       setIsLoading(false);
     };
 
     loadSalon();
-  }, [dates, slug]);
+  }, [dates, slug, stylistParam]);
 
   const groupedServices = useMemo(() => {
     return state.services.reduce<Record<string, Service[]>>((groups, service) => {

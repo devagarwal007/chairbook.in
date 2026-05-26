@@ -92,6 +92,11 @@ export const Icons = {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
     </svg>
   ),
+  upload: ({ width = 18, height = 18, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+    </svg>
+  ),
   chart: ({ width = 20, height = 20, strokeWidth = 2, style, ...props }: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
       <path d="M3 21V3M21 21H3"/>

@@ -10,6 +10,7 @@ export async function insertNotification(payload: NotificationPayload) {
       .from("notifications")
       .insert({
         salon_id: payload.salon_id,
+        stylist_id: payload.stylist_id || null,
         type: payload.type,
         title: payload.title,
         body: payload.body,

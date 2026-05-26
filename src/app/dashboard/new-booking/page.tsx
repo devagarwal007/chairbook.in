@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
-import { initialsOf } from "@/lib/utils";
+import { initialsOf, isUUID } from "@/lib/utils";
 import { useToast } from "@/context/ToastContext";
 
 import { Customer, Service, Stylist, NewCustInput, DbBookingSimple, DbStylistRaw, DbServiceRaw, DbBookingSlotRaw, DbBookingStylistRaw } from "@/types";
@@ -935,6 +935,7 @@ export default function NewBookingPage() {
           const svcNames = services.map(s => s.name).join(", ");
           await insertNotification({
             salon_id: salonId,
+            stylist_id: typeof finalStylistId === "string" && isUUID(finalStylistId) ? finalStylistId : null,
             type: "new_booking",
             title: "New booking",
             body: `${customer.name} booked ${svcNames} for ${date}`,

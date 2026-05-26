@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getPostLoginPath } from "@/lib/auth-routing";
 
 export interface LandingAuthState {
   isChecking: boolean;
   isSignedIn: boolean;
   displayName: string | null;
-  nextPath: "/dashboard" | "/onboarding" | "/auth";
+  nextPath: "/dashboard" | "/onboarding" | "/stylist" | "/auth" | "/signin";
   nextLabel: string;
 }
 
@@ -52,7 +53,7 @@ export function useAuthState() {
       try {
         const { data: profile } = await supabase
           .from("users")
-          .select("name, org_id")
+          .select("name, org_id, role")
           .eq("id", session.user.id)
           .maybeSingle();
 
@@ -64,12 +65,13 @@ export function useAuthState() {
               : session.user.email?.split("@")[0] ?? "Owner";
 
         if (mounted) {
+          const nextPath = await getPostLoginPath(supabase, session.user.id);
           setAuthState({
             isChecking: false,
             isSignedIn: true,
             displayName: name,
-            nextPath: profile?.org_id ? "/dashboard" : "/onboarding",
-            nextLabel: profile?.org_id ? "Dashboard" : "Finish setup",
+            nextPath,
+            nextLabel: nextPath === "/stylist" ? "Stylist dashboard" : nextPath === "/dashboard" ? "Dashboard" : nextPath === "/onboarding" ? "Finish setup" : "Sign in",
           });
         }
       } catch (err) {

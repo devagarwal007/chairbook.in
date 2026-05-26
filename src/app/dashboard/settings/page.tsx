@@ -9,7 +9,7 @@ import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/compo
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
-import { HoursData, Service, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice } from "@/types";
+import { Service, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice } from "@/types";
 
 import { DAYS, TABS, PLANS, INITIAL_DATA } from "@/constants/settings";
 
@@ -82,6 +82,8 @@ export default function SettingsPage() {
   const [stylistName, setStylistName] = useState("");
   const [stylistRole, setStylistRole] = useState("Stylist");
   const [stylistCommission, setStylistCommission] = useState(40);
+  const [stylistEmail, setStylistEmail] = useState("");
+  const [invitingStylistId, setInvitingStylistId] = useState<string | number | null>(null);
 
   // WhatsApp Change Number modal
   const [showWaModal, setShowWaModal] = useState(false);
@@ -136,7 +138,7 @@ export default function SettingsPage() {
         const userName = userProfile.name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Owner";
         const userEmail = userProfile.email || session.user.email || "";
         let userPhone = userProfile.phone || "";
-        let cleaned = userPhone.replace(/\s+/g, "");
+        const cleaned = userPhone.replace(/\s+/g, "");
         if (cleaned === "+91" || cleaned === "91" || cleaned === "+") {
           userPhone = "";
         } else if (cleaned.startsWith("+91")) {
@@ -151,7 +153,7 @@ export default function SettingsPage() {
         let salonArea = "ANDHERI";
         let salonCity = "MUMBAI";
         let salonType = "Unisex salon";
-        let salonHours = INITIAL_DATA.hours;
+        const salonHours = INITIAL_DATA.hours;
         let salonWa = INITIAL_DATA.wa.number;
         let orgPlan = INITIAL_DATA.plan;
         let salonTimezone = "Asia/Kolkata";
@@ -197,7 +199,7 @@ export default function SettingsPage() {
             salonCity = selectedSalon.city || "";
             salonType = selectedSalon.type || "Unisex salon";
             const rawWa = selectedSalon.wa_number || "";
-            let cleaned = rawWa.replace(/\s+/g, "");
+            const cleaned = rawWa.replace(/\s+/g, "");
             if (cleaned.startsWith("+91")) {
               salonWa = cleaned.slice(3);
             } else if (cleaned.startsWith("91") && cleaned.length > 10) {
@@ -254,7 +256,7 @@ export default function SettingsPage() {
 
             const { data: teamData } = await supabase
               .from("stylists")
-              .select("id, name, role_label, tone, commission_pct, active")
+              .select("id, name, role_label, tone, commission_pct, active, email, user_id, specialisations, photo_url, booking_slug, account_invited_at, account_accepted_at")
               .eq("salon_id", currentSalonId);
 
             if (teamData && teamData.length > 0) {
@@ -264,6 +266,13 @@ export default function SettingsPage() {
                 role: s.role_label || "Stylist",
                 tone: (s.tone || "tone-a").replace("tone-", ""),
                 commission: Number(s.commission_pct || 0),
+                email: s.email || null,
+                user_id: s.user_id || null,
+                specialisations: s.specialisations || [],
+                photo_url: s.photo_url || null,
+                booking_slug: s.booking_slug || null,
+                account_invited_at: s.account_invited_at || null,
+                account_accepted_at: s.account_accepted_at || null,
               }));
             }
           } catch (err) {
@@ -466,6 +475,11 @@ export default function SettingsPage() {
               tone: string;
               commission_pct: number;
               active: boolean;
+              email?: string | null;
+              user_id?: string | null;
+              specialisations?: string[];
+              photo_url?: string | null;
+              booking_slug?: string | null;
               id?: string;
             } = {
               salon_id: supabaseSalonId,
@@ -474,6 +488,11 @@ export default function SettingsPage() {
               tone: stylist.tone ? (stylist.tone.startsWith("tone-") ? stylist.tone : `tone-${stylist.tone}`) : "tone-a",
               commission_pct: stylist.commission ?? 0,
               active: true,
+              email: stylist.email || null,
+              user_id: stylist.user_id || null,
+              specialisations: stylist.specialisations || [],
+              photo_url: stylist.photo_url || null,
+              booking_slug: stylist.booking_slug || null,
             };
             if (typeof stylist.id === "string" && !stylist.id.startsWith("temp-")) {
               stylistPayload.id = stylist.id;
@@ -551,7 +570,7 @@ export default function SettingsPage() {
 
           const { data: freshTeam } = await supabase
             .from("stylists")
-            .select("id, name, role_label, tone, commission_pct, active")
+            .select("id, name, role_label, tone, commission_pct, active, email, user_id, specialisations, photo_url, booking_slug, account_invited_at, account_accepted_at")
             .eq("salon_id", supabaseSalonId);
 
           setData(prev => ({
@@ -570,6 +589,13 @@ export default function SettingsPage() {
               role: s.role_label || "Stylist",
               tone: (s.tone || "tone-a").replace("tone-", ""),
               commission: Number(s.commission_pct || 0),
+              email: s.email || null,
+              user_id: s.user_id || null,
+              specialisations: s.specialisations || [],
+              photo_url: s.photo_url || null,
+              booking_slug: s.booking_slug || null,
+              account_invited_at: s.account_invited_at || null,
+              account_accepted_at: s.account_accepted_at || null,
             })) : prev.team,
           }));
         }
@@ -656,6 +682,7 @@ export default function SettingsPage() {
     setStylistName("");
     setStylistRole("Senior stylist · 5 yrs");
     setStylistCommission(30);
+    setStylistEmail("");
     setShowStylistModal(true);
   };
 
@@ -664,6 +691,7 @@ export default function SettingsPage() {
     setStylistName(stylist.name);
     setStylistRole(stylist.role || "Stylist");
     setStylistCommission(stylist.commission ?? 40);
+    setStylistEmail(stylist.email || "");
     setShowStylistModal(true);
   };
 
@@ -677,7 +705,8 @@ export default function SettingsPage() {
         ...t,
         name: stylistName.trim(),
         role: stylistRole,
-        commission: stylistCommission
+        commission: stylistCommission,
+        email: stylistEmail.trim() || null,
       } : t);
       update({ ...data, team: list });
       showFlash("Stylist updated");
@@ -687,12 +716,56 @@ export default function SettingsPage() {
         name: stylistName.trim(),
         role: stylistRole,
         tone: toneLetter,
-        commission: stylistCommission
+        commission: stylistCommission,
+        email: stylistEmail.trim() || null,
       };
       update({ ...data, team: [...data.team, newStylist] });
       showFlash("Stylist added");
     }
     setShowStylistModal(false);
+  };
+
+  const inviteStylistAccount = async (stylist: Stylist) => {
+    const email = (stylist.email || "").trim();
+    if (!email) {
+      showFlash("Add an email before inviting this stylist", 2400);
+      return;
+    }
+    if (typeof stylist.id !== "string" || stylist.id.startsWith("temp-")) {
+      showFlash("Save settings before inviting this new stylist", 2600);
+      return;
+    }
+
+    setInvitingStylistId(stylist.id);
+    try {
+      const res = await fetch("/api/admin/stylists/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stylistId: stylist.id,
+          email,
+          name: stylist.name,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || "Could not invite stylist");
+      }
+      const list = data.team.map((item) => item.id === stylist.id ? {
+        ...item,
+        user_id: payload.userId,
+        email: payload.email,
+        account_invited_at: payload.accountInvitedAt ?? item.account_invited_at ?? null,
+        account_accepted_at: payload.accountAcceptedAt ?? (payload.action === "resent" || payload.action === "sent" ? null : item.account_accepted_at ?? null),
+      } : item);
+      update({ ...data, team: list });
+      setDirty(false);
+      showFlash(payload.message || (stylist.user_id ? "Stylist invite resent" : "Stylist invite sent"));
+    } catch (err) {
+      showFlash(err instanceof Error ? err.message : "Could not invite stylist", 3000);
+    } finally {
+      setInvitingStylistId(null);
+    }
   };
 
   const openWaChange = () => {
@@ -1020,16 +1093,29 @@ export default function SettingsPage() {
             <div className="bg-white border border-line rounded-xl p-0">
               {data.team.map(s => (
                 <div key={s.id} className="grid grid-cols-[40px_1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[40px_1fr]">
-                  <Avatar initials={s.name[0]} tone={s.tone} size="md" />
+                  <Avatar initials={s.name[0]} tone={s.tone} size="md" src={s.photo_url} alt={s.name} />
                   <div className="min-w-0">
                     <div className="text-sm font-semibold">{s.name}</div>
                     <div className="text-xs text-ink-3 mt-0.5">{s.role}</div>
+                    <div className="text-[11px] text-ink-3 mt-1">
+                      {s.account_accepted_at ? "Account active" : s.user_id ? "Invite pending" : s.email ? "Email added · invite optional" : "No account access"}
+                    </div>
                   </div>
                   <div className="text-right px-2.5 border-l border-line max-[720px]:col-span-full max-[720px]:p-0 max-[720px]:border-0 max-[720px]:text-left max-[720px]:flex max-[720px]:items-baseline max-[720px]:gap-2">
                     <div className="text-base font-semibold tracking-[-0.015em]">{s.commission}%</div>
                     <div className="text-[10px] text-ink-3 tracking-[0.04em] uppercase max-[720px]:before:content-['·'] max-[720px]:before:mr-1">Commission</div>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    {!s.account_accepted_at && (
+                      <button
+                        className="h-8 px-2.5 rounded-lg border border-line bg-white text-xs font-medium text-ink-2 cursor-pointer hover:bg-bg-2 disabled:opacity-50"
+                        onClick={() => inviteStylistAccount(s)}
+                        disabled={invitingStylistId === s.id}
+                        title={s.user_id ? "Resend pending invite" : s.email ? "Invite account access" : "Add email to enable invite"}
+                      >
+                        {invitingStylistId === s.id ? (s.user_id ? "Resending" : "Inviting") : (s.user_id ? "Resend" : "Invite")}
+                      </button>
+                    )}
                     <button
                       className="cust-action wa"
                       style={{ opacity: 1, background: "transparent", borderColor: "var(--line)", cursor: "pointer" }}
@@ -1640,6 +1726,18 @@ export default function SettingsPage() {
               autoFocus
               style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
             />
+          </FormField>
+          <FormField label="Account email (optional)" className="mt-3">
+            <input
+              type="email"
+              placeholder="anjali@salon.com"
+              value={stylistEmail}
+              onChange={e => setStylistEmail(e.target.value)}
+              className="w-full h-[42px] px-3 rounded-lg border border-line-2 bg-white text-sm outline-none focus:border-teal"
+            />
+            <div className="text-[11px] text-ink-3 mt-1.5">
+              Leave empty for schedule-only stylists. Add an email only when this stylist needs their own login.
+            </div>
           </FormField>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
             <FormField label="Role / subtitle">

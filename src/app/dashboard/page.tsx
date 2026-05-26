@@ -113,6 +113,7 @@ export default function DashboardPage() {
           if (appt && salonId) {
             insertNotification({
               salon_id: salonId,
+              stylist_id: typeof appt.stylist === "string" && isUUID(appt.stylist) ? appt.stylist : null,
               type: "status_update",
               title: "Booking updated",
               body: `${appt.customer} marked as ${STATUS_LABEL[status]}`,
@@ -155,6 +156,7 @@ export default function DashboardPage() {
 
         insertNotification({
           salon_id: salonId!,
+          stylist_id: typeof stylistId === "string" && isUUID(stylistId) ? stylistId : null,
           type: "walk_in",
           title: "Walk-in arrived",
           body: `${name} walked in for ${svc.name}`,

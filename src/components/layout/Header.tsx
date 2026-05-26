@@ -9,6 +9,7 @@ import { useBookings } from "@/hooks";
 import type { HeaderProps } from "@/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { INITIAL_NOTIFS } from "@/constants/notifications";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export default function Header({
   title,
@@ -54,17 +55,17 @@ export default function Header({
 
   useEffect(() => {
     let active = true;
-    let channel: any = null;
+    let channel: RealtimeChannel | null = null;
 
     const checkUnread = async () => {
       if (!salonId) {
         const stored = localStorage.getItem("cb_notifications");
         if (stored) {
           try {
-            const parsed = JSON.parse(stored);
-            const unread = parsed.some((n: any) => n.unread);
+            const parsed = JSON.parse(stored) as Array<{ unread?: boolean }>;
+            const unread = parsed.some((n) => n.unread);
             if (active) setHasUnread(unread);
-          } catch (e) {
+          } catch {
             if (active) setHasUnread(false);
           }
         } else {

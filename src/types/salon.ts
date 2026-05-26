@@ -18,6 +18,21 @@ export interface Salon {
   hours: HoursData | null;
 }
 
+export interface SalonWhatsAppSettings {
+  reminder?: number;
+  autoConfirm?: boolean;
+  sendOffers?: boolean;
+  verified?: boolean;
+  templates?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+export interface SalonNotificationChannel {
+  push: boolean;
+  sms: boolean;
+  wa: boolean;
+}
+
 export interface DbSalon {
   id: string;
   name: string;
@@ -29,8 +44,8 @@ export interface DbSalon {
   timezone?: string | null;
   currency?: string | null;
   language?: string | null;
-  wa_settings?: any | null;
-  notification_settings?: any | null;
+  wa_settings?: SalonWhatsAppSettings | null;
+  notification_settings?: Record<string, SalonNotificationChannel> | null;
   is_active?: boolean | null;
   photos?: string[] | null;
 }

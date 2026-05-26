@@ -4,22 +4,13 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
+import { getPostLoginPath } from "@/lib/auth-routing";
 
 import { Icons } from "@/components/ui/Icons";
 
 
 interface AuthScreenProps {
   initialMode?: "signin" | "signup";
-}
-
-async function getPostLoginPath(supabase: NonNullable<ReturnType<typeof getSupabaseBrowserClient>>, userId: string) {
-  const { data: profile, error: profileError } = await supabase.from("users").select("org_id").eq("id", userId).maybeSingle();
-
-  if (profileError) {
-    throw profileError;
-  }
-
-  return profile?.org_id ? "/dashboard" : "/onboarding";
 }
 
 export function AuthScreen({ initialMode = "signup" }: AuthScreenProps) {

@@ -229,8 +229,17 @@ export function useStylistWorkspace() {
 
       setProfile(nextProfile);
 
-      const todayKey = formatDateKey(new Date());
+      const todayDate = new Date();
+      const tomorrowDate = new Date();
+      tomorrowDate.setDate(todayDate.getDate() + 1);
+      const todayKey = formatDateKey(todayDate);
       const { start, end } = getWeekBounds();
+      
+      const qStart = start;
+      const qEnd = new Date(end);
+      if (tomorrowDate > qEnd) {
+        qEnd.setDate(qEnd.getDate() + 1);
+      }
 
       const { data: bookingRows, error: bookingError } = await supabase
         .from("bookings")
@@ -252,8 +261,8 @@ export function useStylistWorkspace() {
           )
         `)
         .eq("stylist_id", stylistRow.id)
-        .gte("date", formatDateKey(start))
-        .lte("date", formatDateKey(end))
+        .gte("date", formatDateKey(qStart))
+        .lte("date", formatDateKey(qEnd))
         .neq("status", "Cancelled")
         .order("date", { ascending: true })
         .order("start_time", { ascending: true });

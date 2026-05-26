@@ -82,68 +82,135 @@ export default function StylistCalendarPage() {
       {({ weekAppointments, loading }) => (
         <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-7">
           <div className="bg-white border border-line rounded-xl overflow-hidden">
-            <div className="overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="min-w-[900px]">
-                <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] border-b border-line bg-white sticky top-0 z-10">
-                  <div className="bg-bg border-r border-line relative" />
-                  {days.map((day) => {
-                    const key = formatDateKey(day);
-                    const isToday = key === todayKey;
-                    const count = weekAppointments.filter((item) => item.date === key).length;
-                    return (
-                      <div key={key} className={`p-3 border-r border-line flex flex-col items-start gap-[2px] last:border-r-0 max-[720px]:p-[8px_6px] ${isToday ? "bg-teal-soft" : ""}`}>
-                        <div className={`font-mono text-[10px] font-medium tracking-[0.06em] ${isToday ? "text-teal" : "text-ink-3"}`}>{DOW_FULL[day.getDay()]}</div>
-                        <div className={`font-semibold leading-none mt-0.5 text-[22px] max-[720px]:text-base ${isToday ? "text-teal-ink" : "text-ink-2"}`}>{day.getDate()}</div>
-                        <div className={`text-[11px] mt-1 max-[720px]:text-[10px] ${isToday ? "text-teal-ink" : "text-ink-3"}`}>
-                          {count} booking{count === 1 ? "" : "s"}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] relative">
-                  <div className="bg-bg border-r border-line relative">
-                    {TIME_LABELS.map((label, index) => (
-                      <div key={label} className="border-b border-dashed border-line relative first:border-t-0 h-[56px]">
-                        <span className="font-mono text-[10px] text-ink-3 absolute left-2 -top-[7px] bg-white px-1 max-[720px]:text-[9px] first:top-0">{index === 0 ? "" : label}</span>
+            {loading ? (
+              <div className="overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="min-w-[900px]">
+                  {/* Header row */}
+                  <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] border-b border-line bg-white sticky top-0 z-10">
+                    <div className="bg-bg border-r border-line relative" />
+                    {days.map((day, i) => (
+                      <div key={i} className="p-3 border-r border-line flex flex-col items-start gap-[2px] last:border-r-0 max-[720px]:p-[8px_6px]">
+                        <div className="h-2.5 w-10 bg-bg-2 rounded animate-pulse" />
+                        <div className="h-6 w-8 bg-bg-2 rounded mt-1.5 animate-pulse" />
+                        <div className="h-2 w-16 bg-bg-2 rounded mt-2 animate-pulse" />
                       </div>
                     ))}
                   </div>
 
-                  {days.map((day) => {
-                    const key = formatDateKey(day);
-                    const isToday = key === todayKey;
-                    const dayAppointments = weekAppointments.filter((item) => item.date === key);
-                    return (
-                      <div key={key} className={`relative border-r border-line last:border-r-0 ${isToday ? "bg-[rgba(15,110,86,0.025)]" : ""}`} style={{ height: gridHeight }}>
-                        {TIME_LABELS.map((label) => (
-                          <div key={label} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005] h-[56px]" />
+                  {/* Grid body */}
+                  <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] relative">
+                    {/* Time sidebar */}
+                    <div className="bg-bg border-r border-line relative">
+                      {TIME_LABELS.map((label, index) => (
+                        <div key={index} className="border-b border-dashed border-line relative first:border-t-0 h-[56px]">
+                          <div className="w-8 h-2.5 bg-bg-2 rounded absolute left-2 top-2.5 animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Columns */}
+                    {days.map((day, colIndex) => (
+                      <div key={colIndex} className="relative border-r border-line last:border-r-0" style={{ height: gridHeight }}>
+                        {TIME_LABELS.map((label, index) => (
+                          <div key={index} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005] h-[56px]" />
                         ))}
 
-                        {loading && (
-                          <div className="absolute left-2 right-2 top-4 h-20 rounded-lg bg-bg-2 animate-pulse" />
-                        )}
-
-                        {!loading && dayAppointments.length === 0 && (
-                          <div className="absolute inset-x-0 top-[190px] text-center text-xs text-ink-3">Free</div>
-                        )}
-
-                        {isToday && nowTop >= 0 && nowTop <= gridHeight && (
-                          <div className="absolute left-0 right-0 h-0.5 bg-teal z-20 pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
-                            <span className="absolute left-2 -top-2 bg-teal text-white text-[9px] font-mono py-0.25 px-1 rounded">{nowStr}</span>
+                        {/* Pulsing floating appointments in random shapes with premium colored indicators */}
+                        {colIndex === 0 && (
+                          <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-blue-soft/50 border-l-[3px] border-blue/40 animate-pulse" style={{ top: 30, height: 75 }}>
+                            <div className="h-3 w-16 bg-blue/15 rounded" />
+                            <div className="h-2.5 w-10 bg-blue/10 rounded mt-1" />
                           </div>
                         )}
-
-                        {!loading && dayAppointments.map((appointment) => (
-                          <AppointmentBlock key={appointment.id} appointment={appointment} />
-                        ))}
+                        {colIndex === 1 && (
+                          <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-green-soft/50 border-l-[3px] border-green/40 animate-pulse" style={{ top: 120, height: 95 }}>
+                            <div className="h-3 w-20 bg-green/15 rounded" />
+                            <div className="h-2.5 w-12 bg-green/10 rounded mt-1" />
+                          </div>
+                        )}
+                        {colIndex === 3 && (
+                          <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-amber-soft/50 border-l-[3px] border-amber/40 animate-pulse" style={{ top: 60, height: 110 }}>
+                            <div className="h-3 w-16 bg-amber/15 rounded" />
+                            <div className="h-2.5 w-10 bg-amber/10 rounded mt-1" />
+                          </div>
+                        )}
+                        {colIndex === 4 && (
+                          <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-teal-soft/50 border-l-[3px] border-teal/40 animate-pulse" style={{ top: 160, height: 60 }}>
+                            <div className="h-3 w-14 bg-teal/15 rounded" />
+                            <div className="h-2.5 w-8 bg-teal/10 rounded mt-1" />
+                          </div>
+                        )}
+                        {colIndex === 6 && (
+                          <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-rose-soft/50 border-l-[3px] border-rose/40 animate-pulse" style={{ top: 80, height: 90 }}>
+                            <div className="h-3 w-18 bg-rose/15 rounded" />
+                            <div className="h-2.5 w-12 bg-rose/10 rounded mt-1" />
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="min-w-[900px]">
+                  <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] border-b border-line bg-white sticky top-0 z-10">
+                    <div className="bg-bg border-r border-line relative" />
+                    {days.map((day) => {
+                      const key = formatDateKey(day);
+                      const isToday = key === todayKey;
+                      const count = weekAppointments.filter((item) => item.date === key).length;
+                      return (
+                        <div key={key} className={`p-3 border-r border-line flex flex-col items-start gap-[2px] last:border-r-0 max-[720px]:p-[8px_6px] ${isToday ? "bg-teal-soft" : ""}`}>
+                          <div className={`font-mono text-[10px] font-medium tracking-[0.06em] ${isToday ? "text-teal" : "text-ink-3"}`}>{DOW_FULL[day.getDay()]}</div>
+                          <div className={`font-semibold leading-none mt-0.5 text-[22px] max-[720px]:text-base ${isToday ? "text-teal-ink" : "text-ink-2"}`}>{day.getDate()}</div>
+                          <div className={`text-[11px] mt-1 max-[720px]:text-[10px] ${isToday ? "text-teal-ink" : "text-ink-3"}`}>
+                            {count} booking{count === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] relative">
+                    <div className="bg-bg border-r border-line relative">
+                      {TIME_LABELS.map((label, index) => (
+                        <div key={label} className="border-b border-dashed border-line relative first:border-t-0 h-[56px]">
+                          <span className="font-mono text-[10px] text-ink-3 absolute left-2 -top-[7px] bg-white px-1 max-[720px]:text-[9px] first:top-0">{index === 0 ? "" : label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {days.map((day) => {
+                      const key = formatDateKey(day);
+                      const isToday = key === todayKey;
+                      const dayAppointments = weekAppointments.filter((item) => item.date === key);
+                      return (
+                        <div key={key} className={`relative border-r border-line last:border-r-0 ${isToday ? "bg-[rgba(15,110,86,0.025)]" : ""}`} style={{ height: gridHeight }}>
+                          {TIME_LABELS.map((label) => (
+                            <div key={label} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005] h-[56px]" />
+                          ))}
+
+                          {dayAppointments.length === 0 && (
+                            <div className="absolute inset-x-0 top-[190px] text-center text-xs text-ink-3">Free</div>
+                          )}
+
+                          {isToday && nowTop >= 0 && nowTop <= gridHeight && (
+                            <div className="absolute left-0 right-0 h-0.5 bg-teal z-20 pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
+                              <span className="absolute left-2 -top-2 bg-teal text-white text-[9px] font-mono py-0.25 px-1 rounded">{nowStr}</span>
+                            </div>
+                          )}
+
+                          {dayAppointments.map((appointment) => (
+                            <AppointmentBlock key={appointment.id} appointment={appointment} />
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-3 text-xs text-ink-3">
             <I.lock /> Calendar data is scoped to your stylist account.

@@ -841,11 +841,190 @@ export default function BookingsPage() {
 
         {/* Calendar card */}
         <div className={`overflow-x-auto overflow-y-hidden p-0 bg-surface border border-line rounded-xl [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-bg-2 [&::-webkit-scrollbar-thumb]:bg-ink-4 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-ink-3 ${view === "list" ? "overflow-x-hidden" : ""}`}>
-          {loading ? (
-            <div className="p-[40px_24px] flex flex-col gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="animate-pulse h-[36px] bg-bg-2 rounded-lg" />
-              ))}
+          {loading && view === "week" ? (
+            <div className="overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="min-w-[900px]">
+                {/* Header row */}
+                <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] border-b border-line bg-white sticky top-0 z-10">
+                  <div className="bg-bg border-r border-line relative" />
+                  {weekDays.map((day, i) => (
+                    <div key={i} className="p-3 border-r border-line flex flex-col items-start gap-[2px] last:border-r-0 max-[720px]:p-[8px_6px]">
+                      <div className="h-2.5 w-10 bg-bg-2 rounded animate-pulse" />
+                      <div className="h-6 w-8 bg-bg-2 rounded mt-1.5 animate-pulse" />
+                      <div className="h-2.5 w-16 bg-bg-2 rounded mt-2 animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Grid body */}
+                <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] relative">
+                  {/* Time sidebar */}
+                  <div className="bg-bg border-r border-line relative">
+                    {TIME_LABELS.map((label, index) => (
+                      <div key={index} className="border-b border-dashed border-line relative first:border-t-0 h-[56px]">
+                        <div className="w-8 h-2.5 bg-bg-2 rounded absolute left-2 top-2.5 animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Columns */}
+                  {weekDays.map((day, colIndex) => (
+                    <div key={colIndex} className="relative border-r border-line last:border-r-0" style={{ height: TIME_LABELS.length * 56 }}>
+                      {TIME_LABELS.map((label, index) => (
+                        <div key={index} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005] h-[56px]" />
+                      ))}
+
+                      {/* Floating premium colored shimmers */}
+                      {colIndex === 0 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-blue-soft/50 border-l-[3px] border-blue/40 animate-pulse" style={{ top: 30, height: 75 }}>
+                          <div className="h-3 w-16 bg-blue/15 rounded" />
+                          <div className="h-2.5 w-10 bg-blue/10 rounded mt-1" />
+                        </div>
+                      )}
+                      {colIndex === 1 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-green-soft/50 border-l-[3px] border-green/40 animate-pulse" style={{ top: 120, height: 95 }}>
+                          <div className="h-3 w-20 bg-green/15 rounded" />
+                          <div className="h-2.5 w-12 bg-green/10 rounded mt-1" />
+                        </div>
+                      )}
+                      {colIndex === 3 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-amber-soft/50 border-l-[3px] border-amber/40 animate-pulse" style={{ top: 60, height: 110 }}>
+                          <div className="h-3 w-16 bg-amber/15 rounded" />
+                          <div className="h-2.5 w-10 bg-amber/10 rounded mt-1" />
+                        </div>
+                      )}
+                      {colIndex === 4 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-teal-soft/50 border-l-[3px] border-teal/40 animate-pulse" style={{ top: 160, height: 60 }}>
+                          <div className="h-3 w-14 bg-teal/15 rounded" />
+                          <div className="h-2.5 w-8 bg-teal/10 rounded mt-1" />
+                        </div>
+                      )}
+                      {colIndex === 6 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-rose-soft/50 border-l-[3px] border-rose/40 animate-pulse" style={{ top: 80, height: 90 }}>
+                          <div className="h-3 w-18 bg-rose/15 rounded" />
+                          <div className="h-2.5 w-12 bg-rose/10 rounded mt-1" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : loading && view === "day" ? (
+            <div className="overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="min-w-[900px]">
+                {/* Header row */}
+                <div className="grid border-b border-line bg-white sticky top-0 z-10" style={{ gridTemplateColumns: `56px repeat(${stylistFilter === "all" ? stylists.length : 1}, minmax(130px, 1fr))` }}>
+                  <div className="bg-bg border-r border-line relative" />
+                  {(stylistFilter === "all" ? stylists : stylists.filter(s => s.id === stylistFilter)).map((s, i) => (
+                    <div key={s.id || i} className="p-[10px_8px] text-left border-r border-line flex items-center gap-2.5 last:border-r-0">
+                      <div className="w-9 h-9 rounded-full bg-bg-2 animate-pulse shrink-0" />
+                      <div className="flex flex-col gap-1">
+                        <div className="h-3.5 w-16 bg-bg-2 rounded animate-pulse" />
+                        <div className="h-2.5 w-12 bg-bg-2 rounded mt-0.5 animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Grid body */}
+                <div className="grid relative" style={{ gridTemplateColumns: `56px repeat(${stylistFilter === "all" ? stylists.length : 1}, minmax(130px, 1fr))` }}>
+                  {/* Time sidebar */}
+                  <div className="bg-bg border-r border-line relative">
+                    {TIME_LABELS.map((label, index) => (
+                      <div key={index} className="border-b border-dashed border-line relative first:border-t-0 h-[56px]">
+                        <div className="w-8 h-2.5 bg-bg-2 rounded absolute left-2 top-2.5 animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Stylist Columns */}
+                  {(stylistFilter === "all" ? stylists : stylists.filter(s => s.id === stylistFilter)).map((s, colIndex) => (
+                    <div key={s.id || colIndex} className="relative border-r border-line last:border-r-0" style={{ height: TIME_LABELS.length * 56 }}>
+                      {TIME_LABELS.map((label, index) => (
+                        <div key={index} className="border-b border-dashed border-line first:border-t-0 odd:bg-black/[0.005] h-[56px]" />
+                      ))}
+
+                      {/* Floating premium colored shimmers */}
+                      {colIndex % 4 === 0 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-blue-soft/50 border-l-[3px] border-blue/40 animate-pulse" style={{ top: 60, height: 100 }}>
+                          <div className="h-3 w-16 bg-blue/15 rounded" />
+                          <div className="h-2.5 w-10 bg-blue/10 rounded mt-1" />
+                        </div>
+                      )}
+                      {colIndex % 4 === 1 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-teal-soft/50 border-l-[3px] border-teal/40 animate-pulse" style={{ top: 180, height: 80 }}>
+                          <div className="h-3 w-14 bg-teal/15 rounded" />
+                          <div className="h-2.5 w-8 bg-teal/10 rounded mt-1" />
+                        </div>
+                      )}
+                      {colIndex % 4 === 2 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-green-soft/50 border-l-[3px] border-green/40 animate-pulse" style={{ top: 120, height: 90 }}>
+                          <div className="h-3 w-20 bg-green/15 rounded" />
+                          <div className="h-2.5 w-12 bg-green/10 rounded mt-1" />
+                        </div>
+                      )}
+                      {colIndex % 4 === 3 && (
+                        <div className="absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden bg-amber-soft/50 border-l-[3px] border-amber/40 animate-pulse" style={{ top: 260, height: 60 }}>
+                          <div className="h-3 w-16 bg-amber/15 rounded" />
+                          <div className="h-2.5 w-10 bg-amber/10 rounded mt-1" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : loading && view === "list" ? (
+            <div className="w-full">
+              {/* Column header */}
+              <div className="hidden md:grid grid-cols-[100px_1.5fr_1fr_1fr_80px_120px_90px_32px] gap-3 px-5 py-2.5 border-b border-line bg-bg text-[10px] font-semibold text-ink-4 uppercase tracking-[0.06em]">
+                <div>Time</div>
+                <div>Customer</div>
+                <div>Service</div>
+                <div>Stylist</div>
+                <div>Duration</div>
+                <div>Payment</div>
+                <div>Status</div>
+                <div></div>
+              </div>
+              {/* List Shimmer Rows */}
+              <div className="divide-y divide-line">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-[100px_1.5fr_1fr_1fr_80px_120px_90px_32px] max-md:grid-cols-[80px_1fr_auto] gap-3 px-5 py-3 items-center">
+                    {/* Time */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="h-3.5 w-12 bg-bg-2 rounded animate-pulse" />
+                      <div className="h-3 w-8 bg-bg-2 rounded animate-pulse" />
+                    </div>
+                    {/* Customer */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-bg-2 animate-pulse shrink-0" />
+                      <div className="h-3.5 w-24 bg-bg-2 rounded animate-pulse" />
+                    </div>
+                    {/* Service */}
+                    <div className="hidden md:block h-3.5 w-20 bg-bg-2 rounded animate-pulse" />
+                    {/* Stylist */}
+                    <div className="hidden md:flex items-center gap-2">
+                      <div className="w-[22px] h-[22px] rounded-full bg-bg-2 animate-pulse shrink-0" />
+                      <div className="h-3 w-16 bg-bg-2 rounded animate-pulse" />
+                    </div>
+                    {/* Duration */}
+                    <div className="hidden md:block h-3 w-10 bg-bg-2 rounded animate-pulse" />
+                    {/* Payment */}
+                    <div className="hidden md:flex flex-col gap-1.5">
+                      <div className="h-3.5 w-12 bg-bg-2 rounded animate-pulse" />
+                      <div className="h-3.5 w-14 bg-bg-2 rounded-full animate-pulse animate-duration-1000" />
+                    </div>
+                    {/* Status */}
+                    <div className="flex items-center justify-end md:justify-start">
+                      <div className="h-5 w-16 bg-bg-2 rounded-full animate-pulse" />
+                    </div>
+                    {/* Chevron */}
+                    <div className="hidden md:block h-3.5 w-3.5 bg-bg-2 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : view === "week" ? (
             <WeekView

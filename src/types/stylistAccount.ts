@@ -28,6 +28,10 @@ export interface StylistAppointment {
   duration: number;
   service: string;
   status: BookingStatus;
+  arrivedAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  actualDurationMinutes?: number | null;
   notes: string;
   tone: string;
 }

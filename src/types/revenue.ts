@@ -15,6 +15,14 @@ export interface PeriodData {
     bookings: MetricInfo;
     newCust: MetricInfo;
     noShow: MetricInfo;
+    serviceTime: MetricInfo;
+  };
+  timing: {
+    avgActualMinutes: number | null;
+    avgEstimatedMinutes: number | null;
+    completedWithTiming: number;
+    runningLate: number;
+    bestOnTimeStylist: string | null;
   };
   chart: {
     title: string;
@@ -41,6 +49,7 @@ export interface DbAnalyticsBooking {
   id: string;
   date: string;
   start_time: string;
+  duration: number | null;
   status: string;
   payment_status?: string | null;
   amount_paid?: number | null;
@@ -49,6 +58,10 @@ export interface DbAnalyticsBooking {
   customer_id: string | null;
   stylist_id: string | null;
   created_at: string;
+  arrived_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  actual_duration_minutes?: number | null;
   customer: { id: string; name: string; created_at: string } | null;
   stylist: { id: string; name: string; tone: string | null } | null;
   booking_services: Array<{

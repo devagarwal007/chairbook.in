@@ -634,7 +634,7 @@ export default function NewBookingPage() {
           .from("bookings")
           .select("id, customer_id, status, date, booking_services(price_at_booking, qty)")
           .eq("salon_id", salonId)
-          .in("status", ["Completed", "Paid", "Confirmed", "Arrived"])
+          .in("status", ["Completed", "Paid", "Confirmed", "Arrived", "In Service"])
           .order("date", { ascending: false });
 
         if (bkData) {
@@ -741,7 +741,7 @@ export default function NewBookingPage() {
           .select("id, start_time, duration")
           .eq("salon_id", salonId)
           .eq("date", date)
-          .in("status", ["Confirmed", "Arrived"]);
+          .in("status", ["Confirmed", "Arrived", "In Service"]);
 
         if (stylist && stylist !== "any") {
           query = query.eq("stylist_id", stylist);
@@ -773,7 +773,7 @@ export default function NewBookingPage() {
             .select("id, start_time, duration, stylist_id")
             .eq("salon_id", salonId)
             .eq("date", date)
-            .in("status", ["Confirmed", "Arrived"]);
+            .in("status", ["Confirmed", "Arrived", "In Service"]);
 
           if (allBookings && dbStylists.length > 0) {
             const bookingsList = allBookings as unknown as DbBookingStylistRaw[];

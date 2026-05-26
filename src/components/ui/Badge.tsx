@@ -8,6 +8,7 @@ export type BadgeTone =
   | "gray"
   | "confirmed"
   | "arrived"
+  | "in_service"
   | "completed"
   | "noshow"
   | "cancelled";
@@ -25,6 +26,7 @@ const toneClasses: Record<BadgeTone, string> = {
   confirmed: "text-[#1957B8] bg-[#E6EEFA]",
   amber: "text-[#B47A0F] bg-amber-soft",
   arrived: "text-[#B47A0F] bg-amber-soft",
+  in_service: "text-teal bg-teal-soft",
   green: "text-[#137A4A] bg-[#DFF1E6]",
   completed: "text-[#137A4A] bg-[#DFF1E6]",
   rose: "text-rose bg-[#FAE2DC]",

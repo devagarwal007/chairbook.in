@@ -1,4 +1,5 @@
 import { BookingStatus } from "@/types";
+import { mapDbStatusToUiStatus } from "@/lib/booking-progress";
 
 /**
  * Utility helper functions for ChairBook Salon CRM.
@@ -94,11 +95,5 @@ export const formatPhone = (value: string): string => {
  * Maps DB booking status string to the UI-compatible BookingStatus type.
  */
 export const mapDbStatusToUi = (s: string): BookingStatus => {
-  const lower = (s || "").toLowerCase();
-  if (lower === "confirmed") return "confirmed";
-  if (lower === "arrived") return "arrived";
-  if (lower === "completed" || lower === "paid") return "completed";
-  if (lower === "no-show") return "noshow";
-  if (lower === "cancelled") return "cancelled";
-  return "confirmed";
+  return mapDbStatusToUiStatus(s);
 };

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/components/ui/Icons";
 import { Avatar } from "@/components/ui/Avatar";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { signOutCurrentUser } from "@/lib/auth-session";
 import type { StylistSessionProfile } from "@/types";
 
 interface StylistHeaderProps {
@@ -18,11 +18,9 @@ export default function StylistHeader({ title, subtitle, profile, unreadCount = 
   const router = useRouter();
 
   const signOut = async () => {
-    const supabase = getSupabaseBrowserClient();
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
-    router.push("/signin");
+    await signOutCurrentUser();
+    router.replace("/signin");
+    router.refresh();
   };
 
   return (

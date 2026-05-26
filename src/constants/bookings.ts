@@ -9,6 +9,7 @@ export const DOW_FULL = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
 export const STATUS_LABEL: Record<string, string> = {
   confirmed: "Confirmed",
   arrived: "Arrived",
+  in_service: "In Service",
   completed: "Done",
   noshow: "No-show",
   cancelled: "Cancelled",
@@ -56,6 +57,7 @@ export const MOCK_BOOKING: BookingData = {
 export const STATUS_LABEL_DETAIL = {
   confirmed: "Confirmed",
   arrived: "Arrived",
+  in_service: "In Service",
   completed: "Completed",
   noshow: "No-show",
   cancelled: "Cancelled",

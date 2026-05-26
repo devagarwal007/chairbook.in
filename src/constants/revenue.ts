@@ -10,6 +10,14 @@ export const PERIODS_MOCK: Record<string, PeriodData> = {
       bookings: { value: 8, delta: "+2", tone: "up" },
       newCust: { value: 2, delta: "same", tone: "flat" },
       noShow: { value: 12.5, delta: "+5pp", tone: "down", unit: "%" },
+      serviceTime: { value: 46, delta: "4m under", tone: "up", compare: "50m estimate", unit: "min" },
+    },
+    timing: {
+      avgActualMinutes: 46,
+      avgEstimatedMinutes: 50,
+      completedWithTiming: 5,
+      runningLate: 1,
+      bestOnTimeStylist: "Anjali",
     },
     chart: {
       title: "Revenue by hour",
@@ -44,6 +52,14 @@ export const PERIODS_MOCK: Record<string, PeriodData> = {
       bookings: { value: 54, delta: "+8", tone: "up" },
       newCust: { value: 9, delta: "+3", tone: "up" },
       noShow: { value: 5.5, delta: "-1.2pp", tone: "up", unit: "%" },
+      serviceTime: { value: 52, delta: "2m over", tone: "down", compare: "50m estimate", unit: "min" },
+    },
+    timing: {
+      avgActualMinutes: 52,
+      avgEstimatedMinutes: 50,
+      completedWithTiming: 37,
+      runningLate: 1,
+      bestOnTimeStylist: "Pooja",
     },
     chart: {
       title: "Revenue by day",
@@ -77,6 +93,14 @@ export const PERIODS_MOCK: Record<string, PeriodData> = {
       bookings: { value: 198, delta: "+24", tone: "up" },
       newCust: { value: 31, delta: "+9", tone: "up" },
       noShow: { value: 6.1, delta: "+0.4pp", tone: "down", unit: "%" },
+      serviceTime: { value: 49, delta: "1m under", tone: "up", compare: "50m estimate", unit: "min" },
+    },
+    timing: {
+      avgActualMinutes: 49,
+      avgEstimatedMinutes: 50,
+      completedWithTiming: 143,
+      runningLate: 1,
+      bestOnTimeStylist: "Anjali",
     },
     chart: {
       title: "Revenue by week",

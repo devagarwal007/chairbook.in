@@ -11,6 +11,7 @@ export const stylistNavItems = [
 export const STYLIST_STATUS_LABEL = {
   confirmed: "Confirmed",
   arrived: "Arrived",
+  in_service: "In Service",
   completed: "Completed",
   noshow: "No-show",
   cancelled: "Cancelled",

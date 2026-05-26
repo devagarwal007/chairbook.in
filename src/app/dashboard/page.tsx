@@ -4,13 +4,22 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  BOOKING_STATUS_LABEL,
+  getActualServiceMinutes,
+  getNextProgressAction,
+  getWaitMinutes,
+  isRunningLate,
+  PROGRESS_ACTION_LABEL,
+  PROGRESS_ACTION_NEXT_STATUS,
+} from "@/lib/booking-progress";
 import { toMin, formatTime12hFromMin, isUUID } from "@/lib/utils";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
-import { useSalonData, useBookings, useTimeUpdate } from "@/hooks";
+import { useSalonData, useBookings, useTimeUpdate, useBookingProgress } from "@/hooks";
 import { useToast } from "@/context/ToastContext";
-import { Appointment, Stylist, Service } from "@/types";
+import { Appointment, BookingProgressAction, Stylist, Service } from "@/types";
 import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip, PhoneInput } from "@/components/ui";
 
 // ===== TYPES =====
@@ -22,8 +31,7 @@ const FALLBACK_STYLISTS: Stylist[] = [
 
 const FALLBACK_SERVICES: Service[] = [];
 
-const STATUS_LABEL = { confirmed: "Confirmed", arrived: "Arrived", completed: "Completed", noshow: "No-show", cancelled: "Cancelled" };
-const STATUS_ORDER: ("confirmed" | "arrived" | "completed" | "noshow")[] = ["confirmed", "arrived", "completed", "noshow"];
+const STATUS_LABEL = BOOKING_STATUS_LABEL;
 
 // ===== MAIN DASHBOARD PAGE =====
 export default function DashboardPage() {
@@ -44,6 +52,7 @@ export default function DashboardPage() {
 
   const { nowTimeMin, dateDisplayStr } = useTimeUpdate(!!salonId);
   const { show: showFlash } = useToast();
+  const { advanceBooking } = useBookingProgress();
 
   const { stylists: dbStylists, services: dbServices, loading: salonDataLoading } = useSalonData(salonId);
 
@@ -81,6 +90,45 @@ export default function DashboardPage() {
   const totalAppts = todayAppts.length;
   const noShows = todayAppts.filter((a) => a.status === "noshow").length;
 
+  const timingInsights = useMemo(() => {
+    const completed = todayAppts
+      .map((appt) => ({ appt, actual: getActualServiceMinutes(appt) }))
+      .filter((item): item is { appt: Appointment; actual: number } => item.actual !== null);
+
+    const avgActual = completed.length
+      ? Math.round(completed.reduce((sum, item) => sum + item.actual, 0) / completed.length)
+      : null;
+    const avgEstimate = completed.length
+      ? Math.round(completed.reduce((sum, item) => sum + item.appt.duration, 0) / completed.length)
+      : null;
+
+    const late = todayAppts.filter((appt) => isRunningLate(appt.status, appt.time, appt.duration, nowTimeMin));
+    const stylistStats = new Map<string | number, { total: number; onTime: number }>();
+
+    completed.forEach(({ appt, actual }) => {
+      const current = stylistStats.get(appt.stylist) || { total: 0, onTime: 0 };
+      current.total += 1;
+      if (actual <= appt.duration) current.onTime += 1;
+      stylistStats.set(appt.stylist, current);
+    });
+
+    const bestStylist = Array.from(stylistStats.entries())
+      .filter(([, stat]) => stat.total > 0)
+      .sort((a, b) => (b[1].onTime / b[1].total) - (a[1].onTime / a[1].total))[0];
+
+    const bestStylistName = bestStylist
+      ? activeStylists.find((stylist) => stylist.id === bestStylist[0])?.name || "Top stylist"
+      : "Need completed bookings";
+
+    return {
+      avgActual,
+      avgEstimate,
+      runningLate: late.length,
+      urgentLate: late.sort((a, b) => toMin(a.time) - toMin(b.time))[0],
+      bestStylistName,
+    };
+  }, [activeStylists, nowTimeMin, todayAppts]);
+
   const unrepliedCount = useMemo(() => {
     if (day !== "today") return 0;
     return appts.filter((a) => {
@@ -90,39 +138,47 @@ export default function DashboardPage() {
     }).length;
   }, [appts, nowTimeMin, day]);
 
-  const updateStatus = async (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => {
-    setAppts(prev => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-    showFlash(`Status updated to ${STATUS_LABEL[status]}`, 1800);
+  const advanceStatus = async (id: string | number, action: BookingProgressAction) => {
+    const nextStatus = PROGRESS_ACTION_NEXT_STATUS[action];
+    setAppts(prev => prev.map((a) => (a.id === id ? { ...a, status: nextStatus } : a)));
 
     if (typeof id === "string" && isUUID(id)) {
-      const supabase = getSupabaseBrowserClient();
-      if (supabase) {
-        const dbStatus = status === "confirmed" ? "Confirmed"
-                       : status === "arrived" ? "Arrived"
-                       : status === "completed" ? "Completed"
-                       : "No-show";
-        const { error } = await supabase
-          .from("bookings")
-          .update({ status: dbStatus })
-          .eq("id", id);
-        if (error) {
-          console.error("Error updating status in Supabase:", error);
-        } else {
-          // Insert notification
-          const appt = appts.find(a => a.id === id);
-          if (appt && salonId) {
-            insertNotification({
-              salon_id: salonId,
-              stylist_id: typeof appt.stylist === "string" && isUUID(appt.stylist) ? appt.stylist : null,
-              type: "status_update",
-              title: "Booking updated",
-              body: `${appt.customer} marked as ${STATUS_LABEL[status]}`,
-              meta: { booking_id: id, status },
-            });
-          }
+      try {
+        const result = await advanceBooking(id, action);
+        setAppts(prev => prev.map((a) => (a.id === id ? {
+          ...a,
+          status: result.status,
+          arrivedAt: result.arrivedAt ?? a.arrivedAt,
+          startedAt: result.startedAt ?? a.startedAt,
+          completedAt: result.completedAt ?? a.completedAt,
+          actualDurationMinutes: result.actualDurationMinutes ?? a.actualDurationMinutes,
+        } : a)));
+        const appt = appts.find(a => a.id === id);
+        if (appt && salonId) {
+          insertNotification({
+            salon_id: salonId,
+            stylist_id: typeof appt.stylist === "string" && isUUID(appt.stylist) ? appt.stylist : null,
+            type: "status_update",
+            title: "Booking updated",
+            body: `${appt.customer} marked as ${STATUS_LABEL[result.status]}`,
+            meta: { booking_id: id, status: result.status },
+          });
         }
+      } catch (error) {
+        console.error("Error advancing booking status:", error);
+        const errMsg = error instanceof Error
+          ? error.message
+          : (error && typeof error === "object" && "message" in error)
+            ? String((error as { message?: string }).message)
+            : "Could not update booking";
+        showFlash(errMsg, 2600);
+        refreshToday();
+        refreshTomorrow();
+        return;
       }
     }
+
+    showFlash(PROGRESS_ACTION_LABEL[action], 1800);
   };
 
   const sendWA = (a: Appointment) => {
@@ -266,6 +322,30 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {!metricsLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-[28px]">
+            <TimingInsightCard
+              icon={<I.clock />}
+              label="Avg service time"
+              value={timingInsights.avgActual !== null && timingInsights.avgEstimate !== null ? `${timingInsights.avgActual}m` : "No data yet"}
+              hint={timingInsights.avgActual !== null && timingInsights.avgEstimate !== null ? `${timingInsights.avgEstimate}m estimate` : "Completes after services finish"}
+            />
+            <TimingInsightCard
+              icon={<I.alert />}
+              label="Running late"
+              value={timingInsights.runningLate}
+              hint={timingInsights.urgentLate ? `${timingInsights.urgentLate.customer} needs attention` : "All active bookings on track"}
+              tone={timingInsights.runningLate > 0 ? "warn" : "ok"}
+            />
+            <TimingInsightCard
+              icon={<I.scissors />}
+              label="On-time stylist"
+              value={timingInsights.bestStylistName}
+              hint="Based on completed bookings today"
+            />
+          </div>
+        )}
+
         {/* Schedule Header */}
         <div className="flex flex-row items-center justify-between gap-4 mb-4 max-[768px]:flex-col max-[768px]:items-stretch max-[768px]:gap-3">
           <div className="flex items-baseline gap-3 max-[768px]:w-full max-[768px]:justify-between">
@@ -345,7 +425,7 @@ export default function DashboardPage() {
                   appt={appt}
                   expanded={expandedId === appt.id}
                   onToggle={() => setExpandedId(expandedId === appt.id ? null : appt.id)}
-                  onStatus={updateStatus}
+                  onStatus={advanceStatus}
                   onWA={sendWA}
                   stylists={activeStylists}
                   nowTimeMin={nowTimeMin}
@@ -431,6 +511,22 @@ function MetricCard({ label, value, prefix, suffix, delta, deltaTone, icon, spar
   );
 }
 
+function TimingInsightCard({ icon, label, value, hint, tone = "neutral" }: { icon: React.ReactNode; label: string; value: string | number; hint: string; tone?: "neutral" | "ok" | "warn" }) {
+  const toneClass = tone === "warn" ? "text-rose" : tone === "ok" ? "text-teal" : "text-ink";
+  return (
+    <div className="bg-white border border-line rounded-xl p-4 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-[11px] uppercase tracking-[0.05em] text-ink-3 font-medium flex items-center gap-2">
+          <span className="grid place-items-center w-4 h-4 text-ink-3">{icon}</span>
+          {label}
+        </div>
+        <div className={`text-lg font-semibold tracking-tight mt-1 truncate ${toneClass}`}>{value}</div>
+        <div className="text-xs text-ink-3 mt-0.5 truncate">{hint}</div>
+      </div>
+    </div>
+  );
+}
+
 // MiniSpark SVG Component
 function MiniSpark({ points, tone = "teal", height = 28, width = 80 }: { points: number[]; tone?: "teal" | "amber" | "rose"; height?: number; width?: number }) {
   const max = Math.max(...points);
@@ -452,20 +548,24 @@ interface ApptRowProps {
   appt: Appointment;
   expanded: boolean;
   onToggle: () => void;
-  onStatus: (id: string | number, status: "confirmed" | "arrived" | "completed" | "noshow") => void;
+  onStatus: (id: string | number, action: BookingProgressAction) => void;
   onWA: (a: Appointment) => void;
   stylists: Stylist[];
   nowTimeMin: number;
 }
 
 function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMin }: ApptRowProps) {
-  const router = useRouter();
   const stylist = stylists.find((s) => s.id === appt.stylist) || stylists[1] || { id: "unknown", name: appt.stylist, tone: "a" };
   const start = toMin(appt.time);
   const end = start + appt.duration;
   const startTimeFormatted = formatTime12hFromMin(start);
   const endTimeFormatted = formatTime12hFromMin(end);
   const isActive = start <= nowTimeMin && nowTimeMin < end;
+  const nextAction = getNextProgressAction(appt.status);
+  const waitMinutes = getWaitMinutes(appt);
+  const actualMinutes = getActualServiceMinutes(appt);
+  const late = isRunningLate(appt.status, appt.time, appt.duration, nowTimeMin);
+  const checkoutPrimary = appt.status === "completed";
 
   const bookingParam = typeof appt.id === "string" ? appt.id : String(appt.id);
   const customerParam = appt.customerId ? String(appt.customerId) : String(appt.id);
@@ -504,6 +604,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
           <Badge tone={appt.status}>
             {STATUS_LABEL[appt.status]}
           </Badge>
+          {late && <span className="text-[11px] text-rose font-medium">Running late</span>}
           <div className="text-[13px] text-ink-2 font-mono font-medium">₹{appt.price.toLocaleString("en-IN")}</div>
         </div>
         <div className={`grid place-items-center transition-transform duration-150 ${expanded ? "rotate-180 text-ink-2" : "text-ink-4"}`}>
@@ -534,6 +635,18 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
               <strong className="font-semibold">{appt.service}</strong>
               <br />
               <span className="text-ink-3">{appt.duration} min · ₹{appt.price.toLocaleString("en-IN")}</span>
+              {actualMinutes !== null && (
+                <>
+                  <br />
+                  <span className="text-ink-3">{actualMinutes} min actual · {appt.duration} min estimate</span>
+                </>
+              )}
+              {waitMinutes !== null && (
+                <>
+                  <br />
+                  <span className="text-ink-3">{waitMinutes} min wait before service</span>
+                </>
+              )}
               <br />
               <span className="text-ink-3">Stylist: {stylist.name}</span>
               <br />
@@ -552,31 +665,21 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
             </div>
           </div>
           <div className="col-span-full flex gap-2 pt-4 border-t border-line flex-wrap">
-            {STATUS_ORDER.map((s) => (
+            {nextAction && (
               <button
-                key={s}
-                className={`h-[34px] px-3 rounded-lg border text-[13px] cursor-pointer inline-flex items-center gap-1.5 transition-colors duration-150 ${
-                  appt.status === s
-                    ? "border-teal text-teal bg-teal-soft font-medium"
-                    : "border-line bg-white text-ink-2 hover:border-ink-3 hover:text-ink"
-                } ${s === "noshow" ? "hover:border-rose hover:text-rose" : ""}`}
-                onClick={() => {
-                  if (s === "completed") {
-                    router.push(`/dashboard/checkout/${bookingParam}`);
-                  } else {
-                    onStatus(appt.id, s);
-                  }
-                }}
+                className="h-[34px] px-3 rounded-lg border border-teal bg-teal text-white text-[13px] cursor-pointer inline-flex items-center gap-1.5 font-semibold hover:bg-teal-ink transition-colors duration-150"
+                onClick={() => onStatus(appt.id, nextAction)}
               >
-                {appt.status === s && "✓ "}
-                {STATUS_LABEL[s]}
+                {PROGRESS_ACTION_LABEL[nextAction]}
               </button>
-            ))}
+            )}
             <Link
               href={`/dashboard/checkout/${bookingParam}`}
-              className="h-[34px] px-3 rounded-lg border border-teal !text-white bg-teal text-[13px] cursor-pointer inline-flex items-center gap-1.5 font-semibold hover:bg-teal-ink transition-colors duration-150 no-underline"
+              className={`h-[34px] px-3 rounded-lg border border-teal text-[13px] cursor-pointer inline-flex items-center gap-1.5 font-semibold transition-colors duration-150 no-underline ${
+                checkoutPrimary ? "!text-white bg-teal hover:bg-teal-ink" : "!text-teal bg-white hover:bg-teal-soft"
+              }`}
             >
-              Payment / POS
+              Checkout / POS
             </Link>
             <button
               className="h-[34px] px-3 rounded-lg border border-wa text-wa bg-white text-[13px] cursor-pointer inline-flex items-center gap-1.5 ml-auto hover:bg-wa-soft/10 transition-colors duration-150"

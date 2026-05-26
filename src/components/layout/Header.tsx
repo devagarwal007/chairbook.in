@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icons } from "@/components/ui/Icons";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 import { useBookings } from "@/hooks";
 import type { HeaderProps } from "@/types";
+import { signOutCurrentUser } from "@/lib/auth-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { INITIAL_NOTIFS } from "@/constants/notifications";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -20,7 +22,9 @@ export default function Header({
   showSearch = false,
   actions,
 }: HeaderProps) {
+  const router = useRouter();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [salonOpen, setSalonOpen] = useState(true);
   const { show: showFlash } = useToast();
   
@@ -49,6 +53,15 @@ export default function Header({
     setSalonOpen(nextState);
     localStorage.setItem("cb_salon_open", String(nextState));
     showFlash(nextState ? "Salon marked OPEN for today" : "Salon marked CLOSED for today");
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setProfileMenuOpen(false);
+    await signOutCurrentUser();
+    router.replace("/signin");
+    router.refresh();
   };
 
   const [hasUnread, setHasUnread] = useState(false);
@@ -219,14 +232,15 @@ export default function Header({
                     </div>
 
                     <div className="border-t border-line pt-2">
-                      <Link
-                        href="/signin"
-                        onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2 px-2.5 py-2 rounded-[var(--radius-sm)] text-xs font-semibold text-[var(--rose)] no-underline"
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        disabled={signingOut}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-[var(--radius-sm)] text-xs font-semibold text-[var(--rose)] bg-transparent border-0 cursor-pointer disabled:opacity-60 text-left"
                       >
                         <Icons.logout />
-                        Log out
-                      </Link>
+                        {signingOut ? "Logging out..." : "Log out"}
+                      </button>
                     </div>
                   </div>
                 </>

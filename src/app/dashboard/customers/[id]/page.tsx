@@ -209,7 +209,7 @@ export default function CustomerProfilePage() {
           const bkDate = new Date(b.date);
           const bkDateZero = new Date(bkDate);
           bkDateZero.setHours(0, 0, 0, 0);
-          return bkDateZero >= today && ["Pending", "Confirmed", "Arrived"].includes(b.status);
+          return bkDateZero >= today && ["Pending", "Confirmed", "Arrived", "In Service"].includes(b.status);
         });
 
         const engagement: "active" | "cooling" | "lost" =

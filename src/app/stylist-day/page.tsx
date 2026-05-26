@@ -3,7 +3,15 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import { StylistAppt } from "@/types";
+import { useBookingProgress } from "@/hooks";
+import {
+  BOOKING_STATUS_DB,
+  getNextProgressAction,
+  mapDbStatusToUiStatus,
+  PROGRESS_ACTION_LABEL,
+  PROGRESS_ACTION_NEXT_STATUS,
+} from "@/lib/booking-progress";
+import { BookingProgressAction, StylistAppt } from "@/types";
 
 
 
@@ -15,6 +23,7 @@ function StylistDayContent() {
   const [appts, setAppts] = useState<StylistAppt[]>([]);
   const [stylistName, setStylistName] = useState("Stylist");
   const [loading, setLoading] = useState(true);
+  const { advanceBooking } = useBookingProgress();
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -34,7 +43,7 @@ function StylistDayContent() {
       const today = new Date().toISOString().slice(0, 10);
       let q = supabase
         .from("bookings")
-        .select("id, start_time, duration, status, notes, customer:customers(name), booking_services(service:services(name))")
+        .select("id, start_time, duration, status, arrived_at, started_at, completed_at, actual_duration_minutes, notes, customer:customers(name), booking_services(service:services(name))")
         .eq("salon_id", salonId)
         .eq("date", today)
         .order("start_time");
@@ -49,11 +58,24 @@ function StylistDayContent() {
     loadData();
   }, [stylistId, salonId]);
 
-  const updateStatus = async (id: string, status: string) => {
-    const supabase = getSupabaseBrowserClient();
-    if (supabase) {
-      await supabase.from("bookings").update({ status }).eq("id", id);
-      setAppts(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+  const advanceStatus = async (id: string, action: BookingProgressAction) => {
+    const optimisticStatus = BOOKING_STATUS_DB[PROGRESS_ACTION_NEXT_STATUS[action]];
+    const previous = appts;
+    setAppts(prev => prev.map(a => a.id === id ? { ...a, status: optimisticStatus } : a));
+
+    try {
+      const result = await advanceBooking(id, action);
+      setAppts(prev => prev.map(a => a.id === id ? {
+        ...a,
+        status: BOOKING_STATUS_DB[result.status],
+        arrived_at: result.arrivedAt ?? a.arrived_at,
+        started_at: result.startedAt ?? a.started_at,
+        completed_at: result.completedAt ?? a.completed_at,
+        actual_duration_minutes: result.actualDurationMinutes ?? a.actual_duration_minutes,
+      } : a));
+    } catch (err) {
+      console.error("Failed to advance booking:", err);
+      setAppts(previous);
     }
   };
 
@@ -70,6 +92,8 @@ function StylistDayContent() {
         <div style={{ marginTop: 20 }}>
           {appts.map(a => {
             const svcNames = a.booking_services?.map((bs) => bs.service?.name).filter(Boolean).join(", ") || "Service";
+            const uiStatus = mapDbStatusToUiStatus(a.status);
+            const nextAction = getNextProgressAction(uiStatus);
             return (
               <div key={a.id} style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "12px 0",
@@ -82,19 +106,22 @@ function StylistDayContent() {
                   <div style={{ fontWeight: 600 }}>{a.customer?.name || "Walk-in"}</div>
                   <div style={{ fontSize: 12, color: "#666" }}>{svcNames} · {a.duration} min</div>
                 </div>
-                <button
-                  onClick={() => {
-                    const next = a.status === "Confirmed" ? "Arrived" : a.status === "Arrived" ? "Completed" : "Confirmed";
-                    updateStatus(a.id, next);
-                  }}
-                  style={{
-                    padding: "6px 12px", borderRadius: 8, border: 0,
-                    background: a.status === "Completed" ? "#e0e0e0" : "#0BAA84", color: a.status === "Completed" ? "#555" : "#fff",
-                    fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  }}
-                >
-                  {a.status === "Confirmed" ? "Arrived" : a.status === "Arrived" ? "Done" : "Undo"}
-                </button>
+                {nextAction ? (
+                  <button
+                    onClick={() => advanceStatus(a.id, nextAction)}
+                    style={{
+                      padding: "6px 12px", borderRadius: 8, border: 0,
+                      background: "#0BAA84", color: "#fff",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    {PROGRESS_ACTION_LABEL[nextAction]}
+                  </button>
+                ) : (
+                  <span style={{ padding: "6px 12px", borderRadius: 8, background: "#e0e0e0", color: "#555", fontSize: 12, fontWeight: 600 }}>
+                    {BOOKING_STATUS_DB[uiStatus]}
+                  </span>
+                )}
               </div>
             );
           })}

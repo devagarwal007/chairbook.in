@@ -6,6 +6,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { Icons as I } from "@/components/ui/Icons";
+import { getActualServiceMinutes, isRunningLate, mapDbStatusToUiStatus, minutesBetween } from "@/lib/booking-progress";
+import { formatDateKey } from "@/lib/utils";
 import { PeriodData, DbAnalyticsBooking } from "@/types";
 
 const IR = I;
@@ -188,12 +190,16 @@ export default function InsightsPage() {
 
     const fetchAnalytics = async () => {
       try {
+        const rangeEnd = new Date();
+        const rangeStart = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth() - 1, 1);
+
         const { data: bookingsData, error } = await supabase
           .from("bookings")
           .select(`
             id,
             date,
             start_time,
+            duration,
             status,
             payment_status,
             amount_paid,
@@ -202,6 +208,10 @@ export default function InsightsPage() {
             customer_id,
             stylist_id,
             created_at,
+            arrived_at,
+            started_at,
+            completed_at,
+            actual_duration_minutes,
             customer:customers (id, name, created_at),
             stylist:stylists (id, name, tone),
             booking_services (
@@ -217,7 +227,9 @@ export default function InsightsPage() {
               method
             )
           `)
-          .eq("salon_id", salonId);
+          .eq("salon_id", salonId)
+          .gte("date", formatDateKey(rangeStart))
+          .lte("date", formatDateKey(rangeEnd));
 
 
 
@@ -229,11 +241,13 @@ export default function InsightsPage() {
           return;
         }
 
-        // Group & parse data
-        // Determine reference date. Let's make it the maximum date in the bookingsData so it handles test data beautifully, or today
-        const bookingDates = bookingsData.map(b => new Date(b.date).getTime());
-        const refDate = new Date(Math.max(...bookingDates, new Date().getTime()));
-        const refDateStr = refDate.toISOString().slice(0, 10);
+        const refDate = new Date();
+        const refDateStr = formatDateKey(refDate);
+
+        const parseDateKey = (value: string) => {
+          const [year, month, day] = value.split("-").map(Number);
+          return new Date(year, (month || 1) - 1, day || 1);
+        };
 
         const getPastDate = (days: number) => {
           const d = new Date(refDate);
@@ -293,6 +307,45 @@ export default function InsightsPage() {
             return (noShow / total) * 100;
           };
 
+          const average = (list: number[]) =>
+            list.length > 0 ? Math.round(list.reduce((sum, n) => sum + n, 0) / list.length) : null;
+          const getEstimatedMinutes = (b: DbAnalyticsBooking) => Number(b.duration || 0) || null;
+          const getActualMinutes = (b: DbAnalyticsBooking) =>
+            getActualServiceMinutes({
+              startedAt: b.started_at,
+              completedAt: b.completed_at,
+              actualDurationMinutes: b.actual_duration_minutes,
+            }) ?? minutesBetween(b.started_at, b.completed_at);
+          const timedRows = filteredBookings
+            .map((b) => ({ booking: b, actual: getActualMinutes(b), estimate: getEstimatedMinutes(b) }))
+            .filter((row): row is { booking: DbAnalyticsBooking; actual: number; estimate: number } =>
+              row.actual !== null && row.estimate !== null && row.estimate > 0
+            );
+          const avgActual = average(timedRows.map((row) => row.actual));
+          const avgEstimate = average(timedRows.map((row) => row.estimate));
+          const serviceDelta = avgActual !== null && avgEstimate !== null ? avgActual - avgEstimate : null;
+          const todayKey = new Date().toISOString().slice(0, 10);
+          const now = new Date();
+          const nowMinute = now.getHours() * 60 + now.getMinutes();
+          const runningLate = filteredBookings.filter((b) => {
+            const estimated = getEstimatedMinutes(b);
+            if (!estimated || b.date !== todayKey) return false;
+            return isRunningLate(mapDbStatusToUiStatus(b.status), b.start_time, estimated, nowMinute);
+          }).length;
+
+          const stylistTiming = new Map<string, { name: string; count: number; onTime: number; actualTotal: number }>();
+          timedRows.forEach(({ booking, actual, estimate }) => {
+            const stylistName = booking.stylist?.name || "Unassigned";
+            const current = stylistTiming.get(stylistName) || { name: stylistName, count: 0, onTime: 0, actualTotal: 0 };
+            current.count += 1;
+            current.actualTotal += actual;
+            if (actual <= estimate + 5) current.onTime += 1;
+            stylistTiming.set(stylistName, current);
+          });
+          const bestOnTimeStylist = Array.from(stylistTiming.values())
+            .filter((stat) => stat.count >= 3)
+            .sort((a, b) => (b.onTime / b.count) - (a.onTime / a.count) || (a.actualTotal / a.count) - (b.actualTotal / b.count))[0]?.name || null;
+
           const rev = getRevenue(filteredBookings);
           const revCompare = getRevenue(compareBookings);
           const bCount = getBookingsCount(filteredBookings);
@@ -350,7 +403,7 @@ export default function InsightsPage() {
             chartData = days.map((dayLabel, index) => {
               const targetDay = (index + 1) % 7; // Sunday is 0, Monday is 1...
               const dayBookings = filteredBookings.filter(b => {
-                const bd = new Date(b.date);
+                const bd = parseDateKey(b.date);
                 return bd.getDay() === targetDay;
               });
               return { x: dayLabel, v: getRevenue(dayBookings) };
@@ -359,7 +412,7 @@ export default function InsightsPage() {
             const weeks = ["W1", "W2", "W3", "W4"];
             chartData = weeks.map((wLabel, index) => {
               const weekBookings = filteredBookings.filter(b => {
-                const bd = new Date(b.date);
+                const bd = parseDateKey(b.date);
                 const dom = bd.getDate();
                 if (index === 0) return dom >= 1 && dom <= 7;
                 if (index === 1) return dom >= 8 && dom <= 14;
@@ -431,6 +484,20 @@ export default function InsightsPage() {
               bookings: { value: bCount, delta: formatCountDelta(bCount, bCountCompare), tone: bCount >= bCountCompare ? "up" : "down" },
               newCust: { value: nCust, delta: formatCountDelta(nCust, nCustCompare), tone: nCust >= nCustCompare ? "up" : "down" },
               noShow: { value: nsRate, delta: formatRateDelta(nsRate, nsRateCompare), tone: nsRate <= nsRateCompare ? "up" : "down", unit: "%" },
+              serviceTime: {
+                value: avgActual || 0,
+                delta: serviceDelta === null ? "no data" : serviceDelta === 0 ? "on estimate" : `${Math.abs(serviceDelta)}m ${serviceDelta > 0 ? "over" : "under"}`,
+                tone: serviceDelta === null ? "flat" : serviceDelta <= 0 ? "up" : "down",
+                compare: avgEstimate !== null ? `${avgEstimate}m estimate` : "needs completed services",
+                unit: "min",
+              },
+            },
+            timing: {
+              avgActualMinutes: avgActual,
+              avgEstimatedMinutes: avgEstimate,
+              completedWithTiming: timedRows.length,
+              runningLate,
+              bestOnTimeStylist,
             },
             chart: {
               title: periodType === "today" ? "Revenue by hour" : periodType === "week" ? "Revenue by day" : "Revenue by week",
@@ -443,11 +510,13 @@ export default function InsightsPage() {
         };
 
         // Filter and calculate
-        const filterBookings = (start: Date, end: Date) =>
-          (bookingsData as unknown as DbAnalyticsBooking[]).filter(b => {
-            const bd = new Date(b.date);
-            return bd >= start && bd <= end;
+        const filterBookings = (start: Date, end: Date) => {
+          const startKey = formatDateKey(start);
+          const endKey = formatDateKey(end);
+          return (bookingsData as unknown as DbAnalyticsBooking[]).filter(b => {
+            return b.date >= startKey && b.date <= endKey;
           });
+        };
 
         const todayList = filterBookings(todayStart, todayEnd);
         const yesterdayList = filterBookings(yesterdayStart, yesterdayEnd);
@@ -627,6 +696,10 @@ export default function InsightsPage() {
       ["Bookings", String(m.bookings.value), m.bookings.delta],
       ["New Customers", String(m.newCust.value), m.newCust.delta],
       ["No-Show Rate", `${m.noShow.value.toFixed(1)}%`, m.noShow.delta],
+      ["Avg Service Time", p.timing.avgActualMinutes !== null ? `${p.timing.avgActualMinutes} min` : "No data", m.serviceTime.delta],
+      ["Avg Estimated Time", p.timing.avgEstimatedMinutes !== null ? `${p.timing.avgEstimatedMinutes} min` : "No data", ""],
+      ["Running Late", String(p.timing.runningLate), ""],
+      ["Best On-Time Stylist", p.timing.bestOnTimeStylist || "Need more data", ""],
       [],
       ["Top Services"],
       ["Name", "Revenue", "Bookings", "Share"],
@@ -712,6 +785,42 @@ export default function InsightsPage() {
             tone={m.noShow.tone}
             compare={p.compareLabel}
           />
+          <MetricBig
+            label="Avg service time"
+            icon={<IR.clock />}
+            value={p.timing.avgActualMinutes !== null ? p.timing.avgActualMinutes : "No data"}
+            suffix={p.timing.avgActualMinutes !== null ? "min" : undefined}
+            delta={m.serviceTime.delta}
+            tone={m.serviceTime.tone}
+            compare={m.serviceTime.compare}
+          />
+        </div>
+
+        <div className="mb-5 grid gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Actual vs estimate</div>
+            <div className="mt-2 font-mono text-xl font-semibold text-ink">
+              {p.timing.avgActualMinutes !== null && p.timing.avgEstimatedMinutes !== null
+                ? `${p.timing.avgActualMinutes}m / ${p.timing.avgEstimatedMinutes}m`
+                : "No data"}
+            </div>
+            <div className="mt-1 text-xs text-ink-soft">Completed services with timing only</div>
+          </div>
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Timed services</div>
+            <div className="mt-2 font-mono text-xl font-semibold text-ink">{p.timing.completedWithTiming}</div>
+            <div className="mt-1 text-xs text-ink-soft">Rows with start and complete time</div>
+          </div>
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Running late now</div>
+            <div className={`mt-2 font-mono text-xl font-semibold ${p.timing.runningLate > 0 ? "text-amber" : "text-teal"}`}>{p.timing.runningLate}</div>
+            <div className="mt-1 text-xs text-ink-soft">{p.timing.runningLate > 0 ? "Active bookings need attention" : "Active bookings on track"}</div>
+          </div>
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">Best on-time stylist</div>
+            <div className="mt-2 truncate text-xl font-semibold text-ink">{p.timing.bestOnTimeStylist || "Need more data"}</div>
+            <div className="mt-1 text-xs text-ink-soft">Requires at least 3 timed services</div>
+          </div>
         </div>
 
         {/* Bar chart */}

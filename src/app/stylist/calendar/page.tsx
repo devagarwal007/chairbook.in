@@ -40,6 +40,7 @@ function AppointmentBlock({ appointment }: { appointment: StylistAppointment }) 
       className={`absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 z-10 overflow-hidden transition-all duration-120 hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-6px_rgba(0,0,0,0.18)] hover:z-20 ${
         appointment.status === "confirmed" ? "bg-blue-soft text-blue border-l-[3px] border-blue" :
         appointment.status === "arrived" ? "bg-amber-soft text-amber-ink border-l-[3px] border-amber" :
+        appointment.status === "in_service" ? "bg-teal-soft text-teal-ink border-l-[3px] border-teal" :
         appointment.status === "completed" ? "bg-green-soft text-green border-l-[3px] border-green" :
         appointment.status === "noshow" ? "bg-rose-soft text-rose border-l-[3px] border-rose" : ""
       }`}

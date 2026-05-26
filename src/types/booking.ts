@@ -1,6 +1,15 @@
-export type BookingStatus = "confirmed" | "arrived" | "completed" | "noshow" | "cancelled";
+export type BookingStatus = "confirmed" | "arrived" | "in_service" | "completed" | "noshow" | "cancelled";
 
-export interface Appointment {
+export type BookingProgressAction = "mark_arrived" | "start_service" | "complete_service";
+
+export interface BookingTimingFields {
+  arrivedAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  actualDurationMinutes?: number | null;
+}
+
+export interface Appointment extends BookingTimingFields {
   id: string | number;
   customerId?: string | number;
   time: string;
@@ -17,7 +26,7 @@ export interface Appointment {
   note: string;
 }
 
-export interface CalAppt {
+export interface CalAppt extends BookingTimingFields {
   id: string | number;
   dayKey: string; // 'YYYY-MM-DD'
   stylistId: string | number;
@@ -67,6 +76,7 @@ export interface BookingData {
     amountDue?: number;
     billTotal?: number;
   };
+  timing?: BookingTimingFields;
   activity: ActivityItem[];
 }
 
@@ -77,6 +87,10 @@ export interface BookingRow {
   start_time: string;
   duration: number;
   status: string;
+  arrived_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  actual_duration_minutes?: number | null;
 }
 
 export interface DbBookingServiceItem {
@@ -92,6 +106,10 @@ export interface DbBookingListItem {
   start_time: string | null;
   duration: number;
   status: string;
+  arrived_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  actual_duration_minutes: number | null;
   notes: string | null;
   customer: { id: string | number; name: string; phone: string | null } | null;
   stylist: { id: string | number; name: string; tone: string | null } | null;
@@ -104,6 +122,10 @@ export interface DbCalBookingRow {
   start_time: string;
   duration: number;
   status: string;
+  arrived_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  actual_duration_minutes: number | null;
   notes: string | null;
   customer: { id: string; name: string; phone: string | null } | null;
   stylist: { id: string; name: string; tone: string | null } | null;
@@ -191,6 +213,10 @@ export interface MyDbBooking {
   start_time: string;
   duration: number;
   status: string;
+  arrived_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  actual_duration_minutes?: number | null;
   notes: string | null;
   customer: { name: string; phone: string } | null;
   stylist: { name: string } | null;
@@ -208,6 +234,10 @@ export interface StylistAppt {
   start_time: string;
   duration: number;
   status: string;
+  arrived_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  actual_duration_minutes?: number | null;
   notes: string | null;
   customer: { name: string } | null;
   booking_services: Array<{

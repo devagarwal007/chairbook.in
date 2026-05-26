@@ -3,22 +3,23 @@
 import React from "react";
 import StylistShell from "@/components/layout/StylistShell";
 import { Avatar, Badge, Icons as I } from "@/components/ui";
+import { getActualServiceMinutes, getNextProgressAction, PROGRESS_ACTION_LABEL } from "@/lib/booking-progress";
 import { STYLIST_STATUS_LABEL } from "@/constants/stylist";
 import { formatDateDisplay, formatTime12hFromMin, toMin } from "@/lib/utils";
 import { useToast } from "@/context/ToastContext";
-import type { BookingStatus, StylistAppointment } from "@/types";
+import type { BookingProgressAction, StylistAppointment } from "@/types";
 
-const statusFlow: BookingStatus[] = ["confirmed", "arrived", "completed", "noshow"];
-
-function AppointmentRow({ appointment, onStatus }: { appointment: StylistAppointment; onStatus: (id: string, status: BookingStatus) => Promise<void> }) {
+function AppointmentRow({ appointment, onStatus }: { appointment: StylistAppointment; onStatus: (id: string, action: BookingProgressAction) => Promise<void> }) {
   const { show } = useToast();
   const start = toMin(appointment.time);
   const end = start + appointment.duration;
+  const nextAction = getNextProgressAction(appointment.status);
+  const actualMinutes = getActualServiceMinutes(appointment);
 
-  const updateStatus = async (status: BookingStatus) => {
+  const updateStatus = async (action: BookingProgressAction) => {
     try {
-      await onStatus(appointment.id, status);
-      show(`Marked ${STYLIST_STATUS_LABEL[status].toLowerCase()}`, 1600);
+      await onStatus(appointment.id, action);
+      show(PROGRESS_ACTION_LABEL[action], 1600);
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not update appointment", 2600);
     }
@@ -35,6 +36,11 @@ function AppointmentRow({ appointment, onStatus }: { appointment: StylistAppoint
         <div className="text-[13px] text-ink-3 mt-1">
           <strong className="font-medium text-ink-2">{appointment.service}</strong> · {formatTime12hFromMin(start)}-{formatTime12hFromMin(end)} · {appointment.duration} min
         </div>
+        {actualMinutes !== null && (
+          <div className="text-xs text-ink-3 mt-1">
+            {actualMinutes} min actual · {appointment.duration} min estimate
+          </div>
+        )}
         {appointment.customerPhone && (
           <div className="text-xs text-ink-3 mt-1 flex items-center gap-1.5">
             <I.phone /> {appointment.customerPhone}
@@ -42,19 +48,14 @@ function AppointmentRow({ appointment, onStatus }: { appointment: StylistAppoint
         )}
         {appointment.notes && <div className="text-xs text-ink-2 mt-2 bg-bg-2 rounded-lg p-2">{appointment.notes}</div>}
         <div className="flex gap-2 flex-wrap mt-3">
-          {statusFlow.map((status) => (
+          {nextAction && (
             <button
-              key={status}
-              onClick={() => updateStatus(status)}
-              className={`h-8 px-3 rounded-lg border text-xs font-medium cursor-pointer transition-colors duration-150 ${
-                appointment.status === status
-                  ? "border-teal bg-teal-soft text-teal"
-                  : "border-line bg-white text-ink-2 hover:border-ink-3"
-              }`}
+              onClick={() => updateStatus(nextAction)}
+              className="h-8 px-3 rounded-lg bg-teal text-white text-xs font-semibold cursor-pointer transition-colors duration-150 hover:bg-teal-ink"
             >
-              {STYLIST_STATUS_LABEL[status]}
+              {PROGRESS_ACTION_LABEL[nextAction]}
             </button>
-          ))}
+          )}
         </div>
       </div>
       <div className="font-mono text-xs font-semibold text-ink-2 whitespace-nowrap">{appointment.time}</div>
@@ -65,7 +66,7 @@ function AppointmentRow({ appointment, onStatus }: { appointment: StylistAppoint
 export default function StylistDashboardPage() {
   return (
     <StylistShell title="My day" subtitle={formatDateDisplay(new Date())}>
-      {({ profile, todayAppointments, loading, updateAppointmentStatus }) => {
+      {({ profile, todayAppointments, loading, advanceAppointmentStatus }) => {
         const upcoming = todayAppointments.filter((item) => item.status === "confirmed").length;
         const chairMinutes = todayAppointments.reduce((sum, item) => sum + item.duration, 0);
 
@@ -105,7 +106,7 @@ export default function StylistDashboardPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {todayAppointments.map((appointment) => (
-                  <AppointmentRow key={appointment.id} appointment={appointment} onStatus={updateAppointmentStatus} />
+                  <AppointmentRow key={appointment.id} appointment={appointment} onStatus={advanceAppointmentStatus} />
                 ))}
               </div>
             )}

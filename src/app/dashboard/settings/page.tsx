@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { signOutCurrentUser } from "@/lib/auth-session";
 import Header from "@/components/layout/Header";
 import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/components/ui";
 import { useProfile } from "@/context/ProfileContext";
@@ -1462,15 +1463,9 @@ export default function SettingsPage() {
               <button
                 onClick={async () => {
                   showFlash("Signing out...");
-                  const supabase = getSupabaseBrowserClient();
-                  if (supabase) {
-                    await supabase.auth.signOut();
-                  }
-                  localStorage.removeItem("cb_profile");
-                  localStorage.removeItem("cb_salon_id");
-                  setTimeout(() => {
-                    router.push("/signin");
-                  }, 500);
+                  await signOutCurrentUser();
+                  router.replace("/signin");
+                  router.refresh();
                 }}
                 className="btn btn-outline btn-sm"
                 style={{
@@ -1580,10 +1575,9 @@ export default function SettingsPage() {
                       if (error) throw error;
                       
                       showFlash("Account deleted successfully");
-                      localStorage.removeItem("cb_profile");
-                      localStorage.removeItem("cb_salon_id");
-                      await supabase.auth.signOut();
-                      router.push("/signin");
+                      await signOutCurrentUser();
+                      router.replace("/signin");
+                      router.refresh();
                     }
                   } catch (err) {
                     console.error("Error deleting account:", err);

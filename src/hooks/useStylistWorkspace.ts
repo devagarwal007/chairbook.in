@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { PROGRESS_ACTION_NEXT_STATUS } from "@/lib/booking-progress";
 import { formatDateKey, initialsOf, mapDbStatusToUi } from "@/lib/utils";
-import type { BookingStatus, StylistAppointment, StylistClient, StylistNotification, StylistSessionProfile } from "@/types";
+import { useBookingProgress } from "@/hooks/useBookingProgress";
+import type { BookingProgressAction, StylistAppointment, StylistClient, StylistNotification, StylistSessionProfile } from "@/types";
 
 interface DbStylistAccount {
   id: string;
@@ -31,6 +33,10 @@ interface DbStylistBooking {
   start_time: string | null;
   duration: number | null;
   status: string;
+  arrived_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  actual_duration_minutes: number | null;
   notes: string | null;
   customer: { id: string; name: string; phone: string | null } | null;
   booking_services: Array<{ service: { name: string } | null } | null> | null;
@@ -76,14 +82,6 @@ function getWeekBounds(base = today) {
   return { start, end };
 }
 
-function dbStatus(status: BookingStatus) {
-  if (status === "arrived") return "Arrived";
-  if (status === "completed") return "Completed";
-  if (status === "noshow") return "No-show";
-  if (status === "cancelled") return "Cancelled";
-  return "Confirmed";
-}
-
 function mapBooking(row: DbStylistBooking, index: number): StylistAppointment {
   const customerName = row.customer?.name || "Walk-in";
   const service = (row.booking_services || [])
@@ -102,6 +100,10 @@ function mapBooking(row: DbStylistBooking, index: number): StylistAppointment {
     duration: row.duration || 30,
     service,
     status: mapDbStatusToUi(row.status),
+    arrivedAt: row.arrived_at,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    actualDurationMinutes: row.actual_duration_minutes,
     notes: row.notes || "",
     tone: tones[index % tones.length],
   };
@@ -142,6 +144,7 @@ function demoAppointments(): StylistAppointment[] {
 }
 
 export function useStylistWorkspace() {
+  const { advanceBooking } = useBookingProgress();
   const [profile, setProfile] = useState<StylistSessionProfile | null>(null);
   const [todayAppointments, setTodayAppointments] = useState<StylistAppointment[]>([]);
   const [weekAppointments, setWeekAppointments] = useState<StylistAppointment[]>([]);
@@ -238,6 +241,10 @@ export function useStylistWorkspace() {
           start_time,
           duration,
           status,
+          arrived_at,
+          started_at,
+          completed_at,
+          actual_duration_minutes,
           notes,
           customer:customers (id, name, phone),
           booking_services (
@@ -268,6 +275,10 @@ export function useStylistWorkspace() {
           start_time,
           duration,
           status,
+          arrived_at,
+          started_at,
+          completed_at,
+          actual_duration_minutes,
           notes,
           customer:customers (id, name, phone),
           booking_services (
@@ -333,25 +344,37 @@ export function useStylistWorkspace() {
 
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications]);
 
-  const updateAppointmentStatus = useCallback(async (bookingId: string, status: BookingStatus) => {
-    const supabase = getSupabaseBrowserClient();
-    setTodayAppointments((prev) => prev.map((item) => item.id === bookingId ? { ...item, status } : item));
-    setWeekAppointments((prev) => prev.map((item) => item.id === bookingId ? { ...item, status } : item));
+  const advanceAppointmentStatus = useCallback(async (bookingId: string, action: BookingProgressAction) => {
+    const optimisticStatus = PROGRESS_ACTION_NEXT_STATUS[action];
+    setTodayAppointments((prev) => prev.map((item) => item.id === bookingId ? { ...item, status: optimisticStatus } : item));
+    setWeekAppointments((prev) => prev.map((item) => item.id === bookingId ? { ...item, status: optimisticStatus } : item));
 
-    if (!supabase || bookingId.startsWith("preview-")) {
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from("bookings")
-      .update({ status: dbStatus(status) })
-      .eq("id", bookingId);
-
-    if (updateError) {
+    try {
+      const result = await advanceBooking(bookingId, action);
+      const timing = {
+        status: result.status,
+      };
+      setTodayAppointments((prev) => prev.map((item) => item.id === bookingId ? {
+        ...item,
+        ...timing,
+        arrivedAt: result.arrivedAt ?? item.arrivedAt,
+        startedAt: result.startedAt ?? item.startedAt,
+        completedAt: result.completedAt ?? item.completedAt,
+        actualDurationMinutes: result.actualDurationMinutes ?? item.actualDurationMinutes,
+      } : item));
+      setWeekAppointments((prev) => prev.map((item) => item.id === bookingId ? {
+        ...item,
+        ...timing,
+        arrivedAt: result.arrivedAt ?? item.arrivedAt,
+        startedAt: result.startedAt ?? item.startedAt,
+        completedAt: result.completedAt ?? item.completedAt,
+        actualDurationMinutes: result.actualDurationMinutes ?? item.actualDurationMinutes,
+      } : item));
+    } catch (err) {
       await load();
-      throw updateError;
+      throw err;
     }
-  }, [load]);
+  }, [advanceBooking, load]);
 
   const markNotificationRead = useCallback(async (notificationId: string) => {
     const supabase = getSupabaseBrowserClient();
@@ -440,7 +463,7 @@ export function useStylistWorkspace() {
     loading,
     error,
     refresh: load,
-    updateAppointmentStatus,
+    advanceAppointmentStatus,
     markNotificationRead,
     updateProfile,
     uploadProfilePhoto,

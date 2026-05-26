@@ -54,7 +54,7 @@ function generateMockAppts(weekDays: Date[]): CalAppt[] {
     { name: "Anita Verma", tone: "a" }, { name: "Ravi K.", tone: "c" },
     { name: "Aisha Khan", tone: "d" }, { name: "Tanvi Kapoor", tone: "c" },
   ];
-  const statuses: ("confirmed" | "arrived" | "completed")[] = ["confirmed", "arrived", "completed"];
+  const statuses: ("confirmed" | "arrived" | "in_service" | "completed")[] = ["confirmed", "arrived", "in_service", "completed"];
 
   let id = 100;
   weekDays.forEach((day) => {
@@ -95,6 +95,7 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
       className={`absolute left-0.5 right-0.5 rounded-lg p-[6px_10px] flex flex-col gap-1 cursor-pointer transition-all duration-120 z-10 overflow-hidden hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-6px_rgba(0,0,0,0.18)] hover:z-20 ${
         a.status === 'confirmed' ? 'bg-blue-soft text-blue border-l-[3px] border-blue' :
         a.status === 'arrived' ? 'bg-amber-soft text-amber-ink border-l-[3px] border-amber' :
+        a.status === 'in_service' ? 'bg-teal-soft text-teal-ink border-l-[3px] border-teal' :
         a.status === 'completed' ? 'bg-green-soft text-green border-l-[3px] border-green' :
         a.status === 'noshow' ? 'bg-rose-soft text-rose border-l-[3px] border-rose' : ''
       }`}
@@ -419,7 +420,7 @@ export default function BookingsPage() {
 
       const { data, error } = await supabase
         .from("bookings")
-        .select(`id, date, start_time, duration, status, notes,
+        .select(`id, date, start_time, duration, status, arrived_at, started_at, completed_at, actual_duration_minutes, notes,
           customer:customers(id, name, phone),
           stylist:stylists(id, name, tone),
           booking_services(service:services(name))`)
@@ -441,9 +442,10 @@ export default function BookingsPage() {
           const startM = parseInt(timeParts[1]) || 0;
           const tone = (b.stylist?.tone || "tone-a").replace("tone-", "");
           const serviceNames = b.booking_services?.map((bs) => bs.service?.name).filter(Boolean).join(" + ") || "Service";
-          const mapStatus = (s: string): "confirmed" | "arrived" | "completed" | "noshow" | "cancelled" => {
+          const mapStatus = (s: string): "confirmed" | "arrived" | "in_service" | "completed" | "noshow" | "cancelled" => {
             const l = (s || "").toLowerCase();
             if (l === "arrived") return "arrived";
+            if (l === "in service") return "in_service";
             if (l === "completed" || l === "paid") return "completed";
             if (l === "no-show") return "noshow";
             if (l === "cancelled") return "cancelled";
@@ -461,6 +463,10 @@ export default function BookingsPage() {
             tone,
             service: serviceNames,
             status: mapStatus(b.status),
+            arrivedAt: b.arrived_at,
+            startedAt: b.started_at,
+            completedAt: b.completed_at,
+            actualDurationMinutes: b.actual_duration_minutes,
             phone: b.customer?.phone || undefined,
           };
         });
@@ -604,6 +610,7 @@ export default function BookingsPage() {
             {[
               { label: "Confirmed", color: "var(--blue)" },
               { label: "Arrived", color: "var(--amber)" },
+              { label: "In service", color: "var(--teal)" },
               { label: "Done", color: "var(--green)" },
               { label: "No-show", color: "var(--rose)" },
             ].map(({ label, color }) => (

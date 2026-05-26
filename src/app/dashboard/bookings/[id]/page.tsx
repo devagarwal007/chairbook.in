@@ -7,7 +7,17 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 import { insertNotification } from "@/lib/notifications";
-import { BookingData } from "@/types";
+import {
+  BOOKING_STATUS_LABEL,
+  formatZonedTimestamp,
+  getActualServiceMinutes,
+  getNextProgressAction,
+  getWaitMinutes,
+  mapDbStatusToUiStatus,
+  PROGRESS_ACTION_LABEL,
+} from "@/lib/booking-progress";
+import { useBookingProgress } from "@/hooks";
+import { BookingData, BookingProgressAction, BookingStatus } from "@/types";
 import { isUUID } from "@/lib/utils";
 import { Modal, Badge, Avatar, FormField } from "@/components/ui";
 
@@ -105,7 +115,9 @@ const IBD = {
 
 // ===== TYPES =====
 
-import { MOCK_BOOKING as BOOKING, STATUS_LABEL_DETAIL as STATUS_LABEL, CANCEL_REASONS, RESCH_DAYS, ALL_SLOTS } from "@/constants/bookings";
+import { MOCK_BOOKING as BOOKING, CANCEL_REASONS, RESCH_DAYS, ALL_SLOTS } from "@/constants/bookings";
+
+const STATUS_LABEL = BOOKING_STATUS_LABEL;
 
 // ===== RESCHEDULE MODAL =====
 interface RescheduleModalProps {
@@ -244,10 +256,11 @@ export default function BookingDetailPage() {
 
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<"confirmed" | "arrived" | "completed" | "noshow" | "cancelled">("confirmed");
+  const [status, setStatus] = useState<BookingStatus>("confirmed");
   const [showResch, setShowResch] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const { show: showFlash } = useToast();
+  const { advanceBooking } = useBookingProgress();
   const [activity, setActivity] = useState(BOOKING.activity);
   const [rescheduled, setRescheduled] = useState<{ date: string; time: string } | null>(null);
   const [salonInfo, setSalonInfo] = useState({
@@ -339,6 +352,10 @@ export default function BookingDetailPage() {
             bill_total,
             amount_paid,
             amount_due,
+            arrived_at,
+            started_at,
+            completed_at,
+            actual_duration_minutes,
             notes,
             created_at,
             source,
@@ -423,17 +440,7 @@ export default function BookingDetailPage() {
           const bDate = new Date(data.date);
           const formattedDate = bDate.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-          const mapDbStatusToUi = (s: string): "confirmed" | "arrived" | "completed" | "noshow" | "cancelled" => {
-            const lower = (s || "").toLowerCase();
-            if (lower === "confirmed") return "confirmed";
-            if (lower === "arrived") return "arrived";
-            if (lower === "completed" || lower === "paid") return "completed";
-            if (lower === "no-show") return "noshow";
-            if (lower === "cancelled") return "cancelled";
-            return "confirmed";
-          };
-
-          const uiStatus = mapDbStatusToUi(data.status);
+          const uiStatus = mapDbStatusToUiStatus(data.status);
           const payments = Array.isArray(paymentData) ? paymentData : [];
           const ledgerPaid = payments.reduce((sum: number, row: { amount?: number | string | null }) => sum + Number(row.amount || 0), 0);
           const totalFromServices = (data.booking_services as unknown as Array<{ price_at_booking: number; qty?: number | null }> | null)?.reduce((sum, bs) => sum + Number(bs.price_at_booking) * (bs.qty || 1), 0) || 0;
@@ -462,7 +469,7 @@ export default function BookingDetailPage() {
             });
           } else if (data.status === "Completed" || data.status === "Paid") {
             actList.push({
-              ts: "Today",
+              ts: data.completed_at ? formatZonedTimestamp(data.completed_at) : "Today",
               icon: "check",
               text: paymentStatus === "paid" ? `Booking completed ${lastPaymentMethod ? `via ${lastPaymentMethod}` : ""}` : "Booking completed",
               meta: paymentStatus === "paid"
@@ -472,9 +479,17 @@ export default function BookingDetailPage() {
                   : `Payment due: ₹${amountDue.toLocaleString("en-IN")}`,
               tone: paymentStatus === "paid" ? "green" : "amber"
             });
+          } else if (data.status === "In Service") {
+            actList.push({
+              ts: data.started_at ? formatZonedTimestamp(data.started_at) : "Today",
+              icon: "check",
+              text: "Service started",
+              meta: "In progress",
+              tone: "amber"
+            });
           } else if (data.status === "Arrived") {
             actList.push({
-              ts: "Today",
+              ts: data.arrived_at ? formatZonedTimestamp(data.arrived_at) : "Today",
               icon: "check",
               text: "Customer arrived at salon",
               meta: "Status updated",
@@ -537,6 +552,12 @@ export default function BookingDetailPage() {
               amountDue,
               billTotal,
             },
+            timing: {
+              arrivedAt: data.arrived_at,
+              startedAt: data.started_at,
+              completedAt: data.completed_at,
+              actualDurationMinutes: data.actual_duration_minutes,
+            },
             activity: actList
           };
 
@@ -575,48 +596,86 @@ export default function BookingDetailPage() {
       : "bg-rose-soft text-rose";
   const isCancelled = status === "cancelled";
   const isPast = status === "completed" || status === "noshow" || status === "cancelled";
-  const isConfirmed = status === "confirmed";
-  const isArrived = status === "arrived";
-  const isCompleted = status === "completed";
   const isNoShow = status === "noshow";
+  const nextAction = getNextProgressAction(status);
+  const actualMinutes = getActualServiceMinutes(b.timing || {});
+  const waitMinutes = getWaitMinutes(b.timing || {});
 
-  const changeStatus = async (s: "confirmed" | "arrived" | "completed" | "noshow") => {
+  const advanceStatus = async (action: BookingProgressAction) => {
+    const optimisticStatus = action === "mark_arrived" ? "arrived" : action === "start_service" ? "in_service" : "completed";
+    setStatus(optimisticStatus);
+    if (booking) {
+      setBooking({ ...booking, status: optimisticStatus });
+    }
+
+    try {
+      if (isUUID(bookingId)) {
+        const result = await advanceBooking(bookingId, action);
+        setStatus(result.status);
+        setBooking((prev) => prev ? {
+          ...prev,
+          status: result.status,
+          timing: {
+            arrivedAt: result.arrivedAt ?? prev.timing?.arrivedAt,
+            startedAt: result.startedAt ?? prev.timing?.startedAt,
+            completedAt: result.completedAt ?? prev.timing?.completedAt,
+            actualDurationMinutes: result.actualDurationMinutes ?? prev.timing?.actualDurationMinutes,
+          },
+        } : prev);
+      }
+    } catch (err) {
+      console.error("Failed to advance booking status:", err);
+      const errMsg = err instanceof Error
+        ? err.message
+        : (err && typeof err === "object" && "message" in err)
+          ? String((err as { message?: string }).message)
+          : "Could not update booking";
+      showFlash(errMsg, 2600);
+      setStatus(b.status);
+      setBooking(booking);
+      return;
+    }
+
+    setActivity([{
+      ts: "Just now",
+      icon: "check",
+      text: PROGRESS_ACTION_LABEL[action],
+      meta: "You",
+      tone: "neutral"
+    }, ...activity]);
+    showFlash(PROGRESS_ACTION_LABEL[action], 1800);
+  };
+
+  const markNoShow = async () => {
     const isUuid = isUUID(bookingId);
-    
-    const mapUiStatusToDb = (u: string) => {
-      if (u === "confirmed") return "Confirmed";
-      if (u === "arrived") return "Arrived";
-      if (u === "completed") return "Completed";
-      if (u === "noshow") return "No-show";
-      return "Confirmed";
-    };
-
     if (isUuid) {
       const supabase = getSupabaseBrowserClient();
       if (supabase) {
         try {
           const { error } = await supabase
             .from("bookings")
-            .update({ status: mapUiStatusToDb(s) })
+            .update({ status: "No-show" })
             .eq("id", bookingId);
 
           if (error) throw error;
         } catch (err) {
-          console.error("Failed to update status in Supabase:", err);
-          alert("Failed to update status in database. Keeping client-side change.");
+          console.error("Failed to mark no-show in Supabase:", err);
+          showFlash("Failed to mark no-show", 2600);
+          return;
         }
       }
     }
 
-    setStatus(s);
+    setStatus("noshow");
+    setBooking((prev) => prev ? { ...prev, status: "noshow" } : prev);
     setActivity([{
       ts: "Just now",
-      icon: "check",
-      text: `Status changed to ${STATUS_LABEL[s]}`,
+      icon: "x",
+      text: "Customer marked as No-show",
       meta: "You",
-      tone: "neutral"
+      tone: "rose"
     }, ...activity]);
-    showFlash(`Marked as ${STATUS_LABEL[s]}`, 1800);
+    showFlash("Marked as No-show", 1800);
   };
 
   const handleReschedule = async ({ date, time, note }: { date: string; time: string; note: string }) => {
@@ -869,6 +928,12 @@ export default function BookingDetailPage() {
               <span><IBD.clock /> {displayDate} · {displayTime}–{displayEnd} <span style={{ color: "var(--ink-3)" }}>({totalDur} min)</span></span>
               <span><IBD.pin /> {salonInfo.name}{salonInfo.area ? `, ${salonInfo.area}` : ""}</span>
             </div>
+            {(actualMinutes !== null || waitMinutes !== null) && (
+              <div className="flex gap-2 flex-wrap mt-3 text-xs text-ink-3">
+                {actualMinutes !== null && <span className="px-2 py-1 rounded-lg bg-bg-2 border border-line">{actualMinutes} min actual</span>}
+                {waitMinutes !== null && <span className="px-2 py-1 rounded-lg bg-bg-2 border border-line">{waitMinutes} min wait</span>}
+              </div>
+            )}
             {rescheduled && (
               <div className="bd-resch-note">
                 <IBD.cal /> Rescheduled from {b.date} · {b.time}
@@ -973,35 +1038,22 @@ export default function BookingDetailPage() {
         {/* Status quick actions */}
         {!isPast && (
           <div className="card bd-quick-status">
-            <div className="bd-section-lbl">MARK AS</div>
-            <div className="bd-status-row">
+            <div className="bd-section-lbl">NEXT ACTION</div>
+            <div className="flex gap-2 flex-wrap">
+              {nextAction && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => advanceStatus(nextAction)}
+                >
+                  <IBD.check /> {PROGRESS_ACTION_LABEL[nextAction]}
+                </button>
+              )}
               <button
-                className={`bd-status ${isConfirmed ? "on" : ""}`}
-                onClick={() => changeStatus("confirmed")}
+                className={`btn btn-outline ${isNoShow ? "opacity-70" : ""}`}
+                style={{ color: "var(--rose)", borderColor: "var(--rose-soft)" }}
+                onClick={markNoShow}
               >
-                {isConfirmed && <IBD.check />}
-                <span className="dot status-confirmed-bg"></span> Confirmed
-              </button>
-              <button
-                className={`bd-status ${isArrived ? "on" : ""}`}
-                onClick={() => changeStatus("arrived")}
-              >
-                {isArrived && <IBD.check />}
-                <span className="dot status-arrived-bg"></span> Arrived
-              </button>
-              <button
-                className={`bd-status ${isCompleted ? "on" : ""}`}
-                onClick={() => changeStatus("completed")}
-              >
-                {isCompleted && <IBD.check />}
-                <span className="dot status-completed-bg"></span> Completed
-              </button>
-              <button
-                className={`bd-status danger ${isNoShow ? "on" : ""}`}
-                onClick={() => changeStatus("noshow")}
-              >
-                {isNoShow && <IBD.check />}
-                <span className="dot status-noshow-bg"></span> No-show
+                <IBD.x /> No-show
               </button>
             </div>
             <div className="flex gap-2 mt-4 pt-3 border-t border-line">

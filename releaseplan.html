@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SalonBook — Product Roadmap</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:#0F6E56;--teal-l:#E1F5EE;--teal-m:#1D9E75;
+  --amber:#EF9F27;--amber-l:#FAEEDA;
+  --red:#E24B4A;--red-l:#FCEBEB;
+  --blue:#378ADD;--blue-l:#E6F1FB;
+  --purple:#6C63FF;--purple-l:#EEEDFE;
+  --dark:#0D1F1A;--dark2:#1A2E28;
+  --text:#1C2B26;--muted:#5A7068;
+  --border:#D8EDE7;--bg:#F7FBF9;--white:#fff;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--dark);padding:28px 24px 24px;position:sticky;top:0;z-index:100;border-bottom:1px solid rgba(255,255,255,.06);}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
+.logo{display:flex;align-items:center;gap:8px;}
+.logo-mark{width:30px;height:30px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;font-weight:700;}
+.logo-txt{font-size:15px;font-weight:600;color:#fff;}
+.logo-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:1px;}
+.stats{display:flex;gap:16px;flex-wrap:wrap;}
+.stat{text-align:center;}
+.stat-n{font-size:18px;font-weight:600;color:#fff;line-height:1;}
+.stat-l{font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;text-transform:uppercase;letter-spacing:.04em;}
+.prog-bar{height:3px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;}
+.prog-fill{height:100%;background:var(--teal-m);border-radius:3px;transition:width .5s ease;}
+.tabs{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px;}
+.tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.45);background:transparent;transition:all .15s;white-space:nowrap;}
+.tab:hover{color:rgba(255,255,255,.8);}
+.tab.on{background:var(--teal);border-color:var(--teal);color:#fff;}
+
+/* MAIN */
+.main{max-width:800px;margin:0 auto;padding:24px 16px 60px;}
+
+/* PHASE */
+.phase{margin-bottom:2.5rem;}
+.phase-hdr{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:12px 16px;border-radius:12px;background:var(--white);border:1px solid var(--border);}
+.phase-icon{font-size:20px;}
+.phase-info{flex:1;}
+.phase-name{font-size:14px;font-weight:700;color:var(--dark);}
+.phase-sub{font-size:12px;color:var(--muted);margin-top:1px;}
+.phase-prog{text-align:right;}
+.phase-pct{font-size:18px;font-weight:700;color:var(--teal);}
+.phase-cnt{font-size:11px;color:var(--muted);}
+
+/* WEEK */
+.week{margin-bottom:12px;}
+.week-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;padding-left:4px;}
+
+/* TASK */
+.task{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:6px;transition:border-color .15s,box-shadow .15s;}
+.task:hover{border-color:#b8d9cf;box-shadow:0 2px 8px rgba(15,110,86,.06);}
+.task.done{opacity:.45;}
+.task.done .task-name{text-decoration:line-through;color:var(--muted);}
+.task-top{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;cursor:pointer;}
+.chk{width:18px;height:18px;border-radius:5px;border:1.5px solid #c5d9d4;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.chk.on{background:var(--teal);border-color:var(--teal);}
+.chk.on::after{content:'✓';font-size:10px;color:#fff;font-weight:700;}
+.pri{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.task-body{flex:1;min-width:0;}
+.task-name{font-size:13.5px;font-weight:500;color:var(--dark);line-height:1.3;}
+.task-desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.task-tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center;}
+.tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;}
+.t-fix{background:var(--red-l);color:#791F1F;}
+.t-v1{background:var(--teal-l);color:var(--teal);}
+.t-v2{background:var(--blue-l);color:#0C447C;}
+.t-v3{background:var(--purple-l);color:#3C3489;}
+.t-launch{background:var(--amber-l);color:#633806;}
+.ai-btn{flex-shrink:0;margin-left:auto;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;background:var(--bg);color:var(--muted);cursor:pointer;border:1px solid var(--border);white-space:nowrap;transition:all .15s;}
+.ai-btn:hover{background:var(--teal);color:#fff;border-color:var(--teal);}
+
+/* PROMPT BOX */
+.prompt{display:none;border-top:1px solid var(--border);background:#F0F8F5;padding:13px 15px;}
+.prompt.open{display:block;}
+.prompt-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.prompt-txt{font-family:var(--mono);font-size:11.5px;color:var(--dark);line-height:1.75;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 13px;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
+.cp-btn{margin-top:9px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 15px;border-radius:8px;background:var(--teal);color:#fff;cursor:pointer;border:none;transition:all .15s;}
+.cp-btn:hover{background:#0a5440;}
+.cp-btn.done-cp{background:var(--blue);}
+
+/* MILESTONE */
+.milestone{background:var(--dark);border-radius:10px;padding:11px 15px;margin:4px 0 14px;display:flex;align-items:center;gap:10px;}
+.ms-ico{font-size:18px;flex-shrink:0;}
+.ms-t{font-size:13px;font-weight:600;color:#fff;}
+.ms-s{font-size:11.5px;color:rgba(255,255,255,.4);margin-top:1px;}
+
+@media(max-width:480px){
+  .hdr{padding:16px;}
+  .stat-n{font-size:15px;}
+  .task-top{padding:9px 11px;}
+  .prompt-txt{font-size:11px;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-top">
+    <div class="logo">
+      <div class="logo-mark">S</div>
+      <div>
+        <div class="logo-txt">SalonBook</div>
+        <div class="logo-sub">Product Roadmap — 6 months</div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="s-done">0</div><div class="stat-l">Done</div></div>
+      <div class="stat"><div class="stat-n" id="s-left">31</div><div class="stat-l">Left</div></div>
+      <div class="stat"><div class="stat-n" id="s-pct">0%</div><div class="stat-l">Progress</div></div>
+    </div>
+  </div>
+  <div class="prog-bar"><div class="prog-fill" id="prog" style="width:0%"></div></div>
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<div class="main" id="main"></div>
+
+<script>
+const PHASES=[
+ {id:'m1',icon:'🔧',name:'Month 1 — Fix & Foundation',sub:'Clean codebase + secure infrastructure',dot:'#E24B4A',
+  ms:{i:'🔧',t:'Clean, secure codebase ready',s:'Build confidently without tech debt slowing you down'},
+  weeks:[
+   {t:'Week 1 — Fix everything broken',tasks:[
+    {id:1,v:'fix',p:'high',name:'Fix inline CSS',
+     desc:'Move all inline styles to CSS classes. Clean, maintainable code.',
+     prompt:`I have a Next.js + Tailwind CSS salon booking app called SalonBook. Several components use inline styles like style={{color:'red'}} or style={{marginTop:12}}.
+
+Task: Audit all components in /components and /pages, find every inline style, and refactor to Tailwind utility classes.
+
+Rules:
+- Preserve exact visual output
+- Use Tailwind classes where possible
+- If no Tailwind equivalent, add to globals.css as a CSS variable
+- Show before/after for each file changed
+
+Stack: Next.js 14, Tailwind CSS, TypeScript`},
+
+    {id:2,v:'fix',p:'high',name:'Fix existing bugs',
+     desc:'Full audit — fix all known issues before adding anything new.',
+     prompt:`I am building SalonBook — a salon booking and CRM app in Next.js + Supabase + TypeScript.
+
+Task: Help me do a full bug audit. For each bug:
+1. Identify root cause
+2. Show exact fix with code
+3. Explain how to prevent recurrence
+
+Key areas:
+- Supabase query errors and null handling
+- Race conditions in slot availability checks
+- Form validation edge cases
+- Mobile layout breakages on small Android screens (360px wide)
+
+Paste your error logs and I will fix them one by one.`},
+
+    {id:3,v:'fix',p:'high',name:'Fix Settings page',
+     desc:'Review all fields, save states, and edge cases.',
+     prompt:`I have a broken Settings page in my SalonBook Next.js app.
+
+Task: Build a robust Settings page with:
+- Salon name, address, phone, working hours (per-day toggle + time range)
+- Service list: add, edit, delete, reorder
+- Stylist list: add, edit, delete, set working days
+- Save with optimistic UI update + error rollback
+- Unsaved changes warning if user navigates away
+- Toast notification on save success/failure
+
+Stack: Next.js 14, Supabase, TypeScript, Tailwind, React Hook Form + Zod`},
+
+    {id:4,v:'v1',p:'high',name:'Security review',
+     desc:'Auth checks, rate limiting, salon data isolation, input sanitisation.',
+     prompt:`I am building SalonBook — a multi-tenant SaaS. Stack: Next.js 14, Supabase, TypeScript.
+
+Task: Security audit and fixes:
+
+1. Supabase RLS policies — salon A cannot read salon B data. Write SQL RLS for: salons, bookings, customers, stylists, services tables.
+
+2. API rate limiting — middleware for all Next.js API routes using upstash/ratelimit.
+
+3. Input sanitisation — middleware pattern before any DB insert.
+
+4. Auth — OTP phone login, JWT validated on every protected route.
+
+5. Env variables checklist — what must never go to client side.
+
+Show full code for each point.`},
+   ]},
+   {t:'Week 2 — Infrastructure',tasks:[
+    {id:5,v:'v1',p:'high',name:'Feature Gating (plan-based access)',
+     desc:'Control which pages each plan can access. Show blurred upgrade screen for locked features — never hide them.',
+     prompt:`I am building SalonBook — a salon SaaS with 3 plans: Free, Pro (₹499/mo), Chain (₹1,499/mo).
+
+Task: Build a complete Feature Gating system (NOT feature flags — this is plan-based access control):
+
+1. Plan config:
+   - free: ['booking_page','calendar','reminders']
+   - pro: ['booking_page','calendar','reminders','crm','revenue_dashboard','gst_invoice','loyalty']
+   - chain: ['all']
+
+2. canAccess(feature, plan) utility — returns true/false
+
+3. useFeatureGate(feature) React hook — returns {allowed, plan, upgradeTo}
+
+4. <FeatureGate feature="crm"> wrapper component:
+   - If allowed: renders children normally
+   - If NOT allowed: shows blurred/locked screen with upgrade CTA
+   - NEVER hide the page completely — users who SEE what they're missing convert better
+
+5. API route middleware to protect endpoints by plan
+
+6. Supabase: salon table has plan column. Show how to fetch and cache in React context.
+
+Stack: Next.js 14, Supabase, TypeScript, Tailwind. Full implementation.`},
+
+    {id:6,v:'v1',p:'high',name:'Per-salon plan system in DB',
+     desc:'Each salon has their own plan, 14-day trial, and expiry handling.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Each salon needs its own subscription plan.
+
+Task: Build the plan management system:
+
+1. Supabase schema — add to salons table:
+   - plan: enum ('free','pro','chain')
+   - plan_started_at: timestamp
+   - plan_expires_at: timestamp (null = active)
+   - trial_ends_at: timestamp (14 days from signup)
+   - razorpay_subscription_id: text
+
+2. Plan context — React context exposing current salon's plan everywhere in the app
+
+3. Trial logic — new signups get 14-day Pro trial automatically. Show countdown banner: "12 days left in your trial"
+
+4. Plan expiry — Supabase Edge Function cron downgrades to free when expired
+
+5. Upgrade/downgrade UI inside app settings
+
+Stack: Next.js 14, Supabase, TypeScript. Show SQL migrations + React code.`},
+   ]},
+  ]},
+
+ {id:'m2',icon:'🚀',name:'Month 2 — Core V1 Features',sub:'First real salon can go live end-to-end',dot:'#0F6E56',
+  ms:{i:'🚀',t:'V1 feature-complete',s:'A salon can sign up, onboard, and take their first booking'},
+  weeks:[
+   {t:'Week 3 — Payments & Billing',tasks:[
+    {id:7,v:'v1',p:'high',name:'Connect with Razorpay',
+     desc:'Subscription billing + UPI. Handle upgrades, downgrades, failed payments, webhooks.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Integrate Razorpay for subscription billing.
+
+Task: Full Razorpay integration:
+
+1. Create Free, Pro (₹499/mo), Chain (₹1,499/mo) plans via Razorpay API programmatically.
+
+2. Checkout flow:
+   - Create Razorpay subscription
+   - Open checkout modal
+   - On success: update salon.plan in Supabase + store razorpay_subscription_id
+
+3. Webhook at /api/razorpay/webhook:
+   - subscription.activated → set plan to pro/chain
+   - subscription.charged → log to payments table
+   - subscription.halted → downgrade to free + WhatsApp alert to owner
+   - subscription.cancelled → downgrade to free
+
+4. Verify webhook signature for security.
+
+5. Billing history page — show past invoices from Razorpay API.
+
+Stack: Next.js 14 API routes, Supabase, TypeScript, razorpay npm. Full code.`},
+
+    {id:8,v:'v1',p:'med',name:'Payment due tracking',
+     desc:'Track unpaid appointments. WhatsApp payment reminder to customer.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. I need payment tracking for appointments.
+
+Task:
+1. Add to bookings table: payment_status (pending/paid/partial/waived), payment_method (cash/upi/card), amount_due, amount_paid, paid_at
+
+2. Billing modal after "Completed": service + price, payment method toggle, "Mark as Paid" button.
+
+3. Pending payments list — all unpaid appointments: customer name, amount, days overdue.
+
+4. WhatsApp reminder button: "Hi [name], your ₹[amount] payment for [service] at [salon] is pending."
+
+Stack: Next.js 14, Supabase, TypeScript, WhatsApp Cloud API.`},
+
+    {id:9,v:'v1',p:'med',name:'CGST and IGST handling',
+     desc:'Auto-apply correct tax by state. GST-compliant PDF invoices.',
+     prompt:`I am building SalonBook — an Indian salon SaaS. I need GST invoice handling.
+
+Task:
+1. Tax logic:
+   - Same state (salon + customer) → CGST 9% + SGST 9% = 18%
+   - Different state → IGST 18%
+   - SAC code: 999721
+
+2. Salon settings: add GSTIN, state, business legal name.
+
+3. calculateTax(amount, salonState, customerState) utility function.
+
+4. PDF invoice using @react-pdf/renderer:
+   - Salon GSTIN, address, customer details
+   - Services itemised with SAC code
+   - CGST/SGST or IGST line breakdown
+   - Total amount in words
+   - Proper "Tax Invoice" header per GST rules
+
+5. One-tap download + WhatsApp share.
+
+Stack: Next.js 14, Supabase, TypeScript.`},
+   ]},
+   {t:'Week 4 — WhatsApp Integration',tasks:[
+    {id:10,v:'v1',p:'high',name:'Integrate with WhatsApp',
+     desc:'Meta Cloud API — booking confirmations, 24hr + 1hr reminders, CANCEL handling, owner alerts.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Integrate Meta WhatsApp Cloud API.
+
+Task: Complete WhatsApp notification system:
+
+1. Base utility: sendWhatsAppMessage(to, templateName, params)
+
+2. Templates (show Meta approval JSON + trigger code):
+   a. booking_confirmation — to customer AND owner
+   b. reminder_24hr — 24hrs before appointment
+   c. reminder_1hr — 1hr before appointment
+   d. booking_cancelled — both customer and owner
+   e. owner_new_booking — owner alert on new booking
+
+3. Cron job — Supabase Edge Function every 15 mins, find bookings needing reminders, send, mark reminder_sent = true to prevent duplicates.
+
+4. CANCEL webhook at /api/whatsapp/webhook — customer replies CANCEL → cancel booking → confirm via WhatsApp.
+
+5. Opt-out — customer replies STOP → set whatsapp_opted_out = true → never message again.
+
+Stack: Next.js 14, Supabase Edge Functions, TypeScript. Full code.`},
+
+    {id:11,v:'v1',p:'med',name:'Invoice on WhatsApp with promo link',
+     desc:'After payment, auto-send PDF invoice + "Book again" link via WhatsApp.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase + WhatsApp Cloud API.
+
+Task: After payment marked, auto-send customer a WhatsApp message with:
+
+1. PDF invoice attached (WhatsApp document message):
+   - Salon name + logo, date, service, stylist, amount
+   - CGST/SGST breakdown
+   Generate using pdf-lib or @react-pdf/renderer.
+
+2. Message body:
+   "Thanks for visiting [Salon]! Your invoice is attached. Book your next visit: [booking_link]"
+
+3. Flow: mark paid → generate PDF → upload to Supabase Storage → send via WhatsApp docs API → delete temp file.
+
+Show the exact WhatsApp API call for sending a document message.`},
+   ]},
+   {t:'Week 5–6 — Stylist System',tasks:[
+    {id:12,v:'v1',p:'high',name:'Stylist accounts & own dashboard',
+     desc:'Own login, schedule view, personal booking link, client list. No earnings, revenue, or billing data shown.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Build a stylist account system separate from the salon owner.
+
+Task:
+1. Auth — stylist logs in via phone OTP. stylists table has salon_id FK.
+
+2. Role system: 'owner' | 'stylist'. Middleware redirects to correct dashboard by role.
+
+3. Stylist dashboard (their data only):
+   - Today's appointments (their own only)
+   - This week calendar
+   - My clients — customers who've booked them specifically
+   - My profile — name, specialisations, photo upload, personal booking link
+
+4. Personal booking link: salonbook.in/book/[salon-slug]/[stylist-slug]
+
+5. Supabase RLS permission boundaries — stylist CANNOT see: revenue, other stylists' clients, billing, owner settings. Show the RLS policies.
+
+6. Different header style to visually distinguish stylist view from owner view.
+
+Full code including RLS policies.`},
+
+    {id:13,v:'v1',p:'high',name:'Present / Absent toggle',
+     desc:'Absent stylists auto-hidden from booking page. Owner or stylist can toggle.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase.
+
+Task: Present/Absent attendance system:
+
+1. Schema — stylist_attendance: stylist_id, date, status (present/absent/leave), marked_at, marked_by
+
+2. Toggle component — large Present/Absent button on stylist dashboard. Owner can also toggle any stylist.
+
+3. Booking page — only show stylists with today's status = present. If stylist goes absent mid-day with upcoming bookings → WhatsApp alert to owner.
+
+4. Owner view — table of all stylists' status today, colour coded: green = present, red = absent, amber = leave.
+
+5. Leave marking — owner marks planned leave for future dates. Those dates auto-hide stylist from booking page.
+
+6. 30-day attendance history per stylist.
+
+Stack: Next.js 14, Supabase, TypeScript, Tailwind.`},
+
+    {id:14,v:'v1',p:'med',name:'Time from arrived to complete',
+     desc:'Track actual service duration. Shows efficiency per stylist and service type.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase.
+
+Task: Service duration tracking:
+
+1. Add to bookings table: arrived_at, started_at, completed_at timestamps. actual_duration_minutes computed column.
+
+2. Status button flow on appointment card:
+   Confirmed → "Mark Arrived" (logs arrived_at) → "Start Service" (logs started_at) → "Complete" (logs completed_at)
+
+3. Owner dashboard insights:
+   - Avg actual vs estimated duration per service
+   - Stylists ranked by efficiency (avg time to complete)
+   - "Running late" warning if overdue
+
+4. Stylist view — their own avg duration per service type.
+
+5. Smart suggestion: "Your haircuts average 52 min — consider 60-min slots instead of 45"
+
+Stack: Next.js 14, Supabase, TypeScript.`},
+   ]},
+  ]},
+
+ {id:'m3',icon:'🎉',name:'Month 3 — Launch',sub:'5 pilot salons live, first ₹499/mo charged',dot:'#EF9F27',
+  ms:{i:'🎉',t:'First paying customers',s:'5 Jaipur salons live, real bookings flowing, first ₹499 charged'},
+  weeks:[
+   {t:'Week 7 — Launch Prep',tasks:[
+    {id:15,v:'launch',p:'high',name:'Owner onboarding portal',
+     desc:'Guided 10-min setup: salon → services → stylists → hours → share link. Resumable.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Build a smooth onboarding flow for new salon owners.
+
+Task: Multi-step conversational onboarding:
+
+Steps:
+1. Welcome — "Let's set up your salon in 10 minutes" with 1/5 progress bar
+2. Salon basics — name, city, phone, profile photo upload
+3. Services — name, duration, price. Pre-fill suggestions: Haircut ₹200, Blow Dry ₹150, Colour ₹800, Keratin ₹2500
+4. Stylists — names + phone numbers. Owner auto-added as first stylist.
+5. Working hours — per-day toggle Mon–Sun + open/close time. Default: Mon–Sat 10am–8pm
+6. Done — show booking link, "Share on WhatsApp" button, confetti animation
+
+Requirements:
+- Each step saves to Supabase on Next (user can refresh and resume)
+- Mobile-first, works on Android Chrome
+- "Step 3 of 5 · ~2 min left" indicator
+- Skip option for stylists and hours (set later in settings)
+
+Stack: Next.js 14, Supabase, TypeScript, Tailwind, Framer Motion for step transitions.`},
+
+    {id:16,v:'launch',p:'high',name:'Launch India only',
+     desc:'Geo-restrict to India. INR currency, +91 phone validation, IST timezone everywhere.',
+     prompt:`I am building SalonBook in Next.js 14. Restrict to India only for initial launch.
+
+Task:
+1. Phone validation — +91 prefix + 10-digit format only. Enforce on signup form and API.
+
+2. Currency — all prices in ₹ INR with Indian comma formatting (₹1,200 not ₹1200).
+
+3. Geo-restriction middleware — check CF-IPCountry header. If not IN, show "Coming soon to your country" page.
+
+4. Timezone — store dates in UTC, display in IST (Asia/Kolkata) using date-fns-tz. Label all times with "IST".
+
+5. Phone display format: stored as 10-digit, displayed as "+91 98765 43210".
+
+6. Only Razorpay for payments (no Stripe, no international cards).
+
+Stack: Next.js 14 Middleware, TypeScript. Full implementation.`},
+
+    {id:17,v:'launch',p:'med',name:'Combo plans on landing page',
+     desc:'Annual plan (2 months free) + bundle options. Improves conversion.',
+     prompt:`I have a SalonBook landing page in HTML/CSS. Update the pricing section.
+
+Task:
+1. Monthly/Annual toggle at top of pricing:
+   - Monthly: Free / ₹499 / ₹1,499
+   - Annual: Free / ₹4,990/yr (save ₹998 = 2 months free) / ₹14,990/yr
+   - Annual badge in green: "Save 2 months"
+
+2. Bundle cards below main plans:
+   - "Starter Kit" — Pro + WhatsApp setup = ₹999 first month
+   - "Growth Pack" — 3 months Pro prepaid = ₹1,299 (₹433/mo)
+
+3. Smooth price animation on monthly/annual toggle.
+4. "Most popular" badge shifts to annual Pro when annual selected.
+
+Colors: teal #0F6E56, amber #EF9F27. Vanilla HTML/CSS/JS only.`},
+
+    {id:18,v:'launch',p:'low',name:'Service code for quick search',
+     desc:'Each service gets a 3-digit code. Owner types code to select service during busy walk-ins.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase.
+
+Task: Add service codes:
+
+1. Auto-generate 3-digit code (001, 002...) per salon when service is created. Show Supabase trigger or app logic.
+
+2. Search bar in owner dashboard accepts service name OR code. Typing "003" instantly selects that service.
+
+3. Show code as small grey pill badge next to service name in owner/stylist views only.
+
+4. Customer booking page does NOT show codes.
+
+Use case: busy walk-ins — owner says "haircut is 001" and types it instantly.
+
+Stack: Next.js 14, Supabase, TypeScript.`},
+   ]},
+   {t:'Week 8 — Pilot',tasks:[
+    {id:19,v:'launch',p:'med',name:'Research competitor platforms',
+     desc:'Deep dive Invoay, MioSalon, Fresha India reviews. Find weaknesses to exploit in positioning.',
+     prompt:`I am building SalonBook competing with Invoay, MioSalon, Fresha, Salonist in India.
+
+Task:
+1. Competitor comparison spreadsheet template: Feature vs each platform. Key rows: Pricing, WhatsApp native, GST billing, Setup time, Mobile app, CRM, India-specific support.
+
+2. 5 Google/G2/Capterra search queries to find real user complaints about each competitor.
+
+3. Top 5 pain points Indian salon owners report about existing salon software.
+
+4. Win statement against each:
+   - vs Invoay: ...
+   - vs Fresha: ...
+   - vs paper + WhatsApp: ...
+
+5. WhatsApp cold outreach template to invite salon owners for a 15-min feedback call.`},
+
+    {id:20,v:'launch',p:'high',name:'Onboard 5 pilot salons in Jaipur',
+     desc:'Sit with real owners. Watch setup. Note every hesitation. Fix friction before wider launch.',
+     prompt:`I am launching SalonBook to 5 pilot salon owners in Jaipur. Help me prepare.
+
+Task:
+1. Pilot onboarding script — 10-minute walkthrough: what to say at each step, what to watch for, questions to ask after each step.
+
+2. Observation checklist: where did they pause? Which words confused them? What did they try that didn't work? What did they ask for that doesn't exist?
+
+3. Post-session feedback form — 5 questions in Hindi + English.
+
+4. Bug log template: screen, what happened, expected vs actual, severity (P0/P1/P2).
+
+5. Pilot success criteria: what numbers tell me the pilot worked?
+   e.g. owner shared booking link, received first real booking, returned next day without prompting.`},
+
+    {id:21,v:'launch',p:'low',name:'Add SEO blog to landing page',
+     desc:'Organic Google traffic from "best salon software India" and related searches.',
+     prompt:`I am building SalonBook — an Indian salon SaaS. I need SEO blog content.
+
+Task:
+1. Top 10 blog post titles for Indian salon owners with: title, target keyword, estimated monthly searches India, 5-point content outline.
+
+   Topics: "Best salon software India 2026", "How to reduce salon no-shows", "GST for salons complete guide", "How to get customers from Instagram for your salon"
+
+2. Next.js blog structure:
+   - /blog index page with post cards
+   - /blog/[slug] post page
+   - SEO meta tags (title, description, og:image)
+   - Article JSON-LD schema markup
+
+3. First 3 posts to write immediately — highest traffic + conversion potential.
+
+Stack: Next.js 14.`},
+   ]},
+  ]},
+
+ {id:'m4',icon:'📈',name:'Month 4–5 — V2 Growth',sub:'50 paying salons, deeper retention features',dot:'#378ADD',
+  ms:{i:'📈',t:'50 paying salons',s:'Sticky product, low churn, word-of-mouth starting to kick in'},
+  weeks:[
+   {t:'Month 4 — Booking & Payments V2',tasks:[
+    {id:22,v:'v2',p:'high',name:'Booking page V2 redesign',
+     desc:'Salon branding, service photos, faster load, optimised mobile UX.',
+     prompt:`I am rebuilding the customer-facing booking page for SalonBook (Next.js 14 + Supabase). V1 is plain and needs a proper redesign.
+
+Task: Booking Page V2:
+
+1. Salon branding header — cover photo banner, logo, name, star rating, address, Instagram link.
+
+2. Service cards V2 — photo (optional), name, duration, price, "Popular" badge. Tap opens service detail bottom sheet with full description.
+
+3. Stylist selection — profile cards with photo, name, specialisation tags, rating. "Any available stylist" as first option.
+
+4. Slot picker V2 — date carousel (next 14 days), time slots as clean grid. Fully booked dates greyed out.
+
+5. Performance targets:
+   - Next.js ISR with revalidate: 60 for fast load
+   - LCP < 2s on Jio 4G connection
+   - Works on 360px wide screen (Redmi/Realme)
+   - All tap targets minimum 44px
+
+Stack: Next.js 14 ISR, Supabase, TypeScript, Tailwind.`},
+
+    {id:23,v:'v2',p:'high',name:'Online payment for customers',
+     desc:'Customer pays deposit at booking via UPI/card. Reduces no-shows further.',
+     prompt:`I am building SalonBook in Next.js 14 + Razorpay. Let customers pay a deposit when booking.
+
+Task:
+1. Salon setting — enable deposit, set amount (₹100 fixed or % of service price).
+
+2. Booking flow payment step — Razorpay checkout (UPI, card, wallet). On success: confirm booking + WhatsApp receipt. On failure: slot released automatically.
+
+3. /api/booking/create-order — creates Razorpay order, returns order_id to frontend.
+
+4. /api/booking/verify-payment — verify Razorpay signature, confirm booking in DB, trigger WhatsApp confirmation.
+
+5. Refund on cancellation: 24hrs+ before = auto-refund via Razorpay API. Under 24hrs = no refund (owner's setting).
+
+6. Owner dashboard: deposits collected today, pending refunds.
+
+Stack: Next.js 14, Razorpay, Supabase, TypeScript.`},
+
+    {id:24,v:'v2',p:'med',name:'Stylist-wise pricing',
+     desc:'Senior stylists charge more for the same service. Price updates on booking page dynamically.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Senior/junior stylists charge different prices for the same services.
+
+Task:
+1. Schema — service_stylist_pricing table: service_id, stylist_id, price_override (nullable). Null = use default service price.
+
+2. Settings UI — in service settings, expandable "Stylist pricing" section. Table with price input per stylist. Empty = uses default.
+
+3. Booking page — when customer selects a stylist, price updates dynamically:
+   "₹500 with Rahul (Senior)" vs "₹300 with Ankit"
+
+4. Invoice uses the actual stylist-specific price charged, not the base price.
+
+5. Revenue dashboard per-stylist breakdown uses their specific pricing.
+
+Stack: Next.js 14, Supabase, TypeScript. Show schema migration + UI + booking page update.`},
+   ]},
+   {t:'Month 5 — Analytics & Staff',tasks:[
+    {id:25,v:'v2',p:'med',name:'Booking page reach insights',
+     desc:'Views vs bookings conversion rate. Which services get most interest. Where people drop off.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Show owners how many people viewed their booking page vs actually booked.
+
+Task:
+1. Event tracking — log to booking_events table:
+   page_view, service_selected, stylist_selected, slot_selected, booking_completed, booking_abandoned
+   Store: salon_id, event_type, date, anonymous session ID only (no PII).
+
+2. Owner analytics dashboard:
+   - This week: X people visited, Y booked (Z% conversion rate)
+   - Most viewed service (even if not booked)
+   - Most abandoned step (where people drop off in the funnel)
+   - Peak viewing hours (best time to post on Instagram)
+   - City breakdown of visitors
+
+3. Charts: bar chart daily views vs bookings, line chart weekly trend. Use Recharts.
+
+Stack: Next.js 14, Supabase, TypeScript, Recharts.`},
+
+    {id:26,v:'v2',p:'med',name:'Attendance & leave management',
+     desc:'Check-in tracking, leave requests, monthly summary. No earnings data — records only.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Build attendance and leave management for stylists.
+
+IMPORTANT: This is NOT linked to earnings. Stylists are on fixed salary. This is for operational records and planning only.
+
+Task:
+1. Schema:
+   - stylist_attendance: stylist_id, date, check_in_time, check_out_time, status (present/absent/late/half_day/leave)
+   - stylist_leaves: stylist_id, from_date, to_date, leave_type (casual/sick/planned), reason, approved_by_owner
+
+2. Check-in — stylist taps "I'm here". If after opening time + 15 min grace → auto-marked "Late".
+
+3. Leave request — stylist requests future dates off. Owner gets WhatsApp notification. Owner approves/rejects. Approved leaves auto-block stylist's slots on booking page.
+
+4. Owner view: today's attendance table + monthly calendar per stylist.
+
+5. Fine recording (optional) — owner can log a fine against a date. Just records it, no payment processing.
+
+Stack: Next.js 14, Supabase, TypeScript, Tailwind.`},
+   ]},
+  ]},
+
+ {id:'m6',icon:'🏰',name:'Month 6+ — V3 Moat',sub:'Features competitors cannot easily copy',dot:'#6C63FF',
+  ms:{i:'🏰',t:'Unbeatable product',s:'Data moat so deep that switching feels painful. Ready to scale India-wide.'},
+  weeks:[
+   {t:'Month 6 — Retention & Virality',tasks:[
+    {id:27,v:'v3',p:'med',name:'Referral system (Advocate)',
+     desc:'Owners refer other salons and earn free months. Turns customers into your sales team.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase. Build a referral system for salon owners.
+
+Task:
+1. Each salon gets a unique referral code + link: salonbook.in/join?ref=GLAMJPR
+
+2. Tracking — referrals table: referrer_salon_id, referred_salon_id, status, rewarded_at.
+   Reward triggers when referred salon completes their first paid month.
+
+3. Rewards:
+   - Referrer: 1 month free Pro added to account
+   - Referred: trial extended from 14 → 30 days
+
+4. Referral dashboard: "You referred 3 salons — earned 2 free months". WhatsApp share button + copy link.
+
+5. WhatsApp share message: "I use SalonBook for my salon — no more no-shows! Try it free: [link]"
+
+6. Anti-fraud: one reward per unique phone number. Self-referral blocked.
+
+Stack: Next.js 14, Supabase, TypeScript.`},
+
+    {id:28,v:'v3',p:'med',name:'Smart gap filler',
+     desc:'Cancellation → auto-WhatsApp top 3 lapsed customers to fill the empty slot.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase + WhatsApp Cloud API.
+
+Task: Smart Gap Filler — when a booking is cancelled, automatically try to fill the slot:
+
+1. Trigger on any cancellation.
+
+2. Find candidates — query customers who:
+   - Previously booked this exact service at this salon
+   - Last visit was 30–90 days ago (due for a visit)
+   - Not messaged in the last 7 days (anti-spam)
+   - WhatsApp opted in
+   - Order by most overdue (last_visit_date ASC), limit top 3
+
+3. WhatsApp message: "Hi [name]! A [service] slot just opened at [Salon] — Today at [time]. Reply YES to book or visit: [booking_link]"
+
+4. YES handler — if customer replies YES within 1 hour:
+   - Auto-create their booking
+   - Send WhatsApp confirmation
+   - Notify owner
+   - Stop messaging other candidates
+
+5. Owner toggle in settings: "Auto-fill cancelled slots"
+6. Log success rate (slots filled / cancellations) in analytics.`},
+
+    {id:29,v:'v3',p:'med',name:'Customer hair/skin profile',
+     desc:'Hair type, allergies, colour history. Stylists see profile card before each appointment.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase.
+
+Task: Customer hair/skin profile system:
+
+1. Profile form (sent to customer via WhatsApp link after first visit):
+   - Hair type: straight/wavy/curly/coily
+   - Hair thickness: thin/medium/thick
+   - Scalp condition: normal/oily/dry/sensitive
+   - Current hair colour + last coloured date
+   - Known allergies: PPD / ammonia / fragrance / latex / none
+   - Skin type (for facial services)
+   - Preferred stylist, service preferences (free text)
+
+2. Store in customer_profile table linked to customers.
+
+3. Stylist view — 30 min before each appointment, stylist sees a compact card:
+   "📋 Priya: Curly · Sensitive scalp · ⚠️ PPD allergy · Last coloured 3 months ago"
+
+4. Owner: enable/disable profile collection, customise which fields to ask.
+
+5. Customer can update their profile via WhatsApp link anytime.
+
+6. Strict Supabase RLS — never exposed to other customers.`},
+   ]},
+   {t:'Month 7+ — AI Layer',tasks:[
+    {id:30,v:'v3',p:'low',name:'AI service recommender',
+     desc:'Suggest complementary add-ons based on customer history at booking. Feature-gated to Pro.',
+     prompt:`I am building SalonBook in Next.js 14. Add AI service recommendations on the booking page using Claude API.
+
+Task:
+1. After customer selects their main service, call Claude API:
+   - Customer's last 5 visits (services, dates)
+   - Currently selected service
+   - All available services + prices at this salon
+   - System prompt: "Based on this customer's history and selected service, suggest 1-2 complementary add-on services. Return JSON only: [{service_id, reason}]"
+   - Model: claude-sonnet-4-20250514, max_tokens: 200
+
+2. Show recommendation as a soft upsell card:
+   "💡 Customers who book Hair Colour often add Keratin Treatment. Add for ₹800?"
+   One-tap to add to booking.
+
+3. Fallback for new customers — show "Popular add-ons" based on most common combinations.
+
+4. Track: recommendation accepted vs dismissed. Use data to improve over time.
+
+5. Feature gated to Pro/Chain plans only (use the FeatureGate component).
+
+Stack: Next.js 14, Claude API, Supabase, TypeScript.`},
+
+    {id:31,v:'v3',p:'low',name:'Monthly business report on WhatsApp',
+     desc:'Auto-send PDF report on 1st of each month. Revenue trend, no-show improvement, top clients.',
+     prompt:`I am building SalonBook in Next.js 14 + Supabase + WhatsApp Cloud API.
+
+Task: Monthly business report, auto-sent on 1st of each month at 9am IST:
+
+1. Data to aggregate (past month vs month before):
+   - Total revenue (with % change arrow)
+   - Total bookings (% change)
+   - No-show rate improvement
+   - Top 3 services by revenue
+   - Top customer (most visits/spend)
+   - New customers acquired
+   - Returning customer rate %
+
+2. PDF using @react-pdf/renderer — clean 1 page:
+   - SalonBook + salon name + "October 2026 Report"
+   - 2x2 metrics grid with trend arrows ↑↓
+   - Highlights: top service, top customer
+   - Footer: "You served X customers this month. Keep growing! 💪"
+
+3. Supabase Edge Function cron — 1st of month, 9am IST:
+   - Generate PDF for every active Pro/Chain salon
+   - Upload to Supabase Storage (delete after 24hrs)
+   - Send via WhatsApp document message
+
+4. Owner can also trigger manually: Settings → "Send me this month's report"
+
+Stack: Supabase Edge Functions, @react-pdf/renderer, WhatsApp Cloud API.`},
+   ]},
+  ]},
+];
+
+let done=new Set(),openP=new Set(),cur='all';
+function load(){try{done=new Set(JSON.parse(localStorage.getItem('sb_rm3')||'[]'));}catch(e){}}
+function save(){try{localStorage.setItem('sb_rm3',JSON.stringify([...done]));}catch(e){}}
+function allTasks(){return PHASES.flatMap(p=>p.weeks.flatMap(w=>w.tasks));}
+function updateStats(){
+  const all=allTasks(),tot=all.length,dn=all.filter(t=>done.has(t.id)).length;
+  document.getElementById('s-done').textContent=dn;
+  document.getElementById('s-left').textContent=tot-dn;
+  document.getElementById('s-pct').textContent=Math.round(dn/tot*100)+'%';
+  document.getElementById('prog').style.width=Math.round(dn/tot*100)+'%';
+}
+function go(id,el){
+  cur=id;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  render();
+}
+function tog(id){done.has(id)?done.delete(id):done.add(id);save();render();}
+function togP(id,e){e.stopPropagation();openP.has(id)?openP.delete(id):openP.add(id);render();}
+function cp(id,e){
+  e.stopPropagation();
+  const t=allTasks().find(t=>t.id===id);
+  if(!t)return;
+  navigator.clipboard.writeText(t.prompt).then(()=>{
+    const b=document.getElementById('cp'+id);
+    if(b){b.textContent='✓ Copied!';b.classList.add('done-cp');setTimeout(()=>{b.textContent='📋 Copy prompt';b.classList.remove('done-cp');},2000);}
+  });
+}
+
+function buildTabs(){
+  const el=document.getElementById('tabs');
+  const btns=[{id:'all',lbl:'All phases'},...PHASES.map(p=>({id:p.id,lbl:p.name.split('—')[0].trim()}))];
+  el.innerHTML=btns.map(b=>`<button class="tab ${b.id==='all'?'on':''}" onclick="go('${b.id}',this)">${b.lbl}</button>`).join('');
+}
+
+function render(){
+  const main=document.getElementById('main');main.innerHTML='';
+  const show=cur==='all'?PHASES:PHASES.filter(p=>p.id===cur);
+  show.forEach(ph=>{
+    const ptasks=ph.weeks.flatMap(w=>w.tasks);
+    const pdn=ptasks.filter(t=>done.has(t.id)).length;
+    const pct=Math.round(pdn/ptasks.length*100);
+    const ph_el=document.createElement('div');ph_el.className='phase';
+    ph_el.innerHTML=`
+      <div class="phase-hdr">
+        <div class="phase-icon">${ph.icon}</div>
+        <div class="phase-info">
+          <div class="phase-name">${ph.name}</div>
+          <div class="phase-sub">${ph.sub}</div>
+        </div>
+        <div class="phase-prog">
+          <div class="phase-pct">${pct}%</div>
+          <div class="phase-cnt">${pdn}/${ptasks.length} done</div>
+        </div>
+      </div>`;
+    ph.weeks.forEach(w=>{
+      const w_el=document.createElement('div');w_el.className='week';
+      w_el.innerHTML=`<div class="week-lbl">${w.t}</div><div class="tasks-wrap"></div>`;
+      ph_el.appendChild(w_el);
+      const tw=w_el.querySelector('.tasks-wrap');
+      w.tasks.forEach(t=>{
+        const isd=done.has(t.id),iso=openP.has(t.id);
+        const pc=t.p==='high'?'#E24B4A':t.p==='med'?'#EF9F27':'#378ADD';
+        const c=document.createElement('div');c.className=`task${isd?' done':''}`;
+        const escaped=t.prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        c.innerHTML=`
+          <div class="task-top" onclick="tog(${t.id})">
+            <div class="chk${isd?' on':''}"></div>
+            <div class="pri" style="background:${pc}"></div>
+            <div class="task-body">
+              <div class="task-name">${t.name}</div>
+              <div class="task-desc">${t.desc}</div>
+              <div class="task-tags"><span class="tag t-${t.v}">${t.v.toUpperCase()}</span></div>
+            </div>
+            <button class="ai-btn" onclick="togP(${t.id},event)">${iso?'▲ Hide':'🤖 AI prompt'}</button>
+          </div>
+          <div class="prompt${iso?' open':''}">
+            <div class="prompt-lbl">🤖 Copy → paste into Claude or Cursor to build this feature</div>
+            <div class="prompt-txt">${escaped}</div>
+            <button class="cp-btn" id="cp${t.id}" onclick="cp(${t.id},event)">📋 Copy prompt</button>
+          </div>`;
+        tw.appendChild(c);
+      });
+    });
+    const ms=document.createElement('div');ms.className='milestone';
+    ms.innerHTML=`<div class="ms-ico">${ph.ms.i}</div><div><div class="ms-t">${ph.ms.t}</div><div class="ms-s">${ph.ms.s}</div></div>`;
+    ph_el.appendChild(ms);
+    main.appendChild(ph_el);
+  });
+  updateStats();
+}
+
+load();buildTabs();render();
+</script>
+</body>
+</html>

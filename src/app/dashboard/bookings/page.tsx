@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
-import { toMinHours, initialsOf, formatDateKey } from "@/lib/utils";
+import { toMinHours, initialsOf, formatDateKey, formatTime12hFromMin } from "@/lib/utils";
 import { Stylist, CalAppt, DbCalBookingRow } from "@/types";
 import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
 
@@ -88,6 +88,7 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
   const start = `${String(a.startH).padStart(2,"0")}:${String(a.startM).padStart(2,"0")}`;
   const endMin = toMinHours(a.startH, a.startM) + a.duration;
   const endStr = `${String(Math.floor(endMin / 60)).padStart(2,"0")}:${String(endMin % 60).padStart(2,"0")}`;
+  const showPayIndicator = a.paymentStatus && a.paymentStatus !== "paid" && a.status === "completed";
 
   return (
     <div
@@ -100,8 +101,16 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
         a.status === 'noshow' ? 'bg-rose-soft text-rose border-l-[3px] border-rose' : ''
       }`}
       style={{ top, height }}
-      title={`${a.customer} · ${a.service} · ${start}–${endStr}`}
+      title={`${a.customer} · ${a.service} · ${start}–${endStr}${a.billTotal ? ` · ₹${a.billTotal.toLocaleString("en-IN")}` : ''}`}
     >
+      {showPayIndicator && (
+        <span
+          className={`absolute top-[3px] right-[5px] w-[16px] h-[16px] rounded-full grid place-items-center text-[8px] font-bold z-20 ${
+            a.paymentStatus === 'partial' ? 'bg-amber text-white' : 'bg-rose text-white'
+          }`}
+          title={`Payment: ${a.paymentStatus === 'partial' ? 'Partial' : 'Due'}`}
+        >₹</span>
+      )}
       <div className="flex items-center justify-between gap-1.5">
         {!narrow && (
         <Avatar initials={a.initials} tone={a.tone} size="sm" style={{ width: 20, height: 20, fontSize: 9 }} />
@@ -222,7 +231,7 @@ function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] border-b border-line bg-white sticky top-0 z-10">
+      <div className="grid grid-cols-[56px_repeat(7,minmax(120px,1fr))] border-b border-line bg-white sticky top-0 z-30">
         <div className="bg-bg border-r border-line relative"></div>
         {weekDays.map((day) => {
           const key = formatDateKey(day);
@@ -267,7 +276,7 @@ function WeekView({ weekDays, appts, stylistFilter, onSelect, todayKey, nowMin }
 
               {/* now line */}
               {isToday && nowTop >= 0 && (
-                <div className="absolute left-0 right-0 h-0.5 bg-teal z-10 pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
+                <div className="absolute left-0 right-0 h-0.5 bg-teal z-[12] pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
                   <span className="absolute left-2 -top-2 bg-teal text-white text-[9px] font-mono py-0.25 px-1 rounded">{nowStr}</span>
                 </div>
               )}
@@ -305,7 +314,7 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="grid border-b border-line bg-white sticky top-0 z-10" style={{ gridTemplateColumns: `56px repeat(${visibleStylists.length}, minmax(130px, 1fr))` }}>
+      <div className="grid border-b border-line bg-white sticky top-0 z-30" style={{ gridTemplateColumns: `56px repeat(${visibleStylists.length}, minmax(130px, 1fr))` }}>
         <div className="bg-bg border-r border-line relative"></div>
         {visibleStylists.map(s => {
           const cnt = appts.filter(a => a.dayKey === dayKey && a.stylistId === s.id).length;
@@ -343,7 +352,7 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
 
               {/* now line */}
               {isToday && nowTop >= 0 && (
-                <div className="absolute left-0 right-0 h-0.5 bg-teal z-10 pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
+                <div className="absolute left-0 right-0 h-0.5 bg-teal z-[12] pointer-events-none before:content-[''] before:absolute before:-left-1 before:-top-0.75 before:w-2 before:h-2 before:rounded-full before:bg-teal" style={{ top: nowTop }}>
                   <span className="absolute left-2 -top-2 bg-teal text-white text-[9px] font-mono py-0.25 px-1 rounded">{nowStr}</span>
                 </div>
               )}
@@ -360,10 +369,203 @@ function DayView({ dayKey, appts, stylists, stylistFilter, onSelect, nowMin, isT
   );
 }
 
+// ===== PAYMENT HELPERS =====
+const PAY_LABEL: Record<string, string> = { paid: "Paid", partial: "Partial", due: "Due" };
+
+function fmtINR(n: number): string {
+  const s = String(Math.round(n));
+  if (s.length <= 3) return s;
+  const last3 = s.slice(-3);
+  const rest = s.slice(0, -3);
+  return rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + last3;
+}
+
+// ===== LIST VIEW =====
+const DOW_LONG: Record<number, string> = {
+  0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+  4: "Thursday", 5: "Friday", 6: "Saturday",
+};
+
+interface ListViewProps {
+  weekDays: Date[];
+  appts: CalAppt[];
+  stylists: Stylist[];
+  stylistFilter: string | number;
+  onSelect: (a: CalAppt) => void;
+  todayKey: string;
+  nowMin: number;
+}
+
+function ListView({ weekDays, appts, stylists, stylistFilter, onSelect, todayKey, nowMin }: ListViewProps) {
+  const groups = weekDays.map((day) => {
+    const key = formatDateKey(day);
+    const isToday = key === todayKey;
+    const items = appts
+      .filter(a => a.dayKey === key && (stylistFilter === "all" || a.stylistId === stylistFilter))
+      .sort((a, b) => toMinHours(a.startH, a.startM) - toMinHours(b.startH, b.startM));
+    const totalMin = items.reduce((s, a) => s + a.duration, 0);
+    return { day, key, isToday, items, totalMin, dow: DOW_FULL[day.getDay()], dom: day.getDate(), dayName: DOW_LONG[day.getDay()] };
+  });
+
+  const totalAll = groups.reduce((s, g) => s + g.items.length, 0);
+
+  if (totalAll === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+        <div className="font-mono text-[10px] text-ink-4 tracking-[0.06em] uppercase">// no bookings</div>
+        <div className="text-lg font-semibold text-ink-2">Nothing on the books</div>
+        <div className="text-sm text-ink-3">Try a different stylist filter or week.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full">
+      {/* Column header */}
+      <div className="hidden md:grid grid-cols-[100px_1.5fr_1fr_1fr_80px_120px_90px_32px] gap-3 px-5 py-2.5 border-b border-line bg-bg text-[10px] font-semibold text-ink-4 uppercase tracking-[0.06em] sticky top-0 z-30">
+        <div>Time</div>
+        <div>Customer</div>
+        <div>Service</div>
+        <div>Stylist</div>
+        <div>Duration</div>
+        <div>Payment</div>
+        <div>Status</div>
+        <div></div>
+      </div>
+
+      {groups.map(g => {
+        if (g.items.length === 0) {
+          return (
+            <div key={g.key} className={`border-b border-line last:border-b-0 ${g.isToday ? 'bg-teal-soft/30' : ''}`}>
+              <div className="flex items-center justify-between px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] font-medium tracking-[0.06em] text-ink-3">{g.dow}</span>
+                  <span className={`font-semibold text-lg tracking-[-0.02em] ${g.isToday ? 'text-teal-ink' : 'text-ink-2'}`}>{g.dom}</span>
+                  <span className="text-sm text-ink-3">{g.dayName}</span>
+                  {g.isToday && (
+                    <span className="text-[9px] font-mono font-medium tracking-[0.06em] px-1.5 py-0.5 rounded bg-teal-soft text-teal-ink">TODAY</span>
+                  )}
+                </div>
+                <div className="text-[12px] text-ink-4">No bookings</div>
+              </div>
+            </div>
+          );
+        }
+
+        const hrs = Math.floor(g.totalMin / 60);
+        const mins = g.totalMin % 60;
+
+        return (
+          <div key={g.key} className={`border-b border-line last:border-b-0 ${g.isToday ? 'bg-teal-soft/30' : ''}`}>
+            {/* Day header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-dashed border-line">
+              <div className="flex items-center gap-2">
+                <span className={`font-mono text-[10px] font-medium tracking-[0.06em] ${g.isToday ? 'text-teal' : 'text-ink-3'}`}>{g.dow}</span>
+                <span className={`font-semibold text-lg tracking-[-0.02em] ${g.isToday ? 'text-teal-ink' : 'text-ink-2'}`}>{g.dom}</span>
+                <span className="text-sm text-ink-3">{g.dayName}</span>
+                {g.isToday && (
+                  <span className="text-[9px] font-mono font-medium tracking-[0.06em] px-1.5 py-0.5 rounded bg-teal-soft text-teal-ink">TODAY</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-[12px] text-ink-3">
+                <span><strong className="text-ink-2 font-semibold">{g.items.length}</strong> booking{g.items.length === 1 ? '' : 's'}</span>
+                <span className="text-ink-4">·</span>
+                <span className="font-mono text-ink-3">{hrs > 0 ? `${hrs}h ` : ''}{mins > 0 ? `${mins}m` : hrs > 0 ? '' : '0m'} booked</span>
+              </div>
+            </div>
+
+            {/* Booking rows */}
+            <div>
+              {g.items.map(a => {
+                const stylist = stylists.find(s => s.id === a.stylistId);
+                const endMin = toMinHours(a.startH, a.startM) + a.duration;
+                const isNow = g.isToday && nowMin >= toMinHours(a.startH, a.startM) && nowMin < endMin && (a.status === 'arrived' || a.status === 'in_service');
+                const payStatus = a.paymentStatus || 'due';
+
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => onSelect(a)}
+                    className={`grid grid-cols-[100px_1.5fr_1fr_1fr_80px_120px_90px_32px] max-md:grid-cols-[80px_1fr_auto] gap-3 px-5 py-3 items-center border-b border-line last:border-b-0 cursor-pointer transition-colors duration-100 hover:bg-bg-2/60 ${
+                      isNow ? 'bg-teal-soft/40 border-l-[3px] border-l-teal' : ''
+                    } ${
+                      a.status === 'noshow' ? 'opacity-60' : ''
+                    }`}
+                  >
+                    {/* Time */}
+                    <div className="flex flex-col">
+                      <div className="text-[13px] font-semibold text-ink">{formatTime12hFromMin(toMinHours(a.startH, a.startM))}</div>
+                      <div className="text-[11px] text-ink-3">→ {formatTime12hFromMin(endMin)}</div>
+                    </div>
+
+                    {/* Customer */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar initials={a.initials} tone={a.tone} size="sm" style={{ width: 32, height: 32, fontSize: 12 }} />
+                      <div className="min-w-0">
+                        <div className={`text-[13px] font-semibold truncate ${a.status === 'noshow' ? 'line-through text-ink-3' : 'text-ink'}`}>{a.customer}</div>
+                        {isNow && <div className="text-[10px] font-medium text-teal mt-0.5">In chair now</div>}
+                      </div>
+                    </div>
+
+                    {/* Service (hidden on mobile) */}
+                    <div className="hidden md:block text-[13px] text-ink-2 truncate">{a.service}</div>
+
+                    {/* Stylist (hidden on mobile) */}
+                    <div className="hidden md:flex items-center gap-2">
+                      {stylist && (
+                        <>
+                          <Avatar initials={stylist.short || stylist.name[0]} tone={stylist.tone ?? undefined} size="sm" style={{ width: 22, height: 22, fontSize: 10 }} />
+                          <span className="text-[13px] text-ink-2">{stylist.name}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Duration (hidden on mobile) */}
+                    <div className="hidden md:block text-[13px] font-mono text-ink-3">{a.duration} min</div>
+
+                    {/* Payment (hidden on mobile) */}
+                    <div className="hidden md:flex flex-col gap-0.5">
+                      {a.billTotal != null && a.billTotal > 0 ? (
+                        <>
+                          <div className="text-[13px] font-semibold text-ink">₹{fmtINR(a.billTotal)}</div>
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-medium w-fit px-1.5 py-[1px] rounded-full ${
+                            payStatus === 'paid' ? 'bg-green-soft text-green' :
+                            payStatus === 'partial' ? 'bg-amber-soft text-amber-ink' :
+                            'bg-rose-soft text-rose'
+                          }`}>
+                            <span className="w-[4px] h-[4px] rounded-full bg-current" />
+                            {PAY_LABEL[payStatus]}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[12px] text-ink-4">—</span>
+                      )}
+                    </div>
+
+                    {/* Status — shown on all screens */}
+                    <div className="flex items-center justify-end md:justify-start">
+                      <Badge tone={a.status} showDot>{STATUS_LABEL[a.status]}</Badge>
+                    </div>
+
+                    {/* Chevron (hidden on mobile) */}
+                    <div className="hidden md:flex items-center justify-end text-ink-4 transition-transform group-hover:translate-x-0.5">
+                      <I.chevR width={14} height={14} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ===== MAIN PAGE =====
 export default function BookingsPage() {
   const { salonId } = useProfile();
-  const [view, setView] = useState<"week" | "day">("week");
+  const [view, setView] = useState<"week" | "day" | "list">("week");
   const [baseDate, setBaseDate] = useState<Date>(() => new Date());
   const [stylistFilter, setStylistFilter] = useState<string | number>("all");
   const [selected, setSelected] = useState<CalAppt | null>(null);
@@ -421,9 +623,10 @@ export default function BookingsPage() {
       const { data, error } = await supabase
         .from("bookings")
         .select(`id, date, start_time, duration, status, arrived_at, started_at, completed_at, actual_duration_minutes, notes,
+          payment_status, bill_total, amount_paid, amount_due,
           customer:customers(id, name, phone),
           stylist:stylists(id, name, tone),
-          booking_services(service:services(name))`)
+          booking_services(price_at_booking, service:services(name))`)
         .eq("salon_id", sid)
         .neq("status", "Cancelled")
         .gte("date", fromDate)
@@ -451,6 +654,15 @@ export default function BookingsPage() {
             if (l === "cancelled") return "cancelled";
             return "confirmed";
           };
+          const totalFromServices = b.booking_services?.reduce((sum, bs) => sum + Number(bs.price_at_booking || 0), 0) || 0;
+          const amountPaid = Number(b.amount_paid || 0);
+          const billTotal = Number(b.bill_total || totalFromServices);
+          const amountDue = Math.max(0, Number(b.amount_due ?? Math.max(0, billTotal - amountPaid)));
+          const paymentStatus = (
+            b.payment_status ||
+            (b.status === "Paid" || (amountDue <= 0 && amountPaid > 0) ? "paid" : amountPaid > 0 ? "partial" : "due")
+          ) as "paid" | "partial" | "due";
+
           return {
             id: b.id,
             dayKey: b.date,
@@ -468,6 +680,10 @@ export default function BookingsPage() {
             completedAt: b.completed_at,
             actualDurationMinutes: b.actual_duration_minutes,
             phone: b.customer?.phone || undefined,
+            paymentStatus,
+            billTotal,
+            amountPaid,
+            amountDue,
           };
         });
         setAppts(mapped);
@@ -500,13 +716,13 @@ export default function BookingsPage() {
   // Navigation
   const goBack = () => {
     const d = new Date(baseDate);
-    if (view === "week") d.setDate(d.getDate() - 7);
+    if (view === "week" || view === "list") d.setDate(d.getDate() - 7);
     else d.setDate(d.getDate() - 1);
     setBaseDate(d);
   };
   const goForward = () => {
     const d = new Date(baseDate);
-    if (view === "week") d.setDate(d.getDate() + 7);
+    if (view === "week" || view === "list") d.setDate(d.getDate() + 7);
     else d.setDate(d.getDate() + 1);
     setBaseDate(d);
   };
@@ -514,7 +730,7 @@ export default function BookingsPage() {
 
   // Date range display
   const dateRangeStr = useMemo(() => {
-    if (view === "week") {
+    if (view === "week" || view === "list") {
       const s = weekDays[0];
       const e = weekDays[6];
       if (s.getMonth() === e.getMonth()) {
@@ -532,7 +748,7 @@ export default function BookingsPage() {
 
   // Count appointments per stylist for chips
   const apptCountForFilter = (id: string | number) => {
-    if (view === "week") return appts.filter(a => id === "all" || a.stylistId === id).length;
+    if (view === "week" || view === "list") return appts.filter(a => id === "all" || a.stylistId === id).length;
     return appts.filter(a => a.dayKey === dayKey && (id === "all" || a.stylistId === id)).length;
   };
 
@@ -552,11 +768,11 @@ export default function BookingsPage() {
             </div>
             <div className="flex flex-col gap-0.5">
               <strong className="text-[15px] font-semibold tracking-[-0.005em]">
-                {view === "week"
+                {view === "week" || view === "list"
                   ? `${weekDays[0].getDate()} – ${weekDays[6].getDate()} ${MONTH_NAMES[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`
                   : `${baseDate.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
               </strong>
-              {view === "week" && <span className="text-xs text-ink-3 font-mono tracking-[0.04em]">Week {getWeekNumber(weekDays[0])}</span>}
+              {(view === "week" || view === "list") && <span className="text-xs text-ink-3 font-mono tracking-[0.04em]">Week {getWeekNumber(weekDays[0])}</span>}
             </div>
           </div>
           <div className="flex items-center gap-2.5 max-[980px]:justify-between max-[480px]:flex-wrap max-[480px]:gap-2">
@@ -564,10 +780,11 @@ export default function BookingsPage() {
               options={[
                 { value: "day", label: "Day" },
                 { value: "week", label: "Week" },
+                { value: "list", label: "List" },
               ]}
               value={view}
-              onChange={(val) => setView(val as "day" | "week")}
-              className="w-[120px] shrink-0 max-[480px]:w-full"
+              onChange={(val) => setView(val as "day" | "week" | "list")}
+              className="w-[180px] shrink-0 max-[480px]:w-full"
             />
             <div className="flex items-center gap-2 max-[480px]:w-full max-[480px]:flex-1">
               <Link
@@ -623,7 +840,7 @@ export default function BookingsPage() {
         </div>
 
         {/* Calendar card */}
-        <div className="overflow-x-auto overflow-y-hidden p-0 bg-surface border border-line rounded-xl [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-bg-2 [&::-webkit-scrollbar-thumb]:bg-ink-4 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-ink-3">
+        <div className={`overflow-x-auto overflow-y-hidden p-0 bg-surface border border-line rounded-xl [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-bg-2 [&::-webkit-scrollbar-thumb]:bg-ink-4 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-ink-3 ${view === "list" ? "overflow-x-hidden" : ""}`}>
           {loading ? (
             <div className="p-[40px_24px] flex flex-col gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -634,6 +851,16 @@ export default function BookingsPage() {
             <WeekView
               weekDays={weekDays}
               appts={appts}
+              stylistFilter={stylistFilter}
+              onSelect={setSelected}
+              todayKey={todayKey}
+              nowMin={nowMin}
+            />
+          ) : view === "list" ? (
+            <ListView
+              weekDays={weekDays}
+              appts={appts}
+              stylists={stylists}
               stylistFilter={stylistFilter}
               onSelect={setSelected}
               todayKey={todayKey}

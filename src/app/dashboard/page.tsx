@@ -610,11 +610,11 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
                 Paid
               </Badge>
             ) : appt.paymentStatus === "partial" ? (
-              <Badge tone="blue" showDot={false} className="!text-[9px] font-semibold">
+              <Badge tone="blue" showDot={true} className="!text-[9px] font-semibold">
                 Partial
               </Badge>
             ) : appt.status === "completed" ? (
-              <Badge tone="rose" showDot={false} className="!text-[9px] font-semibold">
+              <Badge tone="rose" showDot={true} className="!text-[9px] font-semibold">
                 Unpaid
               </Badge>
             ) : null}
@@ -664,21 +664,37 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
               )}
               <br />
               <span className="text-ink-3">Stylist: {stylist.name}</span>
+              <br />
+              <Link
+                href={`/dashboard/bookings/${bookingParam}`}
+                className="text-teal font-semibold text-xs inline-block mt-1 no-underline hover:underline"
+              >
+                View full detail ↗
+              </Link>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[11px] text-ink-3 tracking-wider uppercase font-medium mb-1.5">Payment</div>
+            <div className="text-[13px] text-ink leading-relaxed">
               {appt.paymentStatus && (
                 <>
-                  <br />
-                  <span className="text-ink-3">
-                    Payment:{" "}
-                    <span className={`inline-flex items-center gap-[4px] text-[10px] font-semibold px-[6px] py-[1.5px] rounded-full ${
+                  <Badge
+                    tone={
                       appt.paymentStatus === "paid"
-                        ? "text-[#137A4A] bg-[#DFF1E6]"
+                        ? "green"
                         : appt.paymentStatus === "partial"
-                          ? "text-[#1957B8] bg-[#E6EEFA]"
-                          : "text-rose bg-[#FAE2DC]"
-                    }`}>
-                      {appt.paymentStatus === "paid" ? "Paid" : appt.paymentStatus === "partial" ? "Partially Paid" : "Unpaid"}
-                    </span>
-                  </span>
+                          ? "blue"
+                          : "rose"
+                    }
+                    showDot={appt.paymentStatus !== "paid"}
+                    className="!text-[10px] font-semibold px-[6px] py-[1.5px]"
+                  >
+                    {appt.paymentStatus === "paid"
+                      ? "Paid"
+                      : appt.paymentStatus === "partial"
+                        ? "Partially Paid"
+                        : "Unpaid"}
+                  </Badge>
                   {appt.paymentStatus !== "paid" && appt.amountPaid !== undefined && appt.amountPaid > 0 && (
                     <>
                       <br />
@@ -697,16 +713,9 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
                   )}
                 </>
               )}
-              <br />
-              <Link
-                href={`/dashboard/bookings/${bookingParam}`}
-                className="text-teal font-semibold text-xs inline-block mt-1 no-underline hover:underline"
-              >
-                View full detail ↗
-              </Link>
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="col-span-full flex flex-col gap-1.5">
             <div className="text-[11px] text-ink-3 tracking-wider uppercase font-medium mb-1.5">Notes</div>
             <div className={`text-[13px] leading-relaxed ${appt.note ? "text-ink-2" : "text-ink-4"}`}>
               {appt.note || "No notes yet — tap to add."}
@@ -715,7 +724,8 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
           <div className="col-span-full flex gap-2 pt-4 border-t border-line flex-wrap">
             {nextAction && (
               <button
-                className="h-[34px] px-3 rounded-lg border border-teal bg-teal text-white text-[13px] cursor-pointer inline-flex items-center gap-1.5 font-semibold hover:bg-teal-ink transition-colors duration-150"
+                className="status-btn font-semibold"
+                style={{ borderColor: "var(--teal)", color: "var(--teal)", background: "var(--teal-soft)" }}
                 onClick={() => onStatus(appt.id, nextAction)}
               >
                 {PROGRESS_ACTION_LABEL[nextAction]}
@@ -723,15 +733,15 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
             )}
             <Link
               href={`/dashboard/checkout/${bookingParam}`}
-              className={`h-[34px] px-3 rounded-lg border border-teal text-[13px] cursor-pointer inline-flex items-center gap-1.5 font-semibold transition-colors duration-150 no-underline ${
-                checkoutPrimary ? "!text-white bg-teal hover:bg-teal-ink" : "!text-teal bg-white hover:bg-teal-soft"
-              }`}
+              className="status-btn font-semibold no-underline"
+              style={checkoutPrimary ? { borderColor: "var(--teal)", color: "var(--teal)", background: "var(--teal-soft)" } : {}}
             >
               Checkout / POS
             </Link>
             <button
-              className="h-[34px] px-3 rounded-lg border border-wa text-wa bg-white text-[13px] cursor-pointer inline-flex items-center gap-1.5 ml-auto hover:bg-wa-soft/10 transition-colors duration-150"
+              className="status-btn"
               onClick={() => onWA(appt)}
+              style={{ marginLeft: "auto", color: "var(--wa)", borderColor: "var(--wa)" }}
             >
               <I.wa className="w-3.5 h-3.5" /> Message on WhatsApp
             </button>

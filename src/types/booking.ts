@@ -43,6 +43,11 @@ export interface CalAppt extends BookingTimingFields {
   service: string;
   status: BookingStatus;
   phone?: string;
+  paymentStatus?: "paid" | "partial" | "due" | null;
+  billTotal?: number;
+  amountPaid?: number;
+  amountDue?: number;
+  source?: string;
 }
 
 export interface ActivityItem {
@@ -135,9 +140,15 @@ export interface DbCalBookingRow {
   completed_at: string | null;
   actual_duration_minutes: number | null;
   notes: string | null;
+  payment_status: string | null;
+  bill_total: number | null;
+  amount_paid: number | null;
+  amount_due: number | null;
+  source: string | null;
   customer: { id: string; name: string; phone: string | null } | null;
   stylist: { id: string; name: string; tone: string | null } | null;
   booking_services: Array<{
+    price_at_booking?: number;
     service: {
       name: string;
     } | null;

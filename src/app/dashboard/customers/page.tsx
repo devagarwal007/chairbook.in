@@ -23,6 +23,24 @@ const formatLast = (days: number) => {
   return `${Math.floor(days / 365)} yr ago`;
 };
 
+const formatPhone = (phone: string) => {
+  if (!phone) return "";
+  if (phone.toLowerCase().includes("x")) return phone;
+  const clean = phone.replace(/\D/g, "");
+  if (clean.length === 12 && clean.startsWith("91")) {
+    const mobile = clean.slice(2);
+    return `+91 ${mobile.slice(0, 2)}xxx ${mobile.slice(5)}`;
+  }
+  if (clean.length === 10) {
+    return `+91 ${clean.slice(0, 2)}xxx ${clean.slice(5)}`;
+  }
+  if (clean.length > 10) {
+    const mobile = clean.slice(-10);
+    return `+91 ${mobile.slice(0, 2)}xxx ${mobile.slice(5)}`;
+  }
+  return phone;
+};
+
 import { SORT_OPTIONS, FILTER_TABS } from "@/constants/customers";
 
 // ===== EXPORT COMPONENT =====
@@ -232,99 +250,101 @@ export default function CustomersPage() {
       {/* App Main */}
       <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-6 md:py-7 pb-24">
         {/* Search bar */}
-        <div className="flex items-center gap-2.5 bg-white border border-line-2 rounded-[var(--radius)] px-3.5 py-2.5 mb-4">
-          <I.search />
+        <div className="flex items-center gap-2.5 bg-white border border-line rounded-[12px] px-3.5 h-12 transition-colors duration-150 focus-within:border-teal mb-[18px]">
+          <I.search className="text-ink-3" />
           <input
             placeholder="Search by name, phone, service or stylist…"
             value={q}
             onChange={e => setQ(e.target.value)}
-            className="flex-1 border-0 outline-0 text-[var(--t-body)] font-sans"
+            className="flex-1 h-full border-0 outline-0 text-[14px] text-ink placeholder:text-ink-4 font-sans"
           />
           {q && (
             <button className="border-0 bg-transparent cursor-pointer grid place-items-center" onClick={() => setQ("")}>
               <I.x />
             </button>
           )}
-          <span className="text-[10px] bg-bg-2 px-1.5 py-0.5 rounded text-ink-3 font-mono">⌘ K</span>
+          <span className="text-[10px] text-ink-3 bg-bg-2 px-1.5 py-0.5 rounded border border-line font-mono max-[720px]:hidden">⌘ K</span>
         </div>
 
         {/* Engagement tabs & Sort */}
-        <div className="flex flex-col gap-3.5 sm:flex-row sm:items-center justify-between pb-1.5 mb-4">
-          {/* Tabs - horizontal scrolling on mobile */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {FILTER_TABS.map(f => (
-              <button
-                key={f.id}
-                className={`flex items-center gap-1.5 py-2 px-3 rounded-sm border text-[13px] font-medium cursor-pointer whitespace-nowrap transition-all duration-150 ${
-                  tab === f.id 
-                    ? "border-teal bg-teal-soft text-teal" 
-                    : "border-line bg-white text-ink-2 hover:border-line-2"
-                }`}
-                onClick={() => setTab(f.id)}
-              >
-                {f.id !== "all" && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      f.id === "active" ? "bg-green" : f.id === "cooling" ? "bg-amber" : "bg-rose"
-                    }`}
-                  />
-                )}
-                {f.label}
-                <span className="text-[11px] text-ink-3 ml-0.5">{counts[f.id as keyof typeof counts]}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Sort & Add Customer */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
-            {/* Sort Menu Component */}
-            <div className="sort-menu relative">
-              <button
-                className="flex items-center gap-1.5 px-3 py-2 rounded-sm border border-line bg-white text-[13px] font-medium text-ink cursor-pointer whitespace-nowrap"
-                onClick={() => setSortOpen(!sortOpen)}
-              >
-                <I.sort />
-                <span className="text-ink-3">Sort:</span>
-                <span>{currentSort.label}</span>
-                <I.chev className="text-ink-3" />
-              </button>
-              {sortOpen && (
-                <div className="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-[var(--radius)] shadow-[0_8px_16px_-4px_rgba(0,0,0,0.1)] z-50 min-w-[180px] overflow-hidden">
-                  {SORT_OPTIONS.map(s => (
-                    <button
-                      key={s.id}
-                      className={`flex items-center justify-between w-full px-3.5 py-2.5 border-0 text-[13px] text-left cursor-pointer ${
-                        sort === s.id ? "bg-teal-soft text-teal" : "bg-transparent text-ink"
-                      }`}
-                      onClick={() => {
-                        setSort(s.id);
-                        setSortOpen(false);
-                      }}
-                    >
-                      {s.label}
-                      {sort === s.id && <span className="text-teal">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Add customer button */}
+        <div className="flex gap-[6px] items-center flex-wrap mb-[18px]">
+          {FILTER_TABS.map(f => (
             <button
-              onClick={() => setShowCreateCust(true)}
-              className="h-[34px] rounded-[10px] border border-line-2 bg-teal text-white inline-flex items-center gap-1.5 px-3 cursor-pointer flex-shrink-0 hover:bg-[var(--teal-ink)] transition-all duration-150 text-[13px] font-medium"
+              key={f.id}
+              className={`h-[34px] px-3.5 rounded-full border inline-flex items-center gap-2 font-sans text-[13px] cursor-pointer transition-colors duration-150 ${
+                tab === f.id 
+                  ? "bg-ink border-ink text-white hover:border-ink" 
+                  : "border-line bg-white text-ink-2 hover:border-line-2"
+              }`}
+              onClick={() => setTab(f.id)}
             >
-              <I.plus />
-              Add Customer
+              {f.id !== "all" && (
+                <span
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    f.id === "active" ? "bg-[#2DA76C]" : f.id === "cooling" ? "bg-amber" : "bg-rose"
+                  }`}
+                />
+              )}
+              {f.label}
+              <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-mono font-medium ml-0.5 transition-colors duration-150 ${
+                tab === f.id
+                  ? "bg-[rgba(255,255,255,0.18)] text-white"
+                  : "bg-bg-2 text-ink-3"
+              }`}>
+                {counts[f.id as keyof typeof counts]}
+              </span>
             </button>
+          ))}
+          <div className="flex-1"></div>
+
+          {/* Sort Menu Component */}
+          <div className="sort-menu relative">
+            <button
+              className="h-8 px-3 rounded-full border border-line-2 bg-white inline-flex items-center gap-2 text-[13px] text-ink-2 cursor-pointer hover:border-ink-3 transition-colors duration-150"
+              onClick={() => setSortOpen(!sortOpen)}
+            >
+              <I.sort style={{ width: 14, height: 14 }} />
+              <span className="text-ink-3">Sort:</span>
+              <span>{currentSort.label}</span>
+              <I.chev className="text-ink-3" style={{ width: 14, height: 14 }} />
+            </button>
+            {sortOpen && (
+              <div className="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-[12px] shadow-[0_16px_36px_-16px_rgba(14,21,18,0.18)] z-50 min-w-[220px] p-1.5 overflow-hidden">
+                {SORT_OPTIONS.map(s => (
+                  <button
+                    key={s.id}
+                    className={`flex items-center justify-between w-full px-3 py-2 border-0 text-[13px] text-left cursor-pointer rounded-lg hover:bg-bg-2 hover:text-ink ${
+                      sort === s.id ? "bg-teal-soft text-teal font-medium" : "bg-transparent text-ink-2"
+                    }`}
+                    onClick={() => {
+                      setSort(s.id);
+                      setSortOpen(false);
+                    }}
+                  >
+                    {s.label}
+                    {sort === s.id && <span className="text-teal font-semibold">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Add customer button */}
+          <button
+            onClick={() => setShowCreateCust(true)}
+            className="h-[34px] rounded-full bg-teal text-white inline-flex items-center gap-1.5 px-3.5 cursor-pointer flex-shrink-0 hover:bg-teal-ink hover:-translate-y-0.5 transition-all duration-150 text-[13px] font-medium"
+          >
+            <I.plus style={{ width: 14, height: 14 }} />
+            Add Customer
+          </button>
         </div>
 
         {/* Result Head / Winback Broadcast */}
-        <div className="flex items-center justify-between pb-2.5 px-1 gap-3 max-[720px]:flex-col max-[720px]:items-start max-[720px]:gap-2 mb-3 text-[13px] text-ink-3">
+        <div className="flex items-center justify-between pb-2.5 px-1 gap-3 max-[720px]:flex-col max-[720px]:items-start max-[720px]:gap-2 mb-2 text-[13px] text-ink font-medium">
           <div>
             {filtered.length} {filtered.length === 1 ? "customer" : "customers"}
-            {q && <span> matching &quot;{q}&quot;</span>}
+            {q && <span className="text-ink-3 font-normal"> matching &quot;{q}&quot;</span>}
+            {tab !== "all" && <span className="text-ink-3 font-normal"> · {FILTER_TABS.find(f => f.id === tab)?.label?.toLowerCase()}</span>}
           </div>
           {tab === "cooling" && filtered.length > 0 && (
             <button
@@ -364,32 +384,33 @@ export default function CustomersPage() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2.5">
+          <div className="bg-white border border-line rounded-[12px] overflow-hidden">
             {filtered.map(c => {
               const eng = engagementOf(c.lastDays ?? 999);
               return (
                 <div
                   key={c.id}
                   onClick={() => onSelect(c)}
-                  className={`flex items-center p-3.5 bg-white border cursor-pointer rounded-[var(--radius)] transition-all duration-200 ${
-                    selected === c.id ? "border-teal" : "border-line"
+                  className={`grid grid-cols-[12px_40px_1fr_auto_auto_auto] max-[720px]:grid-cols-[10px_36px_1fr_auto] gap-4 max-[720px]:gap-3 p-4 max-[720px]:py-3 max-[720px]:px-3.5 items-center border-b border-line last:border-b-0 cursor-pointer relative transition-colors duration-150 hover:bg-[#FCFCFA] group ${
+                    selected === c.id ? "bg-teal-soft before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:bg-teal" : ""
                   }`}
                 >
                   {/* Status Indicator */}
                   <span
-                    className={`w-2 h-2 rounded-full mr-3 flex-shrink-0 ${
-                      eng === "active" ? "bg-green" : eng === "cooling" ? "bg-amber" : "bg-rose"
+                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      eng === "active" ? "bg-[#2DA76C]" : eng === "cooling" ? "bg-amber" : "bg-rose"
                     }`}
                   />
 
                   {/* Avatar */}
                   <div
-                    className={`avatar md tone-${c.tone} w-10 h-10 rounded-full mr-3 grid place-items-center font-semibold text-[14px] flex-shrink-0 ${
-                      c.tone === "a" ? "bg-teal-soft text-teal" :
-                      c.tone === "b" ? "bg-amber-soft text-amber-ink" :
+                    className={`avatar md tone-${c.tone} w-10 h-10 max-[720px]:w-9 max-[720px]:h-9 rounded-full grid place-items-center font-semibold text-[14px] max-[720px]:text-xs flex-shrink-0 ${
+                      c.tone === "a" ? "bg-[#F1EAD9] text-[#8C6A1E]" :
+                      c.tone === "b" ? "bg-teal-soft text-teal" :
                       c.tone === "c" ? "bg-blue-soft text-blue" :
-                      c.tone === "d" ? "bg-green-soft text-green" :
-                      c.tone === "e" ? "bg-rose-soft text-rose" :
+                      c.tone === "d" ? "bg-[#F4DCE4] text-[#A03364]" :
+                      c.tone === "e" ? "bg-amber-soft text-amber-ink" :
+                      c.tone === "f" ? "bg-rose-soft text-rose" :
                       "bg-bg-2 text-ink-2"
                     }`}
                   >
@@ -398,43 +419,43 @@ export default function CustomersPage() {
 
                   {/* Name and Meta */}
                   <div className="flex-1 min-w-0 mr-3">
-                    <div className="font-semibold text-[15px] text-ink truncate">
+                    <div className="font-semibold text-[14px] text-ink truncate tracking-[-0.005em]">
                       {c.name}
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-ink-3 mt-0.5">
-                      <span>{c.phone}</span>
-                      <span>·</span>
-                      <span>Seen {formatLast(c.lastDays ?? 999)}</span>
+                    <div className="flex items-center gap-1.5 text-[12px] text-ink-3 mt-0.5">
+                      <span>{formatPhone(c.phone)}</span>
+                      <span className="text-ink-4">·</span>
+                      <span>Last seen <strong className="font-medium text-ink-2">{formatLast(c.lastDays ?? 999)}</strong></span>
                     </div>
                   </div>
 
                   {/* Stats - Hidden on mobile */}
-                  <div className="hidden md:block text-right mr-4 flex-shrink-0">
-                    <div className="text-[13px] font-semibold text-ink-2">{c.visits ?? 0} visits</div>
+                  <div className="text-right flex-shrink-0 max-[720px]:hidden mr-4">
+                    <div className="text-[13px] text-ink-2 font-mono"><strong className="font-semibold text-ink">{c.visits ?? 0}</strong> visit{c.visits === 1 ? "" : "s"}</div>
                     <div className="text-[11px] text-ink-3 mt-0.5">Likes {c.fav ?? "—"}</div>
                   </div>
 
                   {/* Spend */}
-                  <div className="text-right mr-3 sm:mr-4 flex-shrink-0">
-                    <div className="text-[14px] font-semibold text-teal">₹{(c.spend ?? 0).toLocaleString("en-IN")}</div>
-                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.02em] mt-0.5 block md:hidden">
+                  <div className="text-right flex-shrink-0 max-[720px]:min-w-0 mr-3 sm:mr-4">
+                    <div className="text-[15px] max-[720px]:text-[14px] font-semibold text-ink tracking-[-0.01em]">₹{(c.spend ?? 0).toLocaleString("en-IN")}</div>
+                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.04em] mt-0.5 hidden max-[720px]:block">
                       {c.visits ?? 0} visit{c.visits === 1 ? "" : "s"}
                     </div>
-                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.02em] mt-0.5 hidden md:block">
+                    <div className="text-[10px] text-ink-3 uppercase tracking-[0.04em] mt-0.5 block max-[720px]:hidden">
                       Lifetime
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 max-[720px]:hidden flex-shrink-0" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={e => onMessage(c, e)}
-                      className="w-8 h-8 rounded-[8px] border-0 bg-wa-soft text-wa grid place-items-center cursor-pointer"
+                      className="w-8 h-8 rounded-[8px] border border-line bg-white text-ink-2 grid place-items-center cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-150 hover:bg-wa hover:text-white hover:border-wa"
                       aria-label="WhatsApp"
                     >
-                      <I.wa />
+                      <I.wa style={{ width: 16, height: 16 }} />
                     </button>
-                    <I.chev className="text-ink-4" />
+                    <I.chevR className="transition-transform duration-150 text-ink-4 group-hover:translate-x-0.5 group-hover:text-ink-2" style={{ width: 16, height: 16 }} />
                   </div>
                 </div>
               );

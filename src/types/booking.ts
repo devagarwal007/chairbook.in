@@ -60,7 +60,13 @@ export interface BookingData {
   services: { name: string; duration: number; price: number }[];
   stylist: { name: string; short: string; tone: string };
   notes: string;
-  payment: { status: "paid" | "pending"; method: string | null };
+  payment: {
+    status: "paid" | "partial" | "due" | "pending";
+    method: string | null;
+    amountPaid?: number;
+    amountDue?: number;
+    billTotal?: number;
+  };
   activity: ActivityItem[];
 }
 
@@ -130,6 +136,10 @@ export interface DbBooking {
   start_time: string | null;
   status: string;
   notes: string | null;
+  amount_paid?: number | null;
+  amount_due?: number | null;
+  bill_total?: number | null;
+  payment_status?: "paid" | "partial" | "due" | null;
   booking_services: DbBookingService[] | null;
   stylist: { name: string } | null;
   payments: { method: string; amount: number }[] | { method: string; amount: number } | null;
@@ -140,6 +150,10 @@ export interface DbCustomerBooking {
   customer_id: string;
   status: string;
   date: string;
+  amount_paid?: number | null;
+  amount_due?: number | null;
+  bill_total?: number | null;
+  payment_status?: string | null;
   booking_services: Array<{
     price_at_booking: number;
     qty: number | null;

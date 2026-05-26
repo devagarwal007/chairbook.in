@@ -42,6 +42,10 @@ export interface DbAnalyticsBooking {
   date: string;
   start_time: string;
   status: string;
+  payment_status?: string | null;
+  amount_paid?: number | null;
+  amount_due?: number | null;
+  bill_total?: number | null;
   customer_id: string | null;
   stylist_id: string | null;
   created_at: string;

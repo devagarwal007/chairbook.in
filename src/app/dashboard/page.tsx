@@ -41,7 +41,6 @@ export default function DashboardPage() {
   const appts = day === "today" ? todayAppts : tomorrowAppts;
   const setAppts = day === "today" ? setTodayAppts : setTomorrowAppts;
   const loadingBookings = day === "today" ? loadingToday : loadingTomorrow;
-  const refreshBookings = day === "today" ? refreshToday : refreshTomorrow;
 
   const { nowTimeMin, dateDisplayStr } = useTimeUpdate(!!salonId);
   const { show: showFlash } = useToast();
@@ -575,7 +574,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
               href={`/dashboard/checkout/${bookingParam}`}
               className="h-[34px] px-3 rounded-lg border border-teal !text-white bg-teal text-[13px] cursor-pointer inline-flex items-center gap-1.5 font-semibold hover:bg-teal-ink transition-colors duration-150 no-underline"
             >
-              Checkout / POS
+              Payment / POS
             </Link>
             <button
               className="h-[34px] px-3 rounded-lg border border-wa text-wa bg-white text-[13px] cursor-pointer inline-flex items-center gap-1.5 ml-auto hover:bg-wa-soft/10 transition-colors duration-150"

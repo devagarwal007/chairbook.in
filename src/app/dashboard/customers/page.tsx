@@ -62,7 +62,7 @@ export default function CustomersPage() {
         // Fetch customers + all bookings with services in parallel
         const [{ data: custData }, { data: bkData }] = await Promise.all([
           supabase.from("customers").select("id, name, phone, pref_stylist_id, member_since, created_at, stylists:pref_stylist_id(name)").eq("salon_id", salonId),
-          supabase.from("bookings").select("id, customer_id, status, date, booking_services(price_at_booking, qty, service:services(name)), stylist:stylists(name)").eq("salon_id", salonId),
+          supabase.from("bookings").select("id, customer_id, status, date, amount_paid, bill_total, booking_services(price_at_booking, qty, service:services(name)), stylist:stylists(name)").eq("salon_id", salonId),
         ]);
 
         if (!custData || custData.length === 0) {
@@ -81,7 +81,7 @@ export default function CustomersPage() {
           const visits = paidBks.length;
           const spend = paidBks.reduce((sum: number, b) => {
             const bkTotal = (b.booking_services || []).reduce((s: number, bs) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0);
-            return sum + bkTotal;
+            return sum + Number(b.amount_paid || (b.status === "Paid" ? b.bill_total || bkTotal : 0));
           }, 0);
 
           // Days since last booking

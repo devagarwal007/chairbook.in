@@ -335,6 +335,10 @@ export default function BookingDetailPage() {
             start_time,
             duration,
             status,
+            payment_status,
+            bill_total,
+            amount_paid,
+            amount_due,
             notes,
             created_at,
             source,
@@ -370,6 +374,8 @@ export default function BookingDetailPage() {
                 id,
                 date,
                 status,
+                amount_paid,
+                bill_total,
                 booking_services (
                   qty,
                   price_at_booking
@@ -382,8 +388,8 @@ export default function BookingDetailPage() {
               visits = completedBookings.length;
               
               spend = completedBookings.reduce((sum, cb) => {
-                const cbSum = cb.booking_services?.reduce((s: number, bs: { price_at_booking: number; qty?: number | null }) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
-                return sum + cbSum;
+                const legacySum = cb.booking_services?.reduce((s: number, bs: { price_at_booking: number; qty?: number | null }) => s + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
+                return sum + Number(cb.amount_paid || (cb.status === "Paid" ? cb.bill_total || legacySum : 0));
               }, 0);
 
               const sortedCompleted = [...completedBookings].sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
@@ -403,7 +409,7 @@ export default function BookingDetailPage() {
             .from("payments")
             .select("method, amount")
             .eq("booking_id", bookingId)
-            .maybeSingle();
+            .order("received_at", { ascending: false });
 
           const cleanTone = (t: string) => t.replace("tone-", "");
           const custName = customerObj?.name || "Walk-in Customer";
@@ -428,6 +434,14 @@ export default function BookingDetailPage() {
           };
 
           const uiStatus = mapDbStatusToUi(data.status);
+          const payments = Array.isArray(paymentData) ? paymentData : [];
+          const ledgerPaid = payments.reduce((sum: number, row: { amount?: number | string | null }) => sum + Number(row.amount || 0), 0);
+          const totalFromServices = (data.booking_services as unknown as Array<{ price_at_booking: number; qty?: number | null }> | null)?.reduce((sum, bs) => sum + Number(bs.price_at_booking) * (bs.qty || 1), 0) || 0;
+          const amountPaid = Number(data.amount_paid || ledgerPaid || 0);
+          const billTotal = Number(data.bill_total || (data.status === "Paid" ? amountPaid : totalFromServices));
+          const amountDue = Math.max(0, Number(data.amount_due ?? Math.max(0, billTotal - amountPaid)));
+          const paymentStatus = (data.payment_status || (data.status === "Paid" || amountDue <= 0 && amountPaid > 0 ? "paid" : amountPaid > 0 ? "partial" : "due")) as "paid" | "partial" | "due";
+          const lastPaymentMethod = payments[0]?.method || null;
           
           const actList = [];
           if (data.status === "Cancelled") {
@@ -450,9 +464,13 @@ export default function BookingDetailPage() {
             actList.push({
               ts: "Today",
               icon: "check",
-              text: `Booking completed ${paymentData ? `via ${paymentData.method}` : ""}`,
-              meta: paymentData ? `Total Paid: ₹${paymentData.amount}` : "Marked completed",
-              tone: "green"
+              text: paymentStatus === "paid" ? `Booking completed ${lastPaymentMethod ? `via ${lastPaymentMethod}` : ""}` : "Booking completed",
+              meta: paymentStatus === "paid"
+                ? `Total paid: ₹${amountPaid.toLocaleString("en-IN")}`
+                : paymentStatus === "partial"
+                  ? `Partially paid: ₹${amountPaid.toLocaleString("en-IN")} · ₹${amountDue.toLocaleString("en-IN")} due`
+                  : `Payment due: ₹${amountDue.toLocaleString("en-IN")}`,
+              tone: paymentStatus === "paid" ? "green" : "amber"
             });
           } else if (data.status === "Arrived") {
             actList.push({
@@ -513,8 +531,11 @@ export default function BookingDetailPage() {
             },
             notes: data.notes || "",
             payment: {
-              status: (data.status === "Paid" || data.status === "Completed") ? "paid" : "pending",
-              method: paymentData?.method || null
+              status: paymentStatus,
+              method: lastPaymentMethod,
+              amountPaid,
+              amountDue,
+              billTotal,
             },
             activity: actList
           };
@@ -536,6 +557,22 @@ export default function BookingDetailPage() {
   const b = booking || BOOKING;
   const totalDur = b.services.reduce((s, x) => s + x.duration, 0);
   const totalPrice = b.services.reduce((s, x) => s + x.price, 0);
+  const displayTotal = b.payment.billTotal || totalPrice;
+  const paymentLabel = b.payment.status === "paid"
+    ? "Paid"
+    : b.payment.status === "partial"
+      ? "Partially paid"
+      : "Payment due";
+  const paymentMeta = b.payment.status === "paid"
+    ? `${b.payment.method || "Recorded"} · ₹${(b.payment.amountPaid || displayTotal).toLocaleString("en-IN")}`
+    : b.payment.status === "partial"
+      ? `₹${(b.payment.amountPaid || 0).toLocaleString("en-IN")} paid · ₹${(b.payment.amountDue || 0).toLocaleString("en-IN")} due`
+      : `₹${(b.payment.amountDue || displayTotal).toLocaleString("en-IN")} due`;
+  const paymentToneClass = b.payment.status === "paid"
+    ? "bg-green-soft text-green"
+    : b.payment.status === "partial"
+      ? "bg-blue-soft text-blue"
+      : "bg-rose-soft text-rose";
   const isCancelled = status === "cancelled";
   const isPast = status === "completed" || status === "noshow" || status === "cancelled";
   const isConfirmed = status === "confirmed";
@@ -912,20 +949,22 @@ export default function BookingDetailPage() {
             </div>
             <div className="bd-total">
               <span>Total</span>
-              <strong>₹{totalPrice.toLocaleString("en-IN")}</strong>
+              <strong>₹{displayTotal.toLocaleString("en-IN")}</strong>
             </div>
-            <div className={`bd-payment ${b.payment.status}`}>
+            <div className={`bd-payment ${paymentToneClass}`}>
               <IBD.rupee />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>
-                  {b.payment.status === "paid" ? "Paid" : "Payment pending"}
+                  {paymentLabel}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 1 }}>
-                  {b.payment.status === "paid" ? b.payment.method : "Take payment at counter after service"}
+                  {paymentMeta}
                 </div>
               </div>
               {b.payment.status !== "paid" && (
-                <Link className="btn btn-primary btn-sm" href={`/dashboard/checkout/${bookingId}`}>Take payment</Link>
+                <Link className="btn btn-primary btn-sm" href={`/dashboard/checkout/${bookingId}`}>
+                  {b.payment.status === "partial" ? "Collect balance" : "Take payment"}
+                </Link>
               )}
             </div>
           </div>

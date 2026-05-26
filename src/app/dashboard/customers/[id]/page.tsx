@@ -180,7 +180,7 @@ export default function CustomerProfilePage() {
 
         const { data: bookingsRaw } = await supabase
           .from("bookings")
-          .select(`id, date, start_time, status, notes,
+          .select(`id, date, start_time, status, notes, payment_status, amount_paid, amount_due, bill_total,
             booking_services(price_at_booking, qty, service:services(name)),
             stylist:stylists(name),
             payments(method, amount)`)
@@ -196,7 +196,9 @@ export default function CustomerProfilePage() {
         const visits = completedBks.length;
         const spend = completedBks.reduce((sum: number, b) => {
           const t = (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0);
-          return sum + t;
+          const payments = Array.isArray(b.payments) ? b.payments : b.payments ? [b.payments] : [];
+          const ledgerPaid = payments.reduce((paid: number, p) => paid + Number(p.amount || 0), 0);
+          return sum + Number(b.amount_paid || ledgerPaid || (b.status === "Paid" ? b.bill_total || t : 0));
         }, 0);
 
         const dates = completedBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
@@ -241,13 +243,16 @@ export default function CustomerProfilePage() {
         }
 
         const visitHistory: Visit[] = completedBks.map((b) => {
+          const serviceTotal = (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0);
+          const payments = Array.isArray(b.payments) ? b.payments : b.payments ? [b.payments] : [];
+          const ledgerPaid = payments.reduce((paid: number, p) => paid + Number(p.amount || 0), 0);
+          const amountPaid = Number(b.amount_paid || ledgerPaid || (b.status === "Paid" ? b.bill_total || serviceTotal : 0));
+          const amountDue = Number(b.amount_due || 0);
           let method = "—";
-          if (b.payments) {
-            if (Array.isArray(b.payments)) {
-              method = b.payments[0]?.method || "—";
-            } else {
-              method = (b.payments as { method: string }).method || "—";
-            }
+          if (payments.length > 0) {
+            method = payments[0]?.method || "—";
+          } else if (amountDue > 0) {
+            method = "Due";
           }
           return {
             id: b.id,
@@ -257,8 +262,8 @@ export default function CustomerProfilePage() {
               amt: Number(bs.price_at_booking) * (bs.qty || 1)
             })),
             stylist: b.stylist?.name || "—",
-            amount: (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0),
-            payment: method
+            amount: amountPaid,
+            payment: amountDue > 0 && amountPaid > 0 ? `${method} · ₹${amountDue.toLocaleString("en-IN")} due` : method
           };
         });
 

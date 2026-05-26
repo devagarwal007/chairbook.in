@@ -26,11 +26,24 @@ interface Booking {
   stylist: string;
   services: ServiceItem[];
   status?: string;
+  paymentStatus?: PaymentStatus;
+  amountPaid?: number;
+  amountDue?: number;
 }
 
-interface PaymentInfo {
+type DiscountType = "amount" | "percent";
+type PaymentMode = "full" | "partial" | "due";
+type PaymentStatus = "due" | "partial" | "paid";
+
+interface PaymentSubmission {
   method: string;
   received: number;
+}
+
+interface PaymentInfo extends PaymentSubmission {
+  status: PaymentStatus;
+  amountDue: number;
+  mode: PaymentMode;
 }
 
 import { PAYMENT_METHODS } from "@/constants/checkout";
@@ -54,9 +67,13 @@ export default function CheckoutPage() {
   const [stage, setStage] = useState<"bill" | "pay" | "receipt">("bill");
   const [method, setMethod] = useState<string>("upi");
   const [items, setItems] = useState<ServiceItem[]>(baseBooking?.services || []);
-  const [discount, setDiscount] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<DiscountType>("amount");
+  const [discountValue, setDiscountValue] = useState<number>(0);
   const [tip, setTip] = useState<number>(0);
   const [roundOff, setRoundOff] = useState<boolean>(true);
+  const [existingPaidAmount, setExistingPaidAmount] = useState<number>(0);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("full");
+  const [partialAmount, setPartialAmount] = useState<number>(0);
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const { show: triggerFlash } = useToast();
@@ -85,12 +102,28 @@ export default function CheckoutPage() {
             id,
             notes,
             status,
+            payment_status,
+            bill_subtotal,
+            discount_type,
+            discount_value,
+            discount_amount,
+            tip_amount,
+            round_off_amount,
+            bill_total,
+            amount_paid,
+            amount_due,
+            paid_at,
             customer:customers (id, name, phone),
             stylist:stylists (id, name, tone),
             booking_services (
               qty,
               price_at_booking,
               service:services (id, name, price)
+            ),
+            payments (
+              amount,
+              method,
+              received_at
             )
           `)
           .eq("id", bookingId)
@@ -134,36 +167,42 @@ export default function CheckoutPage() {
             },
             stylist: stylistObj?.name || "Unassigned",
             services: serviceItems,
-            status: data.status
+            status: data.status,
+            paymentStatus: (data.payment_status || (data.status === "Paid" ? "paid" : "due")) as PaymentStatus,
+            amountPaid: Number(data.amount_paid || 0),
+            amountDue: Number(data.amount_due || 0),
           };
 
           setBooking(bData);
           setItems(serviceItems);
+          const payments = Array.isArray(data.payments) ? data.payments : [];
+          const paidFromLedger = payments.reduce((sum: number, row: { amount?: number | string | null }) => sum + Number(row.amount || 0), 0);
+          const loadedPaid = Number(data.amount_paid || paidFromLedger || 0);
+          const loadedDiscountAmount = Number(data.discount_amount || 0);
+          const loadedDiscountType = data.discount_type === "percent" ? "percent" : "amount";
+          const loadedDiscountValue = Number(data.discount_value || loadedDiscountAmount || 0);
+
+          setExistingPaidAmount(loadedPaid);
+          setDiscountType(loadedDiscountType);
+          setDiscountValue(loadedDiscountValue);
+          setTip(Number(data.tip_amount || 0));
 
           // If booking is already paid, fetch payment details and jump to receipt stage
-          if (data.status === "Paid") {
-            const { data: paymentData, error: paymentError } = await supabase
-              .from("payments")
-              .select("*")
-              .eq("booking_id", bookingId)
-              .maybeSingle();
+          if ((data.payment_status === "paid" || data.status === "Paid") && loadedPaid > 0) {
+            const lastPayment = payments
+              .slice()
+              .sort((a: { received_at?: string | null }, b: { received_at?: string | null }) =>
+                String(b.received_at || "").localeCompare(String(a.received_at || ""))
+              )[0];
 
-            if (!paymentError && paymentData) {
-              setPayment({
-                method: paymentData.method,
-                received: Number(paymentData.amount)
-              });
-              setDiscount(Number(paymentData.discount || 0));
-              setTip(Number(paymentData.tip || 0));
-              setStage("receipt");
-            } else {
-              // Fallback if payment details aren't found
-              setPayment({
-                method: "Completed",
-                received: serviceItems.reduce((s, i) => s + i.qty * i.price, 0)
-              });
-              setStage("receipt");
-            }
+            setPayment({
+              method: lastPayment?.method || "Completed",
+              received: Number(lastPayment?.amount || loadedPaid),
+              status: "paid",
+              amountDue: 0,
+              mode: "full",
+            });
+            setStage("receipt");
           }
         }
       } catch (err) {
@@ -222,9 +261,13 @@ export default function CheckoutPage() {
   useEffect(() => {
     queueMicrotask(() => {
       setItems([]);
-      setDiscount(0);
+      setDiscountType("amount");
+      setDiscountValue(0);
       setTip(0);
       setRoundOff(true);
+      setExistingPaidAmount(0);
+      setPaymentMode("full");
+      setPartialAmount(0);
       setPayment(null);
       setStage("bill");
     });
@@ -234,9 +277,16 @@ export default function CheckoutPage() {
     return items.reduce((s, i) => s + i.qty * i.price, 0);
   }, [items]);
 
+  const discountAmount = useMemo(() => {
+    if (discountType === "percent") {
+      return Math.min(subtotal, Math.round((subtotal * Math.min(100, discountValue)) / 100));
+    }
+    return Math.min(subtotal, discountValue);
+  }, [discountType, discountValue, subtotal]);
+
   const beforeRound = useMemo(() => {
-    return Math.max(0, subtotal - discount + tip);
-  }, [subtotal, discount, tip]);
+    return Math.max(0, subtotal - discountAmount + tip);
+  }, [subtotal, discountAmount, tip]);
 
   const roundedTotal = useMemo(() => {
     return roundOff ? Math.round(beforeRound / 10) * 10 : beforeRound;
@@ -247,6 +297,17 @@ export default function CheckoutPage() {
   }, [roundedTotal, beforeRound]);
 
   const total = roundedTotal;
+  const balanceDue = useMemo(() => {
+    return Math.max(0, total - existingPaidAmount);
+  }, [existingPaidAmount, total]);
+
+  const collectAmount = paymentMode === "partial"
+    ? Math.min(balanceDue, Math.max(0, partialAmount))
+    : paymentMode === "due"
+      ? 0
+      : balanceDue;
+
+  const amountDueAfterCollection = Math.max(0, balanceDue - collectAmount);
 
   // Qty helpers
   const updateQty = (id: number, delta: number) => {
@@ -274,11 +335,28 @@ export default function CheckoutPage() {
     }
   };
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      if (paymentMode === "partial") {
+        setPartialAmount(balanceDue > 0 ? Math.ceil(balanceDue / 2) : 0);
+      }
+    });
+  }, [balanceDue, paymentMode]);
 
 
-  const finishPayment = async (p: PaymentInfo) => {
+
+  const finishPayment = async (p: PaymentSubmission) => {
     if (!baseBooking) return;
     if (submitting) return;
+    const amountToRecord = Math.max(0, Math.min(balanceDue, p.received));
+    const amountPaidAfter = existingPaidAmount + amountToRecord;
+    const amountDueAfter = Math.max(0, total - amountPaidAfter);
+    const nextPaymentStatus: PaymentStatus = amountDueAfter <= 0 && total > 0
+      ? "paid"
+      : amountPaidAfter > 0
+        ? "partial"
+        : "due";
+
     setSubmitting(true);
     try {
       const isUuid = isUUID(bookingId);
@@ -299,19 +377,21 @@ export default function CheckoutPage() {
             } = {
               booking_id: bookingId,
               method: paymentMethod,
-              amount: total,
+              amount: amountToRecord,
             };
 
-            if (tip > 0) insertPayload.tip = tip;
-            if (discount > 0) insertPayload.discount = discount;
+            if (existingPaidAmount <= 0 && tip > 0) insertPayload.tip = tip;
+            if (existingPaidAmount <= 0 && discountAmount > 0) insertPayload.discount = discountAmount;
 
-            const { error: paymentError } = await supabase
-              .from("payments")
-              .upsert(insertPayload, { onConflict: "booking_id" });
+            if (amountToRecord > 0) {
+              const { error: paymentError } = await supabase
+                .from("payments")
+                .insert(insertPayload);
 
-            if (paymentError) {
-              console.error("Payment insert error:", paymentError);
-              // Don't throw — still complete the flow
+              if (paymentError) {
+                console.error("Payment insert error:", paymentError);
+                // Don't throw — still complete the flow
+              }
             }
 
             const canSyncServices = items.every(it => {
@@ -342,18 +422,40 @@ export default function CheckoutPage() {
 
             const { error: statusError } = await supabase
               .from("bookings")
-              .update({ status: "Paid" })
+              .update({
+                status: "Completed",
+                payment_status: nextPaymentStatus,
+                bill_subtotal: subtotal,
+                discount_type: discountType,
+                discount_value: discountValue,
+                discount_amount: discountAmount,
+                tip_amount: tip,
+                round_off_amount: roundOffAmt,
+                bill_total: total,
+                amount_paid: amountPaidAfter,
+                amount_due: amountDueAfter,
+                paid_at: nextPaymentStatus === "paid" ? new Date().toISOString() : null,
+              })
               .eq("id", bookingId);
 
             if (statusError) throw statusError;
 
             if (salonId) {
+              const notificationTitle = nextPaymentStatus === "paid"
+                ? "Payment received"
+                : nextPaymentStatus === "partial"
+                  ? "Partial payment received"
+                  : "Payment marked due";
+              const notificationBody = amountToRecord > 0
+                ? `₹${amountToRecord.toLocaleString("en-IN")} received from ${baseBooking.customer.name} via ${p.method}. ₹${amountDueAfter.toLocaleString("en-IN")} due.`
+                : `₹${amountDueAfter.toLocaleString("en-IN")} marked due for ${baseBooking.customer.name}.`;
+
               insertNotification({
                 salon_id: salonId,
                 type: "payment",
-                title: "Payment received",
-                body: `₹${total.toLocaleString("en-IN")} received from ${baseBooking.customer.name} via ${p.method}`,
-                meta: { booking_id: bookingId, amount: total, method: p.method },
+                title: notificationTitle,
+                body: notificationBody,
+                meta: { booking_id: bookingId, amount: amountToRecord, due: amountDueAfter, method: p.method },
               });
             }
 
@@ -364,7 +466,21 @@ export default function CheckoutPage() {
         }
       }
 
-      setPayment(p);
+      setExistingPaidAmount(amountPaidAfter);
+      setPayment({
+        ...p,
+        received: amountToRecord,
+        status: nextPaymentStatus,
+        amountDue: amountDueAfter,
+        mode: paymentMode,
+      });
+      setBooking(prev => prev ? {
+        ...prev,
+        status: "Completed",
+        paymentStatus: nextPaymentStatus,
+        amountPaid: amountPaidAfter,
+        amountDue: amountDueAfter,
+      } : prev);
       setStage("receipt");
     } finally {
       setSubmitting(false);
@@ -374,26 +490,26 @@ export default function CheckoutPage() {
   // Cash payment details
   const [cashReceived, setCashReceived] = useState<number>(0);
   const changeToReturn = useMemo(() => {
-    return Math.max(0, cashReceived - total);
-  }, [cashReceived, total]);
+    return Math.max(0, cashReceived - collectAmount);
+  }, [cashReceived, collectAmount]);
 
   // Set default cash received value when total updates
   useEffect(() => {
     queueMicrotask(() => {
-      setCashReceived(total);
+      setCashReceived(collectAmount);
     });
-  }, [total]);
+  }, [collectAmount]);
 
   // Quick cash options
   const quickAmounts = useMemo(() => {
     const arr = [
-      total,
-      Math.ceil(total / 100) * 100,
-      Math.ceil(total / 500) * 500,
-      Math.ceil(total / 500) * 500 + 500,
+      collectAmount,
+      Math.ceil(collectAmount / 100) * 100,
+      Math.ceil(collectAmount / 500) * 500,
+      Math.ceil(collectAmount / 500) * 500 + 500,
     ];
     return Array.from(new Set(arr)).slice(0, 4);
-  }, [total]);
+  }, [collectAmount]);
 
   // Card status simulated toggle
   const [cardWaiting, setCardWaiting] = useState<boolean>(true);
@@ -617,17 +733,43 @@ export default function CheckoutPage() {
 
               <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mt-3.5 mb-2">Adjustments</div>
               <div className="bg-white border border-line rounded-xl p-[4px_16px] mb-4">
-                <div className="flex justify-between items-center gap-4 py-3 border-b border-line text-sm font-medium text-ink">
-                  <span>Discount</span>
-                  <div className="flex items-center gap-1 bg-bg-2 rounded-lg px-2.5 h-9 font-mono">
-                    <span className="text-ink-3">₹</span>
-                    <input
-                      type="number"
-                      value={discount || ""}
-                      placeholder="0"
-                      className="w-[60px] h-full border-0 outline-0 bg-transparent text-sm text-ink text-right"
-                      onChange={(e) => setDiscount(Math.max(0, parseInt(e.target.value) || 0))}
-                    />
+                <div className="flex flex-col gap-2.5 py-3 border-b border-line text-sm font-medium text-ink">
+                  <div className="flex justify-between items-center gap-4">
+                    <span>Discount</span>
+                    <div className="inline-flex bg-bg-2 rounded-lg p-0.5">
+                      {(["amount", "percent"] as DiscountType[]).map((type) => (
+                        <button
+                          key={type}
+                          className={`h-8 min-w-9 px-2 rounded-md border-0 text-xs font-semibold cursor-pointer ${
+                            discountType === type ? "bg-white text-teal shadow-sm" : "bg-transparent text-ink-3"
+                          }`}
+                          onClick={() => {
+                            setDiscountType(type);
+                            setDiscountValue(0);
+                          }}
+                        >
+                          {type === "amount" ? "₹" : "%"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1 bg-bg-2 rounded-lg px-2.5 h-9 font-mono flex-1">
+                      <span className="text-ink-3">{discountType === "amount" ? "₹" : "%"}</span>
+                      <input
+                        type="number"
+                        value={discountValue || ""}
+                        placeholder="0"
+                        className="w-full h-full border-0 outline-0 bg-transparent text-sm text-ink text-right"
+                        onChange={(e) => {
+                          const next = Math.max(0, parseFloat(e.target.value) || 0);
+                          setDiscountValue(discountType === "percent" ? Math.min(100, next) : next);
+                        }}
+                      />
+                    </div>
+                    <div className="text-xs text-rose font-mono min-w-[92px] text-right">
+                      − ₹{discountAmount.toLocaleString("en-IN")}
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2.5 py-3 border-b border-line">
@@ -677,19 +819,69 @@ export default function CheckoutPage() {
 
               <TotalSummary
                 subtotal={subtotal}
-                discount={discount}
+                discount={discountAmount}
+                discountType={discountType}
+                discountValue={discountValue}
                 tip={tip}
                 roundOffAmt={roundOffAmt}
                 total={total}
+                amountPaid={existingPaidAmount}
+                amountDue={balanceDue}
               />
             </>
           )}
 
           {stage === "pay" && (
             <>
-              <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mt-3.5 mb-2 first:mt-0">Payment method</div>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {PAYMENT_METHODS.map((m) => (
+              <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mt-3.5 mb-2 first:mt-0">Payment outcome</div>
+              <div className="grid grid-cols-3 gap-2 mb-4 max-sm:grid-cols-1">
+                {[
+                  { id: "full", label: "Collect full", desc: `₹${balanceDue.toLocaleString("en-IN")}` },
+                  { id: "partial", label: "Partial", desc: "Collect some now" },
+                  { id: "due", label: "Due", desc: "Collect later" },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    className={`border rounded-xl p-3 text-left cursor-pointer font-inherit transition-all duration-150 ${
+                      paymentMode === option.id
+                        ? "border-teal bg-teal-soft text-teal-ink"
+                        : "border-line bg-white text-ink"
+                    }`}
+                    onClick={() => setPaymentMode(option.id as PaymentMode)}
+                  >
+                    <div className="text-sm font-semibold">{option.label}</div>
+                    <div className="text-[11px] text-ink-3 mt-0.5">{option.desc}</div>
+                  </button>
+                ))}
+              </div>
+
+              {paymentMode === "partial" && (
+                <div className="bg-white border border-line rounded-xl p-4 mb-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-sm font-medium text-ink">Amount received now</label>
+                    <div className="flex items-center gap-1 bg-bg-2 rounded-lg px-2.5 h-10 font-mono min-w-[150px]">
+                      <span className="text-ink-3">₹</span>
+                      <input
+                        type="number"
+                        value={partialAmount || ""}
+                        placeholder="0"
+                        className="w-full h-full border-0 outline-0 bg-transparent text-sm text-ink text-right"
+                        onChange={(e) => setPartialAmount(Math.min(balanceDue, Math.max(0, parseInt(e.target.value) || 0)))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs text-ink-3 mt-2">
+                    <span>Balance after this payment</span>
+                    <strong className="font-mono text-ink">₹{amountDueAfterCollection.toLocaleString("en-IN")}</strong>
+                  </div>
+                </div>
+              )}
+
+              {paymentMode !== "due" && (
+                <>
+                  <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mt-3.5 mb-2">Payment method</div>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {PAYMENT_METHODS.filter((m) => m.id !== "split").map((m) => (
                   <button
                     key={m.id}
                     className={`border rounded-xl p-3.5 text-left cursor-pointer font-inherit transition-all duration-150 hover:border-line-2 ${
@@ -710,39 +902,49 @@ export default function CheckoutPage() {
                     <div className="text-sm font-semibold text-ink">{m.label}</div>
                     <div className="text-[11px] text-ink-3 mt-0.5">{m.desc}</div>
                   </button>
-                ))}
-              </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
               <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mt-3.5 mb-2">Amount to collect</div>
               <div className="text-[48px] font-semibold tracking-[-0.03em] text-center py-5 text-teal bg-teal-soft rounded-xl border border-teal-soft-2 mb-3.5 flex items-center justify-center font-mono">
                 <span className="text-2xl text-ink-3 mr-1 self-start mt-2">₹</span>
-                {total.toLocaleString("en-IN")}
+                {collectAmount.toLocaleString("en-IN")}
               </div>
 
-              {method === "upi" && <UpiPanel total={total} onDone={finishPayment} customerName={baseBooking.customer.name} disabled={submitting} />}
-              {method === "cash" && (
+              {paymentMode === "due" && (
+                <div className="bg-white border border-line rounded-xl p-[18px]">
+                  <div className="text-sm font-semibold text-ink">No money collected now</div>
+                  <div className="text-xs text-ink-3 mt-1">The service will be completed and ₹{balanceDue.toLocaleString("en-IN")} will stay due on this booking.</div>
+                  <button
+                    className="btn btn-primary btn-lg w-full mt-3.5"
+                    disabled={submitting}
+                    onClick={() => finishPayment({ method: "Due", received: 0 })}
+                  >
+                    {submitting ? "Saving..." : "Mark payment due"}
+                  </button>
+                </div>
+              )}
+              {paymentMode !== "due" && method === "upi" && <UpiPanel total={collectAmount} onDone={finishPayment} customerName={baseBooking.customer.name} disabled={submitting || collectAmount <= 0} />}
+              {paymentMode !== "due" && method === "cash" && (
                 <CashPanel
-                  total={total}
+                  total={collectAmount}
                   onDone={finishPayment}
                   cashReceived={cashReceived}
                   setCashReceived={setCashReceived}
                   changeToReturn={changeToReturn}
                   quickAmounts={quickAmounts}
-                  disabled={submitting}
+                  disabled={submitting || collectAmount <= 0}
                 />
               )}
-              {method === "card" && (
+              {paymentMode !== "due" && method === "card" && (
                 <CardPanel
-                  total={total}
+                  total={collectAmount}
                   onDone={finishPayment}
                   cardWaiting={cardWaiting}
-                  disabled={submitting}
+                  disabled={submitting || collectAmount <= 0}
                 />
-              )}
-              {method === "split" && (
-                <div className="p-6 bg-bg-2 rounded-xl text-xs text-ink-3 text-center border border-dashed border-line">
-                  Split payment — coming soon. Use individual methods for now.
-                </div>
               )}
             </>
           )}
@@ -751,10 +953,12 @@ export default function CheckoutPage() {
             <Receipt
               items={items}
               total={total}
-              discount={discount}
+              discount={discountAmount}
               tip={tip}
               payment={payment}
               customer={baseBooking.customer}
+              amountPaid={existingPaidAmount}
+              amountDue={payment.amountDue}
               onWhatsApp={() => triggerFlash("Receipt sent on WhatsApp ✓")}
               onPrint={() => triggerFlash("Sent to printer ✓")}
               onClose={() => router.push("/dashboard")}
@@ -766,9 +970,9 @@ export default function CheckoutPage() {
           <div className="p-[14px_18px] bg-white/94 backdrop-blur-[8px] border-t border-line flex items-center justify-between gap-4 sticky bottom-0 z-30">
             <div className="flex flex-col">
               <span className="text-[11px] text-ink-3 uppercase tracking-[0.04em] font-semibold">
-                TOTAL TO COLLECT
+                {existingPaidAmount > 0 ? "BALANCE DUE" : "TOTAL TO COLLECT"}
               </span>
-              <span className="text-2xl font-semibold tracking-[-0.02em] text-teal mt-0.5 font-mono">₹{total.toLocaleString("en-IN")}</span>
+              <span className="text-2xl font-semibold tracking-[-0.02em] text-teal mt-0.5 font-mono">₹{balanceDue.toLocaleString("en-IN")}</span>
             </div>
             <button 
               className="btn btn-primary btn-lg" 
@@ -776,7 +980,7 @@ export default function CheckoutPage() {
               disabled={items.length === 0} 
               style={items.length === 0 ? { opacity: 0.5 } : {}}
             >
-              Take payment <span aria-hidden>→</span>
+              {existingPaidAmount > 0 ? "Collect balance" : "Take payment"} <span aria-hidden>→</span>
             </button>
           </div>
         )}
@@ -790,12 +994,16 @@ export default function CheckoutPage() {
 interface TotalSummaryProps {
   subtotal: number;
   discount: number;
+  discountType: DiscountType;
+  discountValue: number;
   tip: number;
   roundOffAmt: number;
   total: number;
+  amountPaid: number;
+  amountDue: number;
 }
 
-function TotalSummary({ subtotal, discount, tip, roundOffAmt, total }: TotalSummaryProps) {
+function TotalSummary({ subtotal, discount, discountType, discountValue, tip, roundOffAmt, total, amountPaid, amountDue }: TotalSummaryProps) {
   return (
     <div className="bg-white border border-line rounded-xl p-[14px_18px]">
       <div className="flex justify-between items-center py-1.5 text-[13px] text-ink-2">
@@ -804,7 +1012,7 @@ function TotalSummary({ subtotal, discount, tip, roundOffAmt, total }: TotalSumm
       </div>
       {discount > 0 && (
         <div className="flex justify-between items-center py-1.5 text-[13px] text-rose">
-          <span>Discount</span>
+          <span>Discount{discountType === "percent" ? ` (${discountValue}%)` : ""}</span>
           <span className="font-mono">− ₹{discount.toLocaleString("en-IN")}</span>
         </div>
       )}
@@ -823,8 +1031,18 @@ function TotalSummary({ subtotal, discount, tip, roundOffAmt, total }: TotalSumm
         </div>
       )}
       <div className="flex justify-between items-center pt-2.5 mt-1.5 border-t border-line text-base font-semibold text-ink">
-        <span>Total to collect</span>
+        <span>Bill total</span>
         <span className="text-teal text-[22px] tracking-[-0.02em] font-mono">₹{total.toLocaleString("en-IN")}</span>
+      </div>
+      {amountPaid > 0 && (
+        <div className="flex justify-between items-center py-1.5 text-[13px] text-green">
+          <span>Already paid</span>
+          <span className="font-mono">₹{amountPaid.toLocaleString("en-IN")}</span>
+        </div>
+      )}
+      <div className="flex justify-between items-center py-1.5 text-[13px] text-ink-2">
+        <span>Balance due</span>
+        <span className="font-mono">₹{amountDue.toLocaleString("en-IN")}</span>
       </div>
     </div>
   );
@@ -834,7 +1052,7 @@ function TotalSummary({ subtotal, discount, tip, roundOffAmt, total }: TotalSumm
 
 interface UpiPanelProps {
   total: number;
-  onDone: (p: PaymentInfo) => void;
+  onDone: (p: PaymentSubmission) => void;
   customerName: string;
   disabled?: boolean;
 }
@@ -890,7 +1108,7 @@ function UpiPanel({ total, onDone, customerName, disabled }: UpiPanelProps) {
 
 interface CashPanelProps {
   total: number;
-  onDone: (p: PaymentInfo) => void;
+  onDone: (p: PaymentSubmission) => void;
   cashReceived: number;
   setCashReceived: (val: number) => void;
   changeToReturn: number;
@@ -965,7 +1183,7 @@ function CashPanel({
 
 interface CardPanelProps {
   total: number;
-  onDone: (p: PaymentInfo) => void;
+  onDone: (p: PaymentSubmission) => void;
   cardWaiting: boolean;
   disabled?: boolean;
 }
@@ -1019,6 +1237,8 @@ interface ReceiptProps {
   tip: number;
   payment: PaymentInfo;
   customer: Customer;
+  amountPaid: number;
+  amountDue: number;
   onWhatsApp: () => void;
   onPrint: () => void;
   onClose: () => void;
@@ -1031,6 +1251,8 @@ function Receipt({
   tip,
   payment,
   customer,
+  amountPaid,
+  amountDue,
   onWhatsApp,
   onPrint,
   onClose,
@@ -1074,10 +1296,10 @@ function Receipt({
           </svg>
         </div>
         <h2 className="text-[22px] font-semibold tracking-tight m-0 text-ink">
-          Payment received
+          {payment.status === "paid" ? "Payment received" : payment.status === "partial" ? "Partial payment received" : "Payment due"}
         </h2>
         <p className="text-sm text-teal-ink m-[6px_0_0] font-medium font-mono">
-          ₹{total.toLocaleString("en-IN")} · {payment.method}
+          {payment.received > 0 ? `₹${payment.received.toLocaleString("en-IN")} · ${payment.method}` : `₹${amountDue.toLocaleString("en-IN")} due`}
         </p>
       </div>
 
@@ -1121,11 +1343,25 @@ function Receipt({
         </div>
         <div className="h-[1px] bg-line my-4"></div>
         <div className="flex justify-between items-center text-[18px]">
-          <strong>Total paid</strong>
-          <strong className="text-teal font-semibold font-mono">
+          <strong>Bill total</strong>
+          <strong className="text-ink font-semibold font-mono">
             ₹{total.toLocaleString("en-IN")}
           </strong>
         </div>
+        <div className="flex justify-between items-center text-[14px] mt-2">
+          <span className="text-ink-2 font-medium">Total paid</span>
+          <strong className="text-teal font-semibold font-mono">
+            ₹{amountPaid.toLocaleString("en-IN")}
+          </strong>
+        </div>
+        {amountDue > 0 && (
+          <div className="flex justify-between items-center text-[14px] mt-2">
+            <span className="text-ink-2 font-medium">Balance due</span>
+            <strong className="text-rose font-semibold font-mono">
+              ₹{amountDue.toLocaleString("en-IN")}
+            </strong>
+          </div>
+        )}
       </div>
 
       <div className="p-[18px_24px_24px] bg-bg border-t border-dashed border-line">

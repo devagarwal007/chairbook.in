@@ -707,7 +707,7 @@ export default function BookingsPage() {
                   href={`/dashboard/checkout/${selected.id}`}
                   className="flex-1 h-10 flex items-center justify-center border border-line-2 text-ink-2 rounded-[8px] font-medium text-[13px] no-underline hover:border-ink-3 hover:bg-bg-2 transition-all duration-150"
                 >
-                  Checkout / POS
+                  Payment / POS
                 </Link>
                 {selected.phone && (
                   <button

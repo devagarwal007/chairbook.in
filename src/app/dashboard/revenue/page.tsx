@@ -195,6 +195,10 @@ export default function InsightsPage() {
             date,
             start_time,
             status,
+            payment_status,
+            amount_paid,
+            amount_due,
+            bill_total,
             customer_id,
             stylist_id,
             created_at,
@@ -259,11 +263,16 @@ export default function InsightsPage() {
 
         // Aggregate helper
         const calculateStats = (filteredBookings: DbAnalyticsBooking[], compareBookings: DbAnalyticsBooking[], rangeLabel: string, compLabel: string, periodType: "today" | "week" | "month"): PeriodData => {
+          const getPaidAmount = (b: DbAnalyticsBooking) => {
+            const payments = Array.isArray(b.payments) ? b.payments : [];
+            const ledgerPaid = payments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
+            return ledgerPaid || Number(b.amount_paid || 0);
+          };
+
           const getRevenue = (list: DbAnalyticsBooking[]) =>
             list.reduce((acc, b) => {
               if (b.status === "Cancelled" || b.status === "No-show") return acc;
-              const pay = Array.isArray(b.payments) ? b.payments[0] : b.payments;
-              return acc + (pay ? Number(pay.amount) : 0);
+              return acc + getPaidAmount(b);
             }, 0);
 
           const getBookingsCount = (list: DbAnalyticsBooking[]) => list.filter(b => b.status !== "Cancelled").length;
@@ -367,10 +376,12 @@ export default function InsightsPage() {
           const serviceMap: Record<string, { revenue: number; bookings: number }> = {};
           filteredBookings.forEach(b => {
             if (b.status === "Cancelled" || b.status === "No-show") return;
+            const serviceSubtotal = b.booking_services?.reduce((sum, bs) => sum + Number(bs.price_at_booking) * (bs.qty || 1), 0) || 0;
+            const paidRatio = serviceSubtotal > 0 ? getPaidAmount(b) / serviceSubtotal : 0;
             b.booking_services?.forEach((bs) => {
               const name = bs.service?.name || "Other Service";
               if (!serviceMap[name]) serviceMap[name] = { revenue: 0, bookings: 0 };
-              serviceMap[name].revenue += Number(bs.price_at_booking) * (bs.qty || 1);
+              serviceMap[name].revenue += Number(bs.price_at_booking) * (bs.qty || 1) * paidRatio;
               serviceMap[name].bookings += 1;
             });
           });
@@ -396,8 +407,7 @@ export default function InsightsPage() {
             const sTone = b.stylist?.tone ? b.stylist.tone.replace("tone-", "") : "b";
             if (!stylistMap[sName]) stylistMap[sName] = { name: sName, tone: sTone, bookings: 0, revenue: 0 };
             stylistMap[sName].bookings += 1;
-            const pay = Array.isArray(b.payments) ? b.payments[0] : b.payments;
-            stylistMap[sName].revenue += pay ? Number(pay.amount) : 0;
+            stylistMap[sName].revenue += getPaidAmount(b);
           });
 
           const totalStylistRevenue = Object.values(stylistMap).reduce((sum, s) => sum + s.revenue, 0) || 1;

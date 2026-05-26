@@ -24,6 +24,10 @@ export interface Appointment extends BookingTimingFields {
   visits: number;
   phone: string;
   note: string;
+  paymentStatus?: "paid" | "partial" | "due" | null;
+  amountPaid?: number;
+  amountDue?: number;
+  billTotal?: number;
 }
 
 export interface CalAppt extends BookingTimingFields {
@@ -114,6 +118,10 @@ export interface DbBookingListItem {
   customer: { id: string | number; name: string; phone: string | null } | null;
   stylist: { id: string | number; name: string; tone: string | null } | null;
   booking_services: DbBookingServiceItem[] | null;
+  payment_status?: string | null;
+  amount_paid?: number | null;
+  amount_due?: number | null;
+  bill_total?: number | null;
 }
 
 export interface DbCalBookingRow {

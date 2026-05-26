@@ -565,7 +565,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
   const waitMinutes = getWaitMinutes(appt);
   const actualMinutes = getActualServiceMinutes(appt);
   const late = isRunningLate(appt.status, appt.time, appt.duration, nowTimeMin);
-  const checkoutPrimary = appt.status === "completed";
+  const checkoutPrimary = appt.status === "completed" && appt.paymentStatus !== "paid";
 
   const bookingParam = typeof appt.id === "string" ? appt.id : String(appt.id);
   const customerParam = appt.customerId ? String(appt.customerId) : String(appt.id);
@@ -601,9 +601,24 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Badge tone={appt.status}>
-            {STATUS_LABEL[appt.status]}
-          </Badge>
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            <Badge tone={appt.status}>
+              {STATUS_LABEL[appt.status]}
+            </Badge>
+            {appt.paymentStatus === "paid" ? (
+              <Badge tone="green" showDot={false} className="!text-[9px] font-semibold">
+                Paid
+              </Badge>
+            ) : appt.paymentStatus === "partial" ? (
+              <Badge tone="blue" showDot={false} className="!text-[9px] font-semibold">
+                Partial
+              </Badge>
+            ) : appt.status === "completed" ? (
+              <Badge tone="rose" showDot={false} className="!text-[9px] font-semibold">
+                Unpaid
+              </Badge>
+            ) : null}
+          </div>
           {late && <span className="text-[11px] text-rose font-medium">Running late</span>}
           <div className="text-[13px] text-ink-2 font-mono font-medium">₹{appt.price.toLocaleString("en-IN")}</div>
         </div>
@@ -649,6 +664,39 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
               )}
               <br />
               <span className="text-ink-3">Stylist: {stylist.name}</span>
+              {appt.paymentStatus && (
+                <>
+                  <br />
+                  <span className="text-ink-3">
+                    Payment:{" "}
+                    <span className={`inline-flex items-center gap-[4px] text-[10px] font-semibold px-[6px] py-[1.5px] rounded-full ${
+                      appt.paymentStatus === "paid"
+                        ? "text-[#137A4A] bg-[#DFF1E6]"
+                        : appt.paymentStatus === "partial"
+                          ? "text-[#1957B8] bg-[#E6EEFA]"
+                          : "text-rose bg-[#FAE2DC]"
+                    }`}>
+                      {appt.paymentStatus === "paid" ? "Paid" : appt.paymentStatus === "partial" ? "Partially Paid" : "Unpaid"}
+                    </span>
+                  </span>
+                  {appt.paymentStatus !== "paid" && appt.amountPaid !== undefined && appt.amountPaid > 0 && (
+                    <>
+                      <br />
+                      <span className="text-[11px] text-ink-3">
+                        (₹{appt.amountPaid.toLocaleString("en-IN")} paid · ₹{appt.amountDue?.toLocaleString("en-IN")} due)
+                      </span>
+                    </>
+                  )}
+                  {appt.paymentStatus === "due" && appt.status === "completed" && (
+                    <>
+                      <br />
+                      <span className="text-[11px] text-rose font-medium">
+                        (₹{appt.price.toLocaleString("en-IN")} pending collection)
+                      </span>
+                    </>
+                  )}
+                </>
+              )}
               <br />
               <Link
                 href={`/dashboard/bookings/${bookingParam}`}

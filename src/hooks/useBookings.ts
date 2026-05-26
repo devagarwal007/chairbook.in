@@ -45,6 +45,10 @@ export function useBookings(salonId: string | null, day: string) {
           start_time,
           duration,
           status,
+          payment_status,
+          amount_paid,
+          amount_due,
+          bill_total,
           arrived_at,
           started_at,
           completed_at,
@@ -102,8 +106,12 @@ export function useBookings(salonId: string | null, day: string) {
             .filter(Boolean)
             .join(" + ") || "No service";
           
-          const price = (b.booking_services || [])
+          const amountPaid = Number(b.amount_paid || 0);
+          const totalFromServices = (b.booking_services || [])
             .reduce((total, bs) => total + (Number(bs.price_at_booking) * (bs.qty || 1)), 0) || 0;
+          const billTotal = Number(b.bill_total || (b.status === "Paid" ? amountPaid : totalFromServices));
+          const amountDue = Math.max(0, Number(b.amount_due ?? Math.max(0, billTotal - amountPaid)));
+          const paymentStatus = (b.payment_status || (b.status === "Paid" || amountDue <= 0 && amountPaid > 0 ? "paid" : amountPaid > 0 ? "partial" : "due")) as "paid" | "partial" | "due";
 
           return {
             id: b.id,
@@ -115,7 +123,7 @@ export function useBookings(salonId: string | null, day: string) {
             tone: cleanToneVal,
             service: serviceNames,
             stylist: b.stylist?.id ? String(b.stylist.id) : "unassigned",
-            price,
+            price: billTotal,
             status: mapDbStatusToUi(b.status),
             arrivedAt: b.arrived_at,
             startedAt: b.started_at,
@@ -123,7 +131,11 @@ export function useBookings(salonId: string | null, day: string) {
             actualDurationMinutes: b.actual_duration_minutes,
             visits: b.customer_id ? (visitsMap[b.customer_id] || 0) : 0,
             phone: b.customer?.phone || "",
-            note: b.notes || ""
+            note: b.notes || "",
+            paymentStatus,
+            amountPaid,
+            amountDue,
+            billTotal
           };
         });
 

@@ -787,9 +787,13 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
 
   const filteredServices = React.useMemo(() => {
     if (!svcQuery.trim()) return services;
-    const q = svcQuery.toLowerCase();
+    const q = svcQuery.trim().toLowerCase();
     return services.filter(
-      (s) => s.name.toLowerCase().includes(q) || (s.cat && s.cat.toLowerCase().includes(q))
+      (s) => s.name.toLowerCase().includes(q)
+        || (s.cat && s.cat.toLowerCase().includes(q))
+        || (s.kind && s.kind.toLowerCase().includes(q))
+        || String(s.code || "").includes(q)
+        || (s.code ? `#${String(s.code).padStart(3, "0")}`.includes(q) : false)
     );
   }, [svcQuery, services]);
 
@@ -844,7 +848,7 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
         <div className="flex items-center gap-2 border border-line-2 rounded-[10px] px-3.5 py-2 mb-3 bg-white">
           <I.search className="text-ink-3 shrink-0 w-4 h-4" />
           <input
-            placeholder="Search service..."
+            placeholder="Search service or bundle..."
             value={svcQuery}
             onChange={(e) => setSvcQuery(e.target.value)}
             className="flex-1 border-0 outline-0 text-sm font-sans bg-transparent min-w-0"
@@ -864,7 +868,14 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
               }`}
               onClick={() => setSvcId(s.id)}
             >
-              <span className="truncate mr-1">{s.name}</span>
+              <span className="min-w-0 mr-1 flex items-center gap-1.5 flex-wrap">
+                <span className="truncate">{s.name}</span>
+                {s.kind === "bundle" && (
+                  <span className="text-[9px] text-teal bg-teal-soft border border-teal-soft-2 rounded-full px-1.5 py-0.5 uppercase tracking-[0.04em]">
+                    Bundle
+                  </span>
+                )}
+              </span>
               <small className={`font-mono text-xs shrink-0 ${svcId === s.id ? "text-teal" : "text-ink-3"}`}>
                 {s.duration}m · ₹{s.price}
               </small>

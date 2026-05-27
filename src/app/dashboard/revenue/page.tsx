@@ -12,11 +12,49 @@ import { PeriodData, DbAnalyticsBooking } from "@/types";
 
 const IR = I;
 
-
-
-import { PERIODS_MOCK } from "@/constants/revenue";
-
 const fmt = (n: number) => Math.round(n).toLocaleString("en-IN");
+
+function emptyPeriodData(period: "today" | "week" | "month"): PeriodData {
+  const now = new Date();
+  const label = period === "today" ? "Today" : period === "week" ? "This week" : "This month";
+  const dateRange = period === "today"
+    ? now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : period === "week"
+      ? "No bookings this week"
+      : "No bookings this month";
+  const chartLabels = period === "today"
+    ? ["9 AM", "10", "11", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM", "7 PM", "8 PM"]
+    : period === "week"
+      ? ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+      : ["W1", "W2", "W3", "W4"];
+
+  return {
+    label,
+    dateRange,
+    compareLabel: period === "today" ? "vs. yesterday" : period === "week" ? "vs. last week" : "vs. last month",
+    metrics: {
+      revenue: { value: 0, delta: "same", tone: "flat" },
+      bookings: { value: 0, delta: "same", tone: "flat" },
+      newCust: { value: 0, delta: "same", tone: "flat" },
+      noShow: { value: 0, delta: "same", tone: "flat", unit: "%" },
+      serviceTime: { value: 0, delta: "no data", tone: "flat", compare: "needs completed services", unit: "min" },
+    },
+    timing: {
+      avgActualMinutes: null,
+      avgEstimatedMinutes: null,
+      completedWithTiming: 0,
+      runningLate: 0,
+      bestOnTimeStylist: null,
+    },
+    chart: {
+      title: period === "today" ? "Revenue by hour" : period === "week" ? "Revenue by day" : "Revenue by week",
+      data: chartLabels.map((x) => ({ x, v: 0 })),
+      highlight: 0,
+    },
+    topServices: [],
+    topStylists: [],
+  };
+}
 
 // ===== METRIC BIG COMPONENT =====
 interface MetricBigProps {
@@ -571,16 +609,9 @@ export default function InsightsPage() {
     fetchAnalytics();
   }, [salonId, profileLoading]);
 
-  // Use dynamic database data if loaded and has records, else fall back to mock data
+  // Use database data only. Empty databases should stay empty, not show demo revenue.
   const p = useMemo(() => {
-    if (dbData && dbData[period]) {
-      // Check if we actually have any bookings or if the DB analytics yielded non-zero values
-      const data = dbData[period];
-      if (data.metrics.revenue.value > 0 || data.metrics.bookings.value > 0) {
-        return data;
-      }
-    }
-    return PERIODS_MOCK[period];
+    return dbData?.[period] || emptyPeriodData(period);
   }, [dbData, period]);
 
   if (loading) {

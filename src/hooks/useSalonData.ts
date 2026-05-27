@@ -37,7 +37,7 @@ export function useSalonData(salonId: string | null) {
       try {
         const [stRes, svRes, custRes] = await Promise.all([
           supabase.from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true),
-          supabase.from("services").select("id, name, category, duration_min, price").eq("salon_id", salonId).eq("active", true),
+          supabase.from("services").select("id, name, category, duration_min, price, code, kind, bundle_note").eq("salon_id", salonId).eq("active", true).is("deleted_at", null),
           supabase.from("customers").select("id, name, phone, created_at").eq("salon_id", salonId).order("created_at", { ascending: false }),
         ]);
 
@@ -57,9 +57,12 @@ export function useSalonData(salonId: string | null) {
           setServices(rawServices.map((s) => ({
             id: s.id,
             name: s.name,
-            cat: s.category || "General",
+            cat: s.category || (s.kind === "bundle" ? "Bundles" : "General"),
             duration: s.duration_min,
             price: Number(s.price),
+            code: s.code ?? null,
+            kind: s.kind || "service",
+            bundle_note: s.bundle_note || "",
           })));
         }
 

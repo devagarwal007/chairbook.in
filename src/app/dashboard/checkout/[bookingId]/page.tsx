@@ -57,7 +57,7 @@ export default function CheckoutPage() {
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dbServices, setDbServices] = useState<{ id: string; name: string; price: number }[]>([]);
+  const [dbServices, setDbServices] = useState<{ id: string; name: string; price: number; kind?: string | null }[]>([]);
 
   // Resolve booking — only for UUID-sourced bookings loaded from DB
   const baseBooking = useMemo(() => {
@@ -233,15 +233,17 @@ export default function CheckoutPage() {
         if (bookingData?.salon_id) {
           const { data: svcs } = await supabase
             .from("services")
-            .select("id, name, price")
+            .select("id, name, price, kind")
             .eq("salon_id", bookingData.salon_id)
-            .eq("active", true);
+            .eq("active", true)
+            .is("deleted_at", null);
 
           if (svcs) {
             setDbServices(svcs.map(s => ({
               id: s.id,
               name: s.name,
-              price: Number(s.price)
+              price: Number(s.price),
+              kind: s.kind || "service"
             })));
           }
         }
@@ -722,7 +724,10 @@ export default function CheckoutPage() {
                           }}
                           className="flex justify-between items-center w-full p-[10px_14px] border-0 border-b border-line last:border-b-0 bg-transparent cursor-pointer text-[13px] text-left hover:bg-bg-2 transition-colors duration-150"
                         >
-                          <span className="text-ink font-medium">{item.name}</span>
+                          <span className="text-ink font-medium">
+                            {item.name}
+                            {item.kind === "bundle" && <span className="ml-1.5 text-[10px] text-teal bg-teal-soft border border-teal-soft-2 rounded-full px-1.5 py-0.5 uppercase tracking-[0.04em]">Bundle</span>}
+                          </span>
                           <strong className="text-teal font-semibold font-mono">₹{item.price}</strong>
                         </button>
                       ))}

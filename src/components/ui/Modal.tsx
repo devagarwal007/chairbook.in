@@ -10,6 +10,10 @@ export interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: string;
+  className?: string;
+  bodyClassName?: string;
+  subtitle?: React.ReactNode;
+  beforeBody?: React.ReactNode;
 }
 
 export function Modal({
@@ -19,6 +23,10 @@ export function Modal({
   children,
   footer,
   width,
+  className,
+  bodyClassName,
+  subtitle,
+  beforeBody,
 }: ModalProps) {
   if (!isOpen) return null;
 
@@ -28,19 +36,21 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className="modal"
+        className={`modal${className ? ` ${className}` : ""}`}
         onClick={(e) => e.stopPropagation()}
         style={width ? { width } : undefined}
       >
         <div className="modal-head">
           <div>
             <h3>{title}</h3>
+            {subtitle && <div className="modal-subtitle">{subtitle}</div>}
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             <I.x className="w-4 h-4" />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        {beforeBody}
+        <div className={`modal-body${bodyClassName ? ` ${bodyClassName}` : ""}`}>{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
     </div>

@@ -9,7 +9,7 @@ import { toMinHours, initialsOf, formatDateKey, formatTime12hFromMin } from "@/l
 import { Stylist, CalAppt, DbCalBookingRow } from "@/types";
 import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
 
-import { START_HOUR, SLOT_HEIGHT, MONTH_NAMES, DOW_FULL, STATUS_LABEL, TIME_LABELS, FALLBACK_STYLISTS } from "@/constants/bookings";
+import { START_HOUR, SLOT_HEIGHT, MONTH_NAMES, DOW_FULL, STATUS_LABEL, TIME_LABELS } from "@/constants/bookings";
 
 // Helpers
 const getWeekStart = (date: Date): Date => {
@@ -41,38 +41,6 @@ function getWeekNumber(d: Date): number {
   date.setUTCDate(date.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-
-// FALLBACK: only used when salonId is missing (preview / no Supabase)
-function generateMockAppts(weekDays: Date[]): CalAppt[] {
-  const appts: CalAppt[] = [];
-  const stylists = ["anjali", "pooja", "kiran", "rekha"];
-  const services = ["Haircut", "Hair Color", "Facial", "Hair Spa", "Threading", "Manicure", "Pedicure", "Beard Trim"];
-  const customers = [
-    { name: "Priya Sharma", tone: "b" }, { name: "Meera Iyer", tone: "c" },
-    { name: "Kavya Reddy", tone: "e" }, { name: "Sneha P.", tone: "d" },
-    { name: "Anita Verma", tone: "a" }, { name: "Ravi K.", tone: "c" },
-    { name: "Aisha Khan", tone: "d" }, { name: "Tanvi Kapoor", tone: "c" },
-  ];
-  const statuses: ("confirmed" | "arrived" | "in_service" | "completed")[] = ["confirmed", "arrived", "in_service", "completed"];
-
-  let id = 100;
-  weekDays.forEach((day) => {
-    const key = formatDateKey(day);
-    const count = Math.floor(Math.random() * 5) + 2;
-    for (let i = 0; i < count; i++) {
-      const cust = customers[Math.floor(Math.random() * customers.length)];
-      const startH = Math.floor(Math.random() * 8) + START_HOUR;
-      const startM = Math.random() > 0.5 ? 30 : 0;
-      const dur = [30, 45, 60, 90][Math.floor(Math.random() * 4)];
-      const stylistId = stylists[Math.floor(Math.random() * stylists.length)];
-      const svc = services[Math.floor(Math.random() * services.length)];
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
-      const initials = initialsOf(cust.name);
-      appts.push({ id: id++, dayKey: key, stylistId, startH, startM, duration: dur, customer: cust.name, initials, tone: cust.tone, service: svc, status });
-    }
-  });
-  return appts;
 }
 
 // ===== APPOINTMENT BLOCK =====
@@ -412,7 +380,7 @@ function ListView({ weekDays, appts, stylists, stylistFilter, onSelect, todayKey
   if (totalAll === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-        <div className="font-mono text-[10px] text-ink-4 tracking-[0.06em] uppercase">// no bookings</div>
+        <div className="font-mono text-[10px] text-ink-4 tracking-[0.06em] uppercase">{"// no bookings"}</div>
         <div className="text-lg font-semibold text-ink-2">Nothing on the books</div>
         <div className="text-sm text-ink-3">Try a different stylist filter or week.</div>
       </div>
@@ -572,7 +540,7 @@ export default function BookingsPage() {
   const [showBlockModal, setShowBlockModal] = useState(false);
 
   const [appts, setAppts] = useState<CalAppt[]>([]);
-  const [stylists, setStylists] = useState<Stylist[]>(FALLBACK_STYLISTS);
+  const [stylists, setStylists] = useState<Stylist[]>([]);
   const [loading, setLoading] = useState(true);
   const [nowMin, setNowMin] = useState(0);
 
@@ -599,7 +567,8 @@ export default function BookingsPage() {
   const loadAppts = useCallback(async (sid: string, days: Date[]) => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setAppts(generateMockAppts(days));
+      setStylists([]);
+      setAppts([]);
       setLoading(false);
       return;
     }
@@ -609,16 +578,15 @@ export default function BookingsPage() {
       const fromDate = formatDateKey(days[0]);
       const toDate = formatDateKey(days[days.length - 1]);
 
-      const { data: stylistsData } = await supabase
+      const { data: stylistsData, error: stylistsError } = await supabase
         .from("stylists").select("id, name, tone").eq("salon_id", sid).eq("active", true);
-      if (stylistsData && stylistsData.length > 0) {
-        setStylists((stylistsData as unknown as Array<{ id: string; name: string; tone: string | null }>).map((s) => ({
-          id: s.id,
-          name: s.name,
-          short: s.name[0],
-          tone: (s.tone || "tone-a").replace("tone-", ""),
-        })));
-      }
+      if (stylistsError) throw stylistsError;
+      setStylists(((stylistsData || []) as unknown as Array<{ id: string; name: string; tone: string | null }>).map((s) => ({
+        id: s.id,
+        name: s.name,
+        short: s.name[0],
+        tone: (s.tone || "tone-a").replace("tone-", ""),
+      })));
 
       const { data, error } = await supabase
         .from("bookings")
@@ -690,7 +658,7 @@ export default function BookingsPage() {
       }
     } catch (err) {
       console.error("Error loading bookings:", err);
-      setAppts(generateMockAppts(days));
+      setAppts([]);
     } finally {
       setLoading(false);
     }
@@ -702,14 +670,11 @@ export default function BookingsPage() {
         loadAppts(salonId, weekDays);
       });
     } else {
-      // If no salonId yet, load mock data after short delay to check cache
-      const t = setTimeout(() => {
-        if (!salonId) {
-          setAppts(generateMockAppts(weekDays));
-          setLoading(false);
-        }
-      }, 1500);
-      return () => clearTimeout(t);
+      queueMicrotask(() => {
+        setStylists([]);
+        setAppts([]);
+        setLoading(false);
+      });
     }
   }, [salonId, weekDays, loadAppts]);
 

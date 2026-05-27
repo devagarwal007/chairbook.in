@@ -19,11 +19,11 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>({
-    name: "Ravi Kumar",
+    name: "",
     role: "Owner",
-    salonName: "GLOW SALON",
-    salonArea: "ANDHERI",
-    initials: "R",
+    salonName: "CHAIRBOOK",
+    salonArea: "",
+    initials: "",
   });
   const [salonId, setSalonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const cachedSalonId = localStorage.getItem("cb_salon_id");
       if (cachedProfile) {
         try {
-          setProfile(JSON.parse(cachedProfile));
+          const parsed = JSON.parse(cachedProfile) as Profile;
+          const isOldDemoProfile = parsed.salonName === "GLOW SALON" && parsed.salonArea === "ANDHERI";
+          if (isOldDemoProfile) {
+            localStorage.removeItem("cb_profile");
+          } else {
+            setProfile(parsed);
+          }
         } catch (e) {
           console.error("Error parsing cached profile:", e);
         }
@@ -73,8 +79,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const userRole = userProfile.role ? userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1) : "Owner";
       const initials = initialsOf(userName);
 
-      let salonName = "GLOW SALON";
-      let salonArea = "ANDHERI";
+      let salonName = "ChairBook";
+      let salonArea = "";
       let salonIdVal: string | null = null;
 
       if (userProfile.org_id) {

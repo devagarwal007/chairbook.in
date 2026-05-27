@@ -115,9 +115,33 @@ const IBD = {
 
 // ===== TYPES =====
 
-import { MOCK_BOOKING as BOOKING, CANCEL_REASONS, RESCH_DAYS, ALL_SLOTS } from "@/constants/bookings";
+import { CANCEL_REASONS, RESCH_DAYS, ALL_SLOTS } from "@/constants/bookings";
 
 const STATUS_LABEL = BOOKING_STATUS_LABEL;
+
+const EMPTY_BOOKING: BookingData = {
+  id: "",
+  status: "confirmed",
+  date: "",
+  time: "00:00",
+  duration: 0,
+  customer: {
+    id: "",
+    name: "",
+    initials: "",
+    tone: "a",
+    phone: "",
+    visits: 0,
+    lastVisit: "",
+    spend: 0,
+    memberSince: "",
+  },
+  services: [],
+  stylist: { name: "", short: "", tone: "a" },
+  notes: "",
+  payment: { status: "pending", method: null },
+  activity: [],
+};
 
 // ===== RESCHEDULE MODAL =====
 interface RescheduleModalProps {
@@ -261,11 +285,11 @@ export default function BookingDetailPage() {
   const [showCancel, setShowCancel] = useState(false);
   const { show: showFlash } = useToast();
   const { advanceBooking } = useBookingProgress();
-  const [activity, setActivity] = useState(BOOKING.activity);
+  const [activity, setActivity] = useState<BookingData["activity"]>([]);
   const [rescheduled, setRescheduled] = useState<{ date: string; time: string } | null>(null);
   const [salonInfo, setSalonInfo] = useState({
-    name: "Glow Salon & Spa",
-    area: "Andheri West",
+    name: "ChairBook",
+    area: "",
   });
 
   useEffect(() => {
@@ -328,9 +352,8 @@ export default function BookingDetailPage() {
 
     if (!isUuid || !supabase) {
       queueMicrotask(() => {
-        setBooking(BOOKING);
-        setStatus(BOOKING.status);
-        setActivity(BOOKING.activity);
+        setBooking(null);
+        setActivity([]);
         setLoading(false);
       });
       return;
@@ -567,6 +590,8 @@ export default function BookingDetailPage() {
         }
       } catch (err) {
         console.error("Error loading booking details:", err);
+        setBooking(null);
+        setActivity([]);
       } finally {
         setLoading(false);
       }
@@ -575,7 +600,7 @@ export default function BookingDetailPage() {
     loadBooking();
   }, [bookingId]);
 
-  const b = booking || BOOKING;
+  const b = booking || EMPTY_BOOKING;
   const totalDur = b.services.reduce((s, x) => s + x.duration, 0);
   const totalPrice = b.services.reduce((s, x) => s + x.price, 0);
   const displayTotal = b.payment.billTotal || totalPrice;
@@ -894,6 +919,29 @@ export default function BookingDetailPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div className="app pb-[calc(72px+24px)]">
+        <div className="bg-surface border-b border-line sticky top-0 z-30">
+          <div className="max-w-[760px] mx-auto flex items-center h-14 px-6 max-[640px]:px-4 max-[640px]:h-[52px]">
+            <Link className="grid place-items-center w-9 h-9 rounded-full text-ink-2 transition-colors duration-150 no-underline hover:bg-bg-2 hover:text-ink" href="/dashboard/bookings" aria-label="Back">
+              <IBD.back />
+            </Link>
+            <div style={{ flex: 1 }}>
+              <div className="text-sm font-semibold">Booking not found</div>
+              <div className="text-[11px] text-ink-3 mt-0.5">No database record was returned for this booking.</div>
+            </div>
+          </div>
+        </div>
+        <main className="max-w-[760px] mx-auto px-6 py-10 max-[640px]:px-4">
+          <div className="card p-6 text-sm text-ink-2">
+            This booking is unavailable. Go back to the bookings list and open a live record.
           </div>
         </main>
       </div>

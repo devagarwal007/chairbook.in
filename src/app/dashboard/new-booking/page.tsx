@@ -304,7 +304,10 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
                   }}
                 >
                   <div className="svc-info">
-                    <div className="svc-name" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{s.name}</div>
+                    <div className="svc-name" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {s.name}
+                      {s.kind === "bundle" && <span style={{ fontSize: 10, color: "var(--teal)", background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Bundle</span>}
+                    </div>
                     <div className="svc-meta" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
                       <IN.clock /> {s.duration} min
                     </div>
@@ -686,34 +689,39 @@ export default function NewBookingPage() {
         return;
       }
       try {
-        const { data: stylistsData } = await supabaseClient
+        const { data: stylistsData, error: stylistsError } = await supabaseClient
           .from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true);
-        if (stylistsData && stylistsData.length > 0) {
-          const rawStylists = stylistsData as unknown as DbStylistRaw[];
-          setDbStylists(rawStylists.map((s) => ({
-            id: s.id,
-            name: s.name,
-            short: s.name[0],
-            tone: (s.tone || "tone-a").replace("tone-", ""),
-            skills: [],
-          })));
-        }
+        if (stylistsError) throw stylistsError;
 
-        const { data: servicesData } = await supabaseClient
-          .from("services").select("id, name, category, duration_min, price")
-          .eq("salon_id", salonId).eq("active", true);
-        if (servicesData && servicesData.length > 0) {
-          const rawServices = servicesData as unknown as DbServiceRaw[];
-          setDbServices(rawServices.map((s) => ({
-            id: s.id,
-            name: s.name,
-            cat: s.category || "General",
-            duration: s.duration_min,
-            price: Number(s.price),
-          })));
-        }
+        const rawStylists = (stylistsData || []) as unknown as DbStylistRaw[];
+        setDbStylists(rawStylists.map((s) => ({
+          id: s.id,
+          name: s.name,
+          short: s.name[0],
+          tone: (s.tone || "tone-a").replace("tone-", ""),
+          skills: [],
+        })));
+
+        const { data: servicesData, error: servicesError } = await supabaseClient
+          .from("services").select("id, name, category, duration_min, price, code, kind, bundle_note")
+          .eq("salon_id", salonId).eq("active", true).is("deleted_at", null);
+        if (servicesError) throw servicesError;
+
+        const rawServices = (servicesData || []) as unknown as DbServiceRaw[];
+        setDbServices(rawServices.map((s) => ({
+          id: s.id,
+          name: s.name,
+          cat: s.category || (s.kind === "bundle" ? "Bundles" : "General"),
+          duration: s.duration_min,
+          price: Number(s.price),
+          code: s.code ?? null,
+          kind: s.kind || "service",
+          bundle_note: s.bundle_note || "",
+        })));
       } catch (err) {
         console.error("Error loading services:", err);
+        setDbStylists([]);
+        setDbServices([]);
       } finally {
         queueMicrotask(() => {
           setLoadingSvcs(false);

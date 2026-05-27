@@ -144,7 +144,7 @@ export default function PublicBookingPage() {
       const endDate = dates[dates.length - 1].key;
       const [{ data: services, error: serviceError }, { data: stylists, error: stylistError }, { data: bookings, error: bookingError }] =
         await Promise.all([
-          supabase.from("services").select("id,name,category,duration_min,price").eq("salon_id", salon.id).eq("active", true).order("category").order("name"),
+          supabase.from("services").select("id,name,category,duration_min,price,code,kind,bundle_note").eq("salon_id", salon.id).eq("active", true).is("deleted_at", null).order("category").order("name"),
           supabase.from("stylists").select("id,name,role_label,tone,booking_slug").eq("salon_id", salon.id).eq("active", true).order("name"),
           supabase.from("bookings").select("id,stylist_id,date,start_time,duration,status").eq("salon_id", salon.id).gte("date", dates[0].key).lte("date", endDate),
         ]);
@@ -162,6 +162,8 @@ export default function PublicBookingPage() {
         services: (services ?? []).map((s: Omit<Service, "duration"> & { duration_min: number }) => ({
           ...s,
           duration: s.duration_min,
+          cat: s.category || (s.kind === "bundle" ? "Bundles" : "General"),
+          kind: s.kind || "service",
         })),
         stylists: loadedStylists,
         bookings: bookings ?? [],
@@ -364,7 +366,10 @@ export default function PublicBookingPage() {
                       return (
                         <button key={service.id} className={`svc-card ${selected ? "on" : ""}`} onClick={() => toggleService(service)}>
                           <div className="svc-info">
-                            <div className="svc-name">{service.name}</div>
+                            <div className="svc-name">
+                              {service.name}
+                              {service.kind === "bundle" && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--teal)", background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Bundle</span>}
+                            </div>
                             <div className="svc-meta">
                               <I.clock /> {service.duration_min || service.duration} min
                             </div>

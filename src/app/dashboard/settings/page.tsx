@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { signOutCurrentUser } from "@/lib/auth-session";
+import { isUUID } from "@/lib/utils";
 import Header from "@/components/layout/Header";
 import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/components/ui";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
-import { Service, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice } from "@/types";
+import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice } from "@/types";
 
 import { DAYS, TABS, PLANS, INITIAL_DATA } from "@/constants/settings";
 
@@ -53,6 +54,349 @@ function RowField({ label, value, hint, action }: RowFieldProps) {
   );
 }
 
+type ServiceModalState = {
+  mode: "add" | "edit";
+  target?: Service | null;
+  startKind?: ServiceKind;
+};
+
+const SERVICE_CATEGORIES = ["Hair", "Skin", "Hands", "Nails", "General"];
+const SERVICE_SELECT_WITH_BUNDLES = `
+  id,
+  name,
+  category,
+  duration_min,
+  price,
+  active,
+  code,
+  kind,
+  bundle_note,
+  bundle_components!bundle_components_bundle_service_id_fkey (
+    position,
+    component_service_id,
+    component:services!bundle_components_component_service_id_fkey (
+      id,
+      name,
+      category,
+      duration_min,
+      price,
+      code,
+      active
+    )
+  )
+`;
+
+const inr = (value: number) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
+const getServiceKind = (service: Service): ServiceKind => service.kind || "service";
+const getComponentIds = (service: Service) => service.componentIds || service.items || [];
+const formatServiceCode = (service: Service) => `#${String(service.code || 0).padStart(3, "0")}`;
+
+function mapDbServiceRow(row: DbServiceRow): Service {
+  const kind = row.kind || "service";
+  const components = (row.bundle_components || [])
+    .slice()
+    .sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
+  const includedServices = components.flatMap((item) => {
+    const component = item.component;
+    if (!component) return [];
+    return [{
+      id: component.id,
+      name: component.name,
+      cat: component.category || "General",
+      category: component.category || "General",
+      duration: Number(component.duration_min || 0),
+      duration_min: Number(component.duration_min || 0),
+      price: Number(component.price || 0),
+      code: component.code ?? null,
+      kind: "service" as const,
+      active: component.active !== false,
+    }];
+  });
+
+  return {
+    id: row.id,
+    name: row.name,
+    cat: row.category || (kind === "bundle" ? "Bundles" : "General"),
+    category: row.category || (kind === "bundle" ? "Bundles" : "General"),
+    duration: row.duration_min,
+    duration_min: row.duration_min,
+    price: Number(row.price),
+    active: row.active,
+    code: row.code ?? null,
+    kind,
+    bundle_note: row.bundle_note || "",
+    componentIds: components
+      .map((item) => item.component_service_id || item.component?.id)
+      .filter((id): id is string | number => Boolean(id)),
+    includedServices,
+  };
+}
+
+function ServiceMenuModal({
+  modal,
+  allServices,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  modal: ServiceModalState;
+  allServices: Service[];
+  onClose: () => void;
+  onSave: (kind: ServiceKind, service: Service) => void;
+  onDelete: (service: Service) => void;
+}) {
+  const initial = modal.target || null;
+  const isEdit = modal.mode === "edit";
+  const startKind = initial ? getServiceKind(initial) : modal.startKind || "service";
+  const [kind, setKind] = useState<ServiceKind>(startKind);
+  const [name, setName] = useState(initial?.name || "");
+  const [cat, setCat] = useState(initial?.cat || initial?.category || "Hair");
+  const [duration, setDuration] = useState(initial?.duration || initial?.duration_min || 30);
+  const [price, setPrice] = useState(initial?.price || 0);
+  const [active, setActive] = useState(initial?.active !== false);
+  const [componentIds, setComponentIds] = useState<Array<string | number>>(getComponentIds(initial || ({} as Service)));
+  const [note, setNote] = useState(initial?.bundle_note || "");
+  const [pickerQuery, setPickerQuery] = useState("");
+
+  const normalServices = useMemo(() => allServices.filter((service) => getServiceKind(service) === "service"), [allServices]);
+  const selectedServices = useMemo(
+    () => componentIds.map((id) => normalServices.find((service) => service.id === id)).filter(Boolean) as Service[],
+    [componentIds, normalServices]
+  );
+  const originalSum = selectedServices.reduce((sum, service) => sum + Number(service.price || 0), 0);
+  const totalMin = selectedServices.reduce((sum, service) => sum + Number(service.duration || service.duration_min || 0), 0);
+  const savings = Math.max(0, originalSum - Number(price || 0));
+  const savingsPct = originalSum > 0 ? Math.round((savings / originalSum) * 100) : 0;
+  const q = pickerQuery.trim().toLowerCase();
+
+  const toggleComponent = (id: string | number) => {
+    setComponentIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
+  const canSubmit = kind === "service"
+    ? name.trim().length > 0 && Number(duration) > 0 && Number(price) >= 0
+    : name.trim().length > 0 && componentIds.length >= 2 && Number(price) > 0;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    if (kind === "service") {
+      onSave("service", {
+        ...(initial || {}),
+        id: initial?.id ?? "__draft_service__",
+        name: name.trim(),
+        cat,
+        category: cat,
+        duration: Number(duration),
+        duration_min: Number(duration),
+        price: Number(price),
+        active,
+        kind: "service",
+        componentIds: [],
+      });
+      return;
+    }
+
+    onSave("bundle", {
+      ...(initial || {}),
+      id: initial?.id ?? "__draft_bundle__",
+      name: name.trim(),
+      cat: "Bundles",
+      category: "Bundles",
+      duration: totalMin,
+      duration_min: totalMin,
+      price: Number(price),
+      active,
+      kind: "bundle",
+      componentIds,
+      bundle_note: note.trim(),
+    });
+  };
+
+  const matchesPicker = (service: Service) => {
+    if (!q) return true;
+    return service.name.toLowerCase().includes(q)
+      || (service.cat || service.category || "").toLowerCase().includes(q)
+      || String(service.code || "").includes(q)
+      || formatServiceCode(service).toLowerCase().includes(q);
+  };
+
+  const groupedPicker = SERVICE_CATEGORIES
+    .map((category) => ({
+      category,
+      services: normalServices.filter((service) => (service.cat || service.category || "General") === category && matchesPicker(service)),
+    }))
+    .filter((group) => group.services.length > 0);
+
+  return (
+    <Modal
+      title={isEdit ? (kind === "bundle" ? "Edit bundle" : "Edit service") : "Add to menu"}
+      onClose={onClose}
+      width="min(560px, 100%)"
+      className="svc-modal"
+      subtitle={!isEdit ? "A single service or a bundle of two or more." : undefined}
+      beforeBody={!isEdit && (
+        <div className="svc-kind">
+          <button className={`svc-kind-btn ${kind === "service" ? "on" : ""}`} onClick={() => setKind("service")}>
+            <I.scissors />
+            <div>
+              <div className="svc-kind-name">Service</div>
+              <div className="svc-kind-sub">A single offering</div>
+            </div>
+          </button>
+          <button className={`svc-kind-btn ${kind === "bundle" ? "on" : ""}`} onClick={() => setKind("bundle")}>
+            <span className="svc-kind-bundle-ic">
+              <span></span><span></span><span></span>
+            </span>
+            <div>
+              <div className="svc-kind-name">Bundle <span className="svc-kind-tag">save %</span></div>
+              <div className="svc-kind-sub">2+ services, one price</div>
+            </div>
+          </button>
+        </div>
+      )}
+      footer={
+        <div className={`svc-modal-actions ${isEdit ? "edit" : ""}`}>
+          {isEdit && initial && (
+            <button className="btn btn-ghost svc-delete-btn" onClick={() => onDelete(initial)}>
+              <I.trash style={{ width: 14, height: 14 }} /> Delete
+            </button>
+          )}
+          <div className="svc-modal-action-buttons">
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={submit} disabled={!canSubmit}>
+              {isEdit ? "Save changes" : kind === "bundle" ? "Create bundle" : "Add service"}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="field">
+        <label>{kind === "bundle" ? "Bundle name" : "Service name"}</label>
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder={kind === "bundle" ? "e.g. Bridal Glow" : "e.g. Haircut"}
+          autoFocus
+        />
+      </div>
+
+      {kind === "service" ? (
+        <>
+          {isEdit && initial?.code && (
+            <div className="svc-code-display">
+              <span className="svc-code-display-lbl">Service code</span>
+              <span className="svc-code-display-val">{formatServiceCode(initial)}</span>
+            </div>
+          )}
+          <div className="field-row">
+            <div className="field">
+              <label>Category</label>
+              <select
+                value={cat}
+                onChange={(event) => setCat(event.target.value)}
+              >
+                {SERVICE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Duration</label>
+              <div className="svc-input-suffix">
+                <input type="number" min="5" step="5" value={duration} onChange={(event) => setDuration(parseInt(event.target.value, 10) || 0)} />
+                <span>min</span>
+              </div>
+            </div>
+          </div>
+          <div className="field">
+            <label>Price</label>
+            <div className="svc-input-prefix">
+              <span>₹</span>
+              <input type="number" min="0" step="50" value={price} onChange={(event) => setPrice(parseInt(event.target.value, 10) || 0)} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="field">
+            <label>
+              Include services
+              <span className="svc-label-count">{componentIds.length} selected</span>
+            </label>
+            <div className="svc-picker-search">
+              <I.search />
+              <input
+                value={pickerQuery}
+                onChange={(event) => setPickerQuery(event.target.value)}
+                placeholder="Search by name or code (e.g. #003)..."
+              />
+              {pickerQuery && (
+                <button className="svc-search-clear" onClick={() => setPickerQuery("")} aria-label="Clear">
+                  <I.x />
+                </button>
+              )}
+            </div>
+            <div className="svc-picker">
+              {groupedPicker.length === 0 ? (
+                <div className="svc-picker-empty">No services match &ldquo;{pickerQuery}&rdquo;</div>
+              ) : groupedPicker.map((group) => (
+                <div key={group.category} className="svc-picker-group">
+                  <div className="svc-picker-cat">{group.category}</div>
+                  {group.services.map((service) => {
+                    const checked = componentIds.includes(service.id);
+                    return (
+                      <label key={service.id} className={`svc-picker-row ${checked ? "on" : ""}`}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleComponent(service.id)} />
+                        <span className="svc-picker-code">{service.code ? formatServiceCode(service) : "#---"}</span>
+                        <div className="svc-picker-name">{service.name}</div>
+                        <div className="svc-picker-meta mono">{service.duration}m · {inr(service.price)}</div>
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {componentIds.length === 1 && <div className="svc-hint">Pick at least one more to make a bundle.</div>}
+          </div>
+
+          <div className="field">
+            <label>Bundle price</label>
+            <div className="svc-input-prefix">
+              <span>₹</span>
+              <input type="number" min="0" step="50" value={price} onChange={(event) => setPrice(parseInt(event.target.value, 10) || 0)} placeholder="0" />
+            </div>
+          </div>
+
+          <div className={`svc-summary ${savings > 0 && price > 0 ? "good" : ""}`}>
+            <div className="svc-sum-row"><span className="svc-sum-lbl">If sold separately</span><span className="svc-sum-val mono">{inr(originalSum)}</span></div>
+            <div className="svc-sum-row"><span className="svc-sum-lbl">Bundle price</span><span className="svc-sum-val mono">{inr(Number(price || 0))}</span></div>
+            <div className="svc-sum-row svc-sum-save"><span className="svc-sum-lbl">Customer saves</span><span className="svc-sum-val mono">{savings > 0 ? `${inr(savings)} · ${savingsPct}% off` : "-"}</span></div>
+            <div className="svc-sum-row"><span className="svc-sum-lbl">Total time</span><span className="svc-sum-val mono">{totalMin} min</span></div>
+          </div>
+
+          <div className="field">
+            <label>Internal note <span className="svc-optional">(optional)</span></label>
+            <input
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="e.g. Promote for wedding season"
+            />
+          </div>
+        </>
+      )}
+
+      <div className="svc-active-row">
+        <div>
+          <div className="svc-active-name">Show on booking page</div>
+          <div className="svc-active-hint">Customers can pick it when booking online.</div>
+        </div>
+        <label className="set-toggle">
+          <input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} />
+          <span className="set-toggle-track"></span>
+        </label>
+      </div>
+    </Modal>
+  );
+}
+
 // ===== MAIN PAGE COMPONENT =====
 export default function SettingsPage() {
   const router = useRouter();
@@ -69,13 +413,9 @@ export default function SettingsPage() {
   const [supabaseSalonId, setSupabaseSalonId] = useState<string | null>(null);
   const [supabaseOrgId, setSupabaseOrgId] = useState<string | null>(null);
 
-  // Service Modals state
-  const [showServiceModal, setShowServiceModal] = useState(false);
-  const [editingSvc, setEditingSvc] = useState<Service | null>(null);
-  const [svcName, setSvcName] = useState("");
-  const [svcCategory, setSvcCategory] = useState("Hair");
-  const [svcDuration, setSvcDuration] = useState(30);
-  const [svcPrice, setSvcPrice] = useState(500);
+  // Service menu state
+  const [serviceModal, setServiceModal] = useState<ServiceModalState | null>(null);
+  const [serviceSearch, setServiceSearch] = useState("");
 
   // Stylist Modals state
   const [showStylistModal, setShowStylistModal] = useState(false);
@@ -150,9 +490,9 @@ export default function SettingsPage() {
           userPhone = userPhone.trim();
         }
 
-        let salonName = "GLOW SALON";
-        let salonArea = "ANDHERI";
-        let salonCity = "MUMBAI";
+        let salonName = "ChairBook";
+        let salonArea = "";
+        let salonCity = "";
         let salonType = "Unisex salon";
         const salonHours = INITIAL_DATA.hours;
         let salonWa = INITIAL_DATA.wa.number;
@@ -232,36 +572,30 @@ export default function SettingsPage() {
           }
         }
 
-        // Load services and team from DB
-        let dbServices = INITIAL_DATA.services;
-        let dbTeam = INITIAL_DATA.team;
-
         const currentSalonId = selectedSalon?.id;
+
+        // Load services and team from DB. Empty DB means empty UI, never demo rows.
+        let dbServices: Service[] = [];
+        let dbTeam: Stylist[] = [];
+
         if (currentSalonId) {
           try {
-            const { data: svcData } = await supabase
+            const { data: svcData, error: svcError } = await supabase
               .from("services")
-              .select("id, name, category, duration_min, price, active")
-              .eq("salon_id", currentSalonId);
+              .select(SERVICE_SELECT_WITH_BUNDLES)
+              .eq("salon_id", currentSalonId)
+              .is("deleted_at", null);
+            if (svcError) throw svcError;
 
-            if (svcData && svcData.length > 0) {
-              dbServices = (svcData as unknown as DbServiceRow[]).map((s) => ({
-                id: s.id,
-                name: s.name,
-                cat: s.category || "General",
-                duration: s.duration_min,
-                price: Number(s.price),
-                active: s.active,
-              }));
-            }
+            dbServices = ((svcData || []) as unknown as DbServiceRow[]).map(mapDbServiceRow);
 
-            const { data: teamData } = await supabase
+            const { data: teamData, error: teamError } = await supabase
               .from("stylists")
               .select("id, name, role_label, tone, commission_pct, active, email, user_id, specialisations, photo_url, booking_slug, account_invited_at, account_accepted_at")
               .eq("salon_id", currentSalonId);
+            if (teamError) throw teamError;
 
-            if (teamData && teamData.length > 0) {
-              dbTeam = (teamData as unknown as DbStylistRow[]).map((s) => ({
+            dbTeam = ((teamData || []) as unknown as DbStylistRow[]).map((s) => ({
                 id: s.id,
                 name: s.name,
                 role: s.role_label || "Stylist",
@@ -275,7 +609,6 @@ export default function SettingsPage() {
                 account_invited_at: s.account_invited_at || null,
                 account_accepted_at: s.account_accepted_at || null,
               }));
-            }
           } catch (err) {
             console.error("Error loading services/team:", err);
           }
@@ -409,23 +742,16 @@ export default function SettingsPage() {
             .eq("id", supabaseSalonId);
           if (salonError) throw salonError;
 
-          // 2. Delete removed services
+          // 2. Save services and bundles first so new bundle components can point at real IDs.
           const { data: dbServicesList } = await supabase
             .from("services")
             .select("id")
-            .eq("salon_id", supabaseSalonId);
+            .eq("salon_id", supabaseSalonId)
+            .is("deleted_at", null);
           const dbSvcIds = dbServicesList?.map(s => s.id) || [];
-          const currentSvcIds = data.services.map(s => s.id);
-          const svcIdsToDelete = dbSvcIds.filter(id => typeof id === "string" && !currentSvcIds.includes(id));
-          if (svcIdsToDelete.length > 0) {
-            const { error: svcDeleteErr } = await supabase
-              .from("services")
-              .delete()
-              .in("id", svcIdsToDelete);
-            if (svcDeleteErr) throw svcDeleteErr;
-          }
+          const persistedServiceIds = new Set<string>();
+          const savedIdByLocalId = new Map<string, string>();
 
-          // 3. Save services
           for (const svc of data.services) {
             const svcPayload: {
               salon_id: string;
@@ -434,24 +760,91 @@ export default function SettingsPage() {
               duration_min: number;
               price: number;
               active: boolean;
+              code?: number | null;
+              kind: ServiceKind;
+              bundle_note?: string | null;
+              deleted_at?: string | null;
               id?: string;
             } = {
               salon_id: supabaseSalonId,
               name: svc.name,
-              category: svc.cat || "General",
+              category: getServiceKind(svc) === "bundle" ? "Bundles" : svc.cat || "General",
               duration_min: svc.duration,
               price: svc.price,
               active: svc.active ?? true,
+              code: getServiceKind(svc) === "service" ? svc.code ?? null : null,
+              kind: getServiceKind(svc),
+              bundle_note: getServiceKind(svc) === "bundle" ? svc.bundle_note || null : null,
+              deleted_at: null,
             };
-            if (typeof svc.id === "string" && !svc.id.startsWith("temp-")) {
+            if (typeof svc.id === "string" && isUUID(svc.id)) {
               svcPayload.id = svc.id;
             }
-            await supabase
+            const { data: savedSvc, error: saveSvcErr } = await supabase
               .from("services")
-              .upsert(svcPayload, { onConflict: "id" });
+              .upsert(svcPayload, { onConflict: "id" })
+              .select("id")
+              .single();
+            if (saveSvcErr) throw saveSvcErr;
+            if (savedSvc?.id) {
+              persistedServiceIds.add(savedSvc.id);
+              savedIdByLocalId.set(String(svc.id), savedSvc.id);
+            }
           }
 
-          // 4. Delete removed stylists
+          const svcIdsToDelete = dbSvcIds.filter(id => typeof id === "string" && !persistedServiceIds.has(id));
+          if (svcIdsToDelete.length > 0) {
+            const { error: svcDeleteErr } = await supabase
+              .from("services")
+              .update({ active: false, deleted_at: new Date().toISOString() })
+              .in("id", svcIdsToDelete);
+            if (svcDeleteErr) throw svcDeleteErr;
+          }
+
+          const bundleRows = data.services.filter((svc) => getServiceKind(svc) === "bundle");
+          const bundleIds = bundleRows
+            .map((svc) => savedIdByLocalId.get(String(svc.id)) || (typeof svc.id === "string" && isUUID(svc.id) ? svc.id : null))
+            .filter((id): id is string => Boolean(id));
+
+          if (bundleIds.length > 0) {
+            const { error: clearBundleErr } = await supabase
+              .from("bundle_components")
+              .delete()
+              .in("bundle_service_id", bundleIds);
+            if (clearBundleErr) throw clearBundleErr;
+          }
+
+          const componentRows = bundleRows.flatMap((bundle) => {
+            const bundleId = savedIdByLocalId.get(String(bundle.id)) || (typeof bundle.id === "string" && isUUID(bundle.id) ? bundle.id : null);
+            if (!bundleId) return [];
+            return getComponentIds(bundle)
+              .map((componentId) => savedIdByLocalId.get(String(componentId)) || (typeof componentId === "string" && isUUID(componentId) ? componentId : null))
+              .filter((componentId): componentId is string => Boolean(componentId))
+              .map((componentId, index) => ({
+                bundle_service_id: bundleId,
+                component_service_id: componentId,
+                position: index,
+              }));
+          });
+
+          if (componentRows.length > 0) {
+            const { error: componentErr } = await supabase
+              .from("bundle_components")
+              .insert(componentRows);
+            if (componentErr) throw componentErr;
+          }
+
+          for (const bundle of bundleRows) {
+            const bundleId = savedIdByLocalId.get(String(bundle.id)) || (typeof bundle.id === "string" && isUUID(bundle.id) ? bundle.id : null);
+            if (!bundleId) continue;
+            const { error: bundleActiveErr } = await supabase
+              .from("services")
+              .update({ active: bundle.active ?? true })
+              .eq("id", bundleId);
+            if (bundleActiveErr) throw bundleActiveErr;
+          }
+
+          // 3. Delete removed stylists
           const { data: dbStylistsList } = await supabase
             .from("stylists")
             .select("id")
@@ -566,8 +959,9 @@ export default function SettingsPage() {
           // 8. Re-fetch services and team to update UI IDs
           const { data: freshSvcs } = await supabase
             .from("services")
-            .select("id, name, category, duration_min, price, active")
-            .eq("salon_id", supabaseSalonId);
+            .select(SERVICE_SELECT_WITH_BUNDLES)
+            .eq("salon_id", supabaseSalonId)
+            .is("deleted_at", null);
 
           const { data: freshTeam } = await supabase
             .from("stylists")
@@ -576,14 +970,7 @@ export default function SettingsPage() {
 
           setData(prev => ({
             ...prev,
-            services: freshSvcs ? (freshSvcs as unknown as DbServiceRow[]).map((s) => ({
-              id: s.id,
-              name: s.name,
-              cat: s.category || "General",
-              duration: s.duration_min,
-              price: Number(s.price),
-              active: s.active,
-            })) : prev.services,
+            services: freshSvcs ? (freshSvcs as unknown as DbServiceRow[]).map(mapDbServiceRow) : prev.services,
             team: freshTeam ? (freshTeam as unknown as DbStylistRow[]).map((s) => ({
               id: s.id,
               name: s.name,
@@ -631,51 +1018,59 @@ export default function SettingsPage() {
   };
 
   // ----- Modal Triggers & Handlers -----
-  const openAddService = () => {
-    setEditingSvc(null);
-    setSvcName("");
-    setSvcCategory("Hair");
-    setSvcDuration(30);
-    setSvcPrice(300);
-    setShowServiceModal(true);
+  const openAddService = (startKind: ServiceKind = "service") => {
+    setServiceModal({ mode: "add", startKind });
   };
 
   const openEditService = (svc: Service) => {
-    setEditingSvc(svc);
-    setSvcName(svc.name);
-    setSvcCategory(svc.cat || "Hair");
-    setSvcDuration(svc.duration);
-    setSvcPrice(svc.price);
-    setShowServiceModal(true);
+    setServiceModal({ mode: "edit", target: svc });
   };
 
-  const saveService = () => {
-    if (!svcName.trim()) return;
-    if (editingSvc) {
-      // Edit mode
-      const list = data.services.map(s => s.id === editingSvc.id ? {
-        ...s,
-        name: svcName.trim(),
-        cat: svcCategory,
-        duration: svcDuration,
-        price: svcPrice
-      } : s);
+  const saveServiceMenuItem = (kind: ServiceKind, payload: Service) => {
+    if (serviceModal?.mode === "edit" && serviceModal.target) {
+      const list = data.services.map((item) => item.id === serviceModal.target?.id ? payload : item);
       update({ ...data, services: list });
-      showFlash("Service updated");
-    } else {
-      // Add mode
-      const newSvc: Service = {
-        id: "temp-" + Date.now(),
-        name: svcName.trim(),
-        cat: svcCategory,
-        duration: svcDuration,
-        price: svcPrice,
-        active: true
-      };
-      update({ ...data, services: [...data.services, newSvc] });
-      showFlash("Service added");
+      showFlash(kind === "bundle" ? "Bundle updated" : "Service updated");
+      setServiceModal(null);
+      return;
     }
-    setShowServiceModal(false);
+
+    const nextCode = Math.max(0, ...data.services.filter((service) => getServiceKind(service) === "service").map((service) => Number(service.code || 0))) + 1;
+    const newItem: Service = {
+      ...payload,
+      id: `temp-${kind}-${Date.now()}`,
+      kind,
+      code: kind === "service" ? nextCode : null,
+      active: payload.active ?? true,
+    };
+    update({ ...data, services: [...data.services, newItem] });
+    showFlash(kind === "bundle" ? "Bundle created" : "Service added");
+    setServiceModal(null);
+  };
+
+  const deleteServiceMenuItem = (svc: Service) => {
+    if (getServiceKind(svc) === "bundle") {
+      update({ ...data, services: data.services.filter((item) => item.id !== svc.id) });
+      setServiceModal(null);
+      showFlash("Bundle deleted");
+      return;
+    }
+
+    const nextServices = data.services
+      .filter((item) => item.id !== svc.id)
+      .map((item) => {
+        if (getServiceKind(item) !== "bundle") return item;
+        const nextComponents = getComponentIds(item).filter((componentId) => componentId !== svc.id);
+        return {
+          ...item,
+          componentIds: nextComponents,
+          active: nextComponents.length >= 2 ? item.active : false,
+        };
+      });
+
+    update({ ...data, services: nextServices });
+    setServiceModal(null);
+    showFlash("Service deleted");
   };
 
   const openAddStylist = () => {
@@ -880,6 +1275,32 @@ export default function SettingsPage() {
     }
   };
 
+  const qServices = serviceSearch.trim().toLowerCase();
+  const normalServices = data.services.filter((service) => getServiceKind(service) === "service");
+  const bundleServices = data.services.filter((service) => getServiceKind(service) === "bundle");
+  const serviceById = new Map(data.services.map((service) => [service.id, service]));
+  const matchesServiceSearch = (service: Service) => {
+    if (!qServices) return true;
+    const includedNames = getComponentIds(service)
+      .map((id) => serviceById.get(id)?.name || "")
+      .join(" ");
+    return service.name.toLowerCase().includes(qServices)
+      || (service.cat || service.category || "").toLowerCase().includes(qServices)
+      || (service.bundle_note || "").toLowerCase().includes(qServices)
+      || includedNames.toLowerCase().includes(qServices)
+      || String(service.code || "").includes(qServices)
+      || (service.code ? formatServiceCode(service).toLowerCase().includes(qServices) : false);
+  };
+  const filteredNormalServices = normalServices.filter(matchesServiceSearch);
+  const filteredBundleServices = bundleServices.filter(matchesServiceSearch);
+  const totalMenuItems = normalServices.length + bundleServices.length;
+  const totalActiveMenuItems = data.services.filter((service) => service.active).length;
+  const serviceResultCount = filteredNormalServices.length + filteredBundleServices.length;
+  const serviceCategories = Array.from(new Set([
+    ...SERVICE_CATEGORIES,
+    ...normalServices.map((service) => service.cat || service.category || "General"),
+  ]));
+
   // ----- RENDER TAB CONTENT -----
   const renderTabContent = () => {
     switch (activeTab) {
@@ -1016,16 +1437,34 @@ export default function SettingsPage() {
           <div className="flex flex-col gap-[18px]">
             <SectionHead
               title="Services"
-              desc={`${data.services.filter(s => s.active).length} active · ${data.services.length} total`}
+              desc={qServices
+                ? `${serviceResultCount} match${serviceResultCount === 1 ? "" : "es"} for "${serviceSearch}"`
+                : `${totalActiveMenuItems} active · ${totalMenuItems} total · ${bundleServices.length} bundle${bundleServices.length === 1 ? "" : "s"}`}
               action={
-                <button className="btn btn-primary btn-sm" onClick={openAddService}>
-                  <I.plus style={{ width: 14, height: 14 }} /> Add service
+                <button className="btn btn-primary btn-sm" onClick={() => openAddService()}>
+                  <I.plus style={{ width: 14, height: 14 }} /> Add
                 </button>
               }
             />
+
+            <div className="flex items-center gap-2.5 bg-white border border-line-2 rounded-xl px-3.5 h-11 focus-within:border-teal">
+              <I.search style={{ width: 16, height: 16, color: "var(--ink-3)" }} />
+              <input
+                value={serviceSearch}
+                onChange={(event) => setServiceSearch(event.target.value)}
+                placeholder="Search by name, category, or code (e.g. #003)..."
+                className="flex-1 h-full border-0 outline-0 bg-transparent text-sm"
+              />
+              {serviceSearch && (
+                <button className="border-0 bg-transparent cursor-pointer text-ink-3 grid place-items-center" onClick={() => setServiceSearch("")} aria-label="Clear search">
+                  <I.x />
+                </button>
+              )}
+            </div>
+
             <div className="bg-white border border-line rounded-xl p-0">
-              {["Hair", "Skin", "Hands", "Nails", "General"].map(cat => {
-                const items = data.services.filter(s => s.cat === cat);
+              {serviceCategories.map(cat => {
+                const items = filteredNormalServices.filter(s => (s.cat || s.category || "General") === cat);
                 if (items.length === 0) return null;
                 return (
                   <div key={cat}>
@@ -1033,7 +1472,10 @@ export default function SettingsPage() {
                       {cat} <span className="text-ink-4 font-mono">{items.length}</span>
                     </div>
                     {items.map(s => (
-                      <div key={s.id} className={`grid grid-cols-[1fr_auto_auto_auto] gap-3 p-[12px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto] ${!s.active ? "opacity-55" : ""}`}>
+                      <div key={s.id} className={`grid grid-cols-[56px_1fr_auto_auto_auto] gap-3 p-[12px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[56px_1fr_auto] ${!s.active ? "opacity-55" : ""}`}>
+                        <div className="font-mono text-xs font-semibold text-teal bg-teal-soft border border-teal-soft-2 rounded-lg px-2 py-1 text-center">
+                          {s.code ? formatServiceCode(s) : "#---"}
+                        </div>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold">{s.name}</div>
                           <div className="text-xs text-ink-3 mt-0.5 font-mono">
@@ -1063,10 +1505,7 @@ export default function SettingsPage() {
                         <button
                           className="cust-action max-[720px]:hidden"
                           style={{ opacity: 1, background: "transparent", borderColor: "var(--line)", color: "var(--rose)", cursor: "pointer" }}
-                          onClick={() => {
-                            const list = data.services.filter(item => item.id !== s.id);
-                            update({ ...data, services: list });
-                          }}
+                          onClick={() => deleteServiceMenuItem(s)}
                         >
                           <I.trash style={{ width: 14, height: 14 }} />
                         </button>
@@ -1075,6 +1514,84 @@ export default function SettingsPage() {
                   </div>
                 );
               })}
+
+              <div>
+                <div className="p-[12px_20px] text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 bg-bg border-b border-line flex gap-2 items-center">
+                  <span className="grid w-[14px] gap-0.5"><span className="h-0.5 rounded bg-current"></span><span className="h-0.5 rounded bg-current"></span><span className="h-0.5 rounded bg-current"></span></span>
+                  Bundles <span className="text-ink-4 font-mono">{filteredBundleServices.length}{qServices && filteredBundleServices.length !== bundleServices.length ? ` / ${bundleServices.length}` : ""}</span>
+                  <span className="normal-case tracking-normal font-normal text-ink-4">Combo packs with a discount</span>
+                </div>
+                {filteredBundleServices.length === 0 && !qServices ? (
+                  <div className="p-6 text-center">
+                    <div className="font-semibold text-sm">No bundles yet</div>
+                    <div className="text-xs text-ink-3 mt-1 max-w-[420px] mx-auto">Group 2+ services into a discounted combo for wedding season, monthly packages, or first-time offers.</div>
+                    <button className="btn btn-outline btn-sm mt-3" onClick={() => openAddService("bundle")}>
+                      <I.plus style={{ width: 14, height: 14 }} /> Create bundle
+                    </button>
+                  </div>
+                ) : filteredBundleServices.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-ink-3">No matching bundles.</div>
+                ) : filteredBundleServices.map((bundle) => {
+                  const included = getComponentIds(bundle)
+                    .map((id) => serviceById.get(id))
+                    .filter(Boolean) as Service[];
+                  const sum = included.reduce((acc, service) => acc + Number(service.price || 0), 0);
+                  const totalMin = included.reduce((acc, service) => acc + Number(service.duration || service.duration_min || 0), 0);
+                  const save = Math.max(0, sum - Number(bundle.price || 0));
+                  const pct = sum > 0 ? Math.round((save / sum) * 100) : 0;
+                  return (
+                    <div key={bundle.id} className={`grid grid-cols-[56px_1fr_auto_auto_auto] gap-3 p-[12px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[56px_1fr_auto] ${!bundle.active ? "opacity-55" : ""}`}>
+                      <div className="font-mono text-xs font-semibold text-amber-ink bg-amber-soft border border-amber rounded-lg px-2 py-1 text-center">BNDL</div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
+                          {bundle.name}
+                          {save > 0 && <span className="text-[10px] uppercase tracking-[0.05em] bg-teal-soft text-teal border border-teal-soft-2 rounded-full px-2 py-0.5">Save {pct}%</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                          {included.map((service, index) => (
+                            <React.Fragment key={service.id}>
+                              <span className="text-[11px] bg-bg-2 border border-line rounded-full px-2 py-0.5">{service.name}</span>
+                              {index < included.length - 1 && <span className="text-ink-4 text-xs">+</span>}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        <div className="text-xs text-ink-3 mt-1 font-mono">
+                          {totalMin || bundle.duration} min · <span className="text-ink font-semibold">{inr(bundle.price)}</span>
+                          {save > 0 && <span className="line-through ml-1">{inr(sum)}</span>}
+                          {!bundle.active && " · Hidden from booking page"}
+                          {bundle.bundle_note && bundle.active && <span className="font-sans"> · {bundle.bundle_note}</span>}
+                        </div>
+                      </div>
+                      <label className="inline-flex cursor-pointer items-center relative shrink-0">
+                        <input
+                          type="checkbox"
+                          className="absolute opacity-0 pointer-events-none peer"
+                          checked={bundle.active}
+                          onChange={() => {
+                            const list = data.services.map(item => item.id === bundle.id ? { ...item, active: !item.active } : item);
+                            update({ ...data, services: list });
+                          }}
+                        />
+                        <span className="w-9 h-5.5 rounded-full bg-line-2 relative transition-colors duration-150 before:content-[''] before:absolute before:left-[2px] before:top-[2px] before:w-[18px] before:h-[18px] before:rounded-full before:bg-white before:transition-transform before:duration-[180ms] before:ease-[cubic-bezier(0.2,0.9,0.3,1.2)] before:shadow-[0_1px_2px_rgba(0,0,0,0.1)] peer-checked:bg-teal peer-checked:before:translate-x-[14px]"></span>
+                      </label>
+                      <button
+                        className="cust-action wa max-[720px]:hidden"
+                        style={{ opacity: 1, background: "transparent", borderColor: "var(--line)", cursor: "pointer" }}
+                        onClick={() => openEditService(bundle)}
+                      >
+                        <I.edit style={{ width: 14, height: 14 }} />
+                      </button>
+                      <button
+                        className="cust-action max-[720px]:hidden"
+                        style={{ opacity: 1, background: "transparent", borderColor: "var(--line)", color: "var(--rose)", cursor: "pointer" }}
+                        onClick={() => deleteServiceMenuItem(bundle)}
+                      >
+                        <I.trash style={{ width: 14, height: 14 }} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         );
@@ -1639,62 +2156,15 @@ export default function SettingsPage() {
         <Link className="bn-item active" href="/dashboard/settings"><I.settings /><span>Settings</span></Link>
       </nav>
 
-      {/* SERVICE MODAL (ADD & EDIT) */}
-      {showServiceModal && (
-        <Modal
-          title={editingSvc ? "Edit service" : "Add new service"}
-          onClose={() => setShowServiceModal(false)}
-          width="min(540px, 100%)"
-          footer={
-            <>
-              <button className="btn btn-ghost" onClick={() => setShowServiceModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveService} disabled={!svcName.trim()}>
-                {editingSvc ? "Save changes" : "Add service"}
-              </button>
-            </>
-          }
-        >
-          <FormField label="Service name">
-            <input
-              placeholder="e.g. Hair Color"
-              value={svcName}
-              onChange={e => setSvcName(e.target.value)}
-              autoFocus
-              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-            />
-          </FormField>
-          <FormField label="Category" style={{ marginTop: 12 }}>
-            <select
-              value={svcCategory}
-              onChange={e => setSvcCategory(e.target.value)}
-              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%", background: "#fff" }}
-            >
-              <option value="Hair">Hair</option>
-              <option value="Skin">Skin</option>
-              <option value="Hands">Hands</option>
-              <option value="Nails">Nails</option>
-              <option value="General">General</option>
-            </select>
-          </FormField>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-            <FormField label="Duration (min)">
-              <input
-                type="number"
-                value={svcDuration}
-                onChange={e => setSvcDuration(parseInt(e.target.value) || 30)}
-                style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-              />
-            </FormField>
-            <FormField label="Price (₹)">
-              <input
-                type="number"
-                value={svcPrice}
-                onChange={e => setSvcPrice(parseInt(e.target.value) || 0)}
-                style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
-              />
-            </FormField>
-          </div>
-        </Modal>
+      {/* SERVICE / BUNDLE MODAL */}
+      {serviceModal && (
+        <ServiceMenuModal
+          modal={serviceModal}
+          allServices={data.services}
+          onClose={() => setServiceModal(null)}
+          onSave={saveServiceMenuItem}
+          onDelete={deleteServiceMenuItem}
+        />
       )}
 
       {/* STYLIST MODAL (ADD & EDIT) */}

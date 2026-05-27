@@ -726,7 +726,7 @@ export default function CheckoutPage() {
                         >
                           <span className="text-ink font-medium">
                             {item.name}
-                            {item.kind === "bundle" && <span className="ml-1.5 text-[10px] text-teal bg-teal-soft border border-teal-soft-2 rounded-full px-1.5 py-0.5 uppercase tracking-[0.04em]">Bundle</span>}
+                            {item.kind === "bundle" && <span className="ml-1.5 text-[10px] text-teal bg-teal-soft border border-teal-soft-2 rounded-full px-1.5 py-0.5 uppercase tracking-[0.04em]">Combo</span>}
                           </span>
                           <strong className="text-teal font-semibold font-mono">₹{item.price}</strong>
                         </button>

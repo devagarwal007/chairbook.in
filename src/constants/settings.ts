@@ -47,8 +47,8 @@ export const INITIAL_DATA: SettingsData = {
     { id: 5, code: 5, kind: "service", name: "Threading",     cat: "Skin",  duration: 15, price: 80,   active: true },
     { id: 6, code: 6, kind: "service", name: "Manicure",      cat: "Hands", duration: 30, price: 350,  active: true },
     { id: 7, code: 7, kind: "service", name: "Pedicure",      cat: "Hands", duration: 45, price: 500,  active: false },
-    { id: "bundle-1", code: 8, kind: "bundle", name: "Bridal Glow", cat: "Bundles", duration: 195, price: 2300, active: true, componentIds: [2, 4, 6], bundle_note: "Most-booked combo before weddings" },
-    { id: "bundle-2", code: 9, kind: "bundle", name: "Hair Refresh", cat: "Bundles", duration: 90, price: 1000, active: true, componentIds: [1, 3], bundle_note: "" },
+    { id: "bundle-1", code: 8, kind: "bundle", name: "Bridal Glow", cat: "Combos", duration: 195, price: 2300, active: true, componentIds: [2, 4, 6], bundle_note: "Most-booked combo before weddings" },
+    { id: "bundle-2", code: 9, kind: "bundle", name: "Hair Refresh", cat: "Combos", duration: 90, price: 1000, active: true, componentIds: [1, 3], bundle_note: "" },
   ],
   team: [
     { id: 1, name: "Anjali", role: "Senior stylist · 9 yrs",     tone: "b", commission: 30 },

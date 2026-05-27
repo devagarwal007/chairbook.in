@@ -3481,7 +3481,7 @@ footer {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.svc-kind-bundle-ic {
+.svc-kind-combo-ic {
   width: 24px;
   height: 22px;
   display: grid;
@@ -3489,22 +3489,22 @@ footer {
   gap: 3px;
   flex: 0 0 auto;
 }
-.svc-kind-bundle-ic span {
+.svc-kind-combo-ic span {
   display: block;
   height: 4px;
   border-radius: 999px;
   background: var(--ink-3);
 }
-.svc-kind-bundle-ic span:nth-child(1) {
+.svc-kind-combo-ic span:nth-child(1) {
   width: 17px;
 }
-.svc-kind-bundle-ic span:nth-child(2) {
+.svc-kind-combo-ic span:nth-child(2) {
   width: 24px;
 }
-.svc-kind-bundle-ic span:nth-child(3) {
+.svc-kind-combo-ic span:nth-child(3) {
   width: 13px;
 }
-.svc-kind-btn.on .svc-kind-bundle-ic span {
+.svc-kind-btn.on .svc-kind-combo-ic span {
   background: var(--teal);
 }
 .svc-modal .field label {

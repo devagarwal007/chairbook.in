@@ -211,6 +211,9 @@ Status palette: Blue (Confirmed) → Amber (Arrived) → Green (Completed) → R
 
 ## Database Schema (Supabase)
 
+> [!IMPORTANT]
+> **Domain Rebranding**: The UI uses the term **Combo** / **Combos**. The database and TypeScript query properties/types MUST continue to use `bundle` (like `kind = 'bundle'`, table `bundle_components`, column `bundle_note`) to avoid breaking existing DB schemas.
+
 Tables defined in `supabase/migrations/`:
 
 | Table              | Purpose                                         |
@@ -298,3 +301,4 @@ Tables defined in `supabase/migrations/`:
 - ❌ Don't add bouncy/spring animations or parallax effects.
 - ❌ Don't inline SVG icons in page components — add them to `Icons.tsx`.
 - ❌ Don't use external state management libraries.
+- ❌ **Don't rename database tables, columns, or enum values** for "Combo" rebranding. The database uses `bundle`, `bundle_note`, and `bundle_components` (and `kind = 'bundle'`). Keep these schema/query fields named `bundle` in code logic, but present "Combo" / "Combos" in the UI.

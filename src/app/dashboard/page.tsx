@@ -567,13 +567,13 @@ interface ApptRowProps {
   nowTimeMin: number;
 }
 
-function BundleDetailList({ services }: { services?: Service[] }) {
-  const bundles = (services || []).filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
-  if (bundles.length === 0) return null;
+function ComboDetailList({ services }: { services?: Service[] }) {
+  const combos = (services || []).filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
+  if (combos.length === 0) return null;
 
   return (
     <div className="mt-2 flex flex-col gap-2">
-      {bundles.map((bundle) => {
+      {combos.map((bundle) => {
         const included = bundle.includedServices || [];
         const savings = getBundleSavings(bundle);
         const savingsPct = getBundleSavingsPct(bundle);
@@ -582,7 +582,7 @@ function BundleDetailList({ services }: { services?: Service[] }) {
           <div key={bundle.id} className="rounded-lg border border-line bg-bg-2 p-2">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
               <span className="font-semibold text-ink-2">{bundle.name}</span>
-              <span className="rounded-full border border-amber bg-amber-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-amber-ink">Bundle</span>
+              <span className="rounded-full border border-amber bg-amber-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-amber-ink">Combo</span>
               {savings > 0 && <span className="font-mono text-[10px] font-semibold text-teal">Save {savingsPct}%</span>}
             </div>
             {included.length > 0 && (
@@ -712,7 +712,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
               )}
               <br />
               <span className="text-ink-3">Stylist: {stylist.name}</span>
-              <BundleDetailList services={appt.serviceItems} />
+              <ComboDetailList services={appt.serviceItems} />
               <br />
               <Link
                 href={`/dashboard/bookings/${bookingParam}`}
@@ -899,7 +899,7 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
         <div className="flex items-center gap-2 border border-line-2 rounded-[10px] px-3.5 py-2 mb-3 bg-white">
           <I.search className="text-ink-3 shrink-0 w-4 h-4" />
           <input
-            placeholder="Search service or bundle..."
+            placeholder="Search service or combo..."
             value={svcQuery}
             onChange={(e) => setSvcQuery(e.target.value)}
             className="flex-1 border-0 outline-0 text-sm font-sans bg-transparent min-w-0"
@@ -935,7 +935,7 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
                     <span className="font-semibold leading-snug">{s.name}</span>
                     {isBundle && (
                       <span className="text-[9px] text-amber-ink bg-amber-soft border border-amber rounded-full px-1.5 py-0.5 uppercase tracking-[0.04em]">
-                        Bundle
+                        Combo
                       </span>
                     )}
                   </span>

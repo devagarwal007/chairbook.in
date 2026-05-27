@@ -94,20 +94,20 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
   );
 }
 
-function BundleServiceDetails({ services }: { services?: CalAppt["serviceItems"] }) {
-  const bundles = (services || []).filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
-  if (bundles.length === 0) return null;
+function ComboServiceDetails({ services }: { services?: CalAppt["serviceItems"] }) {
+  const combos = (services || []).filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
+  if (combos.length === 0) return null;
 
   return (
     <div className="mt-1 flex flex-col gap-1">
-      {bundles.map((bundle) => {
+      {combos.map((bundle) => {
         const included = bundle.includedServices || [];
         const savings = getBundleSavings(bundle);
 
         return (
           <div key={bundle.id} className="text-[11px] leading-snug text-ink-3">
             <div className="flex flex-wrap items-center gap-1">
-              <span className="rounded-full border border-amber bg-amber-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-amber-ink">Bundle</span>
+              <span className="rounded-full border border-amber bg-amber-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-amber-ink">Combo</span>
               {included.slice(0, 3).map((item) => (
                 <span key={item.id} className="rounded-full border border-line bg-bg-2 px-1.5 py-0.5 text-[10px] text-ink-2">{item.name}</span>
               ))}
@@ -507,7 +507,7 @@ function ListView({ weekDays, appts, stylists, stylistFilter, onSelect, todayKey
                     {/* Service (hidden on mobile) */}
                     <div className="hidden md:block min-w-0 text-[13px] text-ink-2">
                       <div className="truncate">{a.service}</div>
-                      <BundleServiceDetails services={a.serviceItems} />
+                      <ComboServiceDetails services={a.serviceItems} />
                     </div>
 
                     {/* Stylist (hidden on mobile) */}
@@ -1087,7 +1087,7 @@ export default function BookingsPage() {
                   <div className="text-xs text-ink-3 mt-0.5">
                      {selected.service} · {String(selected.startH).padStart(2,"0")}:{String(selected.startM).padStart(2,"0")} · {selected.duration} min
                   </div>
-                  <BundleServiceDetails services={selected.serviceItems} />
+                  <ComboServiceDetails services={selected.serviceItems} />
                 </div>
                 <Badge tone={selected.status} showDot>
                   {STATUS_LABEL[selected.status]}

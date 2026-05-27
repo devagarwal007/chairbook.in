@@ -299,7 +299,7 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder='Search service, bundle, or code "#003"'
+          placeholder='Search service, combo, or code "#003"'
           className="flex-1 h-full border-0 outline-0 bg-transparent text-sm min-w-0"
         />
         {query && (
@@ -350,7 +350,7 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
                         <span style={{ fontSize: 11, color: "var(--teal)", background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: 8, padding: "2px 6px", fontWeight: 700, fontFamily: "var(--font-mono)" }}>
                           {formatServiceCode(s)}
                         </span>
-                        {isBundle && <span style={{ fontSize: 10, color: "var(--amber-ink)", background: "var(--amber-soft)", border: "1px solid var(--amber)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>Bundle</span>}
+                        {isBundle && <span style={{ fontSize: 10, color: "var(--amber-ink)", background: "var(--amber-soft)", border: "1px solid var(--amber)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>Combo</span>}
                         {isBundle && savings > 0 && <span style={{ fontSize: 10, color: "var(--teal)", background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>Save {savingsPct}%</span>}
                       </div>
                       <div className="svc-name" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", lineHeight: 1.25 }}>
@@ -594,7 +594,7 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
               <span>
                 <small className="mono" style={{ color: "var(--teal)", fontWeight: 700, marginRight: 6 }}>{formatServiceCode(s)}</small>
                 {s.name}
-                {s.kind === "bundle" && <small style={{ color: "var(--amber-ink)", marginLeft: 6 }}>Bundle</small>}
+                {s.kind === "bundle" && <small style={{ color: "var(--amber-ink)", marginLeft: 6 }}>Combo</small>}
                 <small style={{ color: "var(--ink-3)" }}> · {s.duration} min</small>
               </span>
               <span className="mono">₹{s.price.toLocaleString("en-IN")}</span>

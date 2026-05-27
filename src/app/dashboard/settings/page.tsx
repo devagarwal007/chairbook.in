@@ -115,8 +115,8 @@ function mapDbServiceRow(row: DbServiceRow): Service {
   return {
     id: row.id,
     name: row.name,
-    cat: row.category || (kind === "bundle" ? "Bundles" : "General"),
-    category: row.category || (kind === "bundle" ? "Bundles" : "General"),
+    cat: row.category || (kind === "bundle" ? "Combos" : "General"),
+    category: row.category || (kind === "bundle" ? "Combos" : "General"),
     duration: row.duration_min,
     duration_min: row.duration_min,
     price: Number(row.price),
@@ -234,11 +234,11 @@ function ServiceMenuModal({
 
   return (
     <Modal
-      title={isEdit ? (kind === "bundle" ? "Edit bundle" : "Edit service") : "Add to menu"}
+      title={isEdit ? (kind === "bundle" ? "Edit combo" : "Edit service") : "Add to menu"}
       onClose={onClose}
       width="min(560px, calc(100vw - 24px))"
       className="svc-modal"
-      subtitle={!isEdit ? "A single service or a bundle of two or more." : undefined}
+      subtitle={!isEdit ? "A single service or a combo of two or more." : undefined}
       beforeBody={!isEdit && (
         <div className="svc-kind">
           <button className={`svc-kind-btn ${kind === "service" ? "on" : ""}`} onClick={() => setKind("service")}>
@@ -249,11 +249,11 @@ function ServiceMenuModal({
             </div>
           </button>
           <button className={`svc-kind-btn ${kind === "bundle" ? "on" : ""}`} onClick={() => setKind("bundle")}>
-            <span className="svc-kind-bundle-ic">
+            <span className="svc-kind-combo-ic">
               <span></span><span></span><span></span>
             </span>
             <div>
-              <div className="svc-kind-name">Bundle <span className="svc-kind-tag">save %</span></div>
+              <div className="svc-kind-name">Combo <span className="svc-kind-tag">save %</span></div>
               <div className="svc-kind-sub">2+ services, one price</div>
             </div>
           </button>
@@ -269,14 +269,14 @@ function ServiceMenuModal({
           <div className="svc-modal-action-buttons">
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button className="btn btn-primary" onClick={submit} disabled={!canSubmit}>
-              {isEdit ? "Save changes" : kind === "bundle" ? "Create bundle" : "Add service"}
+              {isEdit ? "Save changes" : kind === "bundle" ? "Create combo" : "Add service"}
             </button>
           </div>
         </div>
       }
     >
       <div className="field">
-        <label>{kind === "bundle" ? "Bundle name" : "Service name"}</label>
+        <label>{kind === "bundle" ? "Combo name" : "Service name"}</label>
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -286,7 +286,7 @@ function ServiceMenuModal({
       </div>
 
       <div className="field">
-        <label>{kind === "bundle" ? "Bundle code" : "Service code"}</label>
+        <label>{kind === "bundle" ? "Combo code" : "Service code"}</label>
         <input
           value={codeInput}
           onChange={(event) => setCodeInput(event.target.value)}
@@ -366,11 +366,11 @@ function ServiceMenuModal({
                 </div>
               ))}
             </div>
-            {componentIds.length === 1 && <div className="svc-hint">Pick at least one more to make a bundle.</div>}
+            {componentIds.length === 1 && <div className="svc-hint">Pick at least one more to make a combo.</div>}
           </div>
 
           <div className="field">
-            <label>Bundle price</label>
+            <label>Combo price</label>
             <div className="svc-input-prefix">
               <span>₹</span>
               <input type="number" min="0" step="50" value={price} onChange={(event) => setPrice(parseInt(event.target.value, 10) || 0)} placeholder="0" />
@@ -379,7 +379,7 @@ function ServiceMenuModal({
 
           <div className={`svc-summary ${savings > 0 && price > 0 ? "good" : ""}`}>
             <div className="svc-sum-row"><span className="svc-sum-lbl">If sold separately</span><span className="svc-sum-val mono">{inr(originalSum)}</span></div>
-            <div className="svc-sum-row"><span className="svc-sum-lbl">Bundle price</span><span className="svc-sum-val mono">{inr(Number(price || 0))}</span></div>
+            <div className="svc-sum-row"><span className="svc-sum-lbl">Combo price</span><span className="svc-sum-val mono">{inr(Number(price || 0))}</span></div>
             <div className="svc-sum-row svc-sum-save"><span className="svc-sum-lbl">Customer saves</span><span className="svc-sum-val mono">{savings > 0 ? `${inr(savings)} · ${savingsPct}% off` : "-"}</span></div>
             <div className="svc-sum-row"><span className="svc-sum-lbl">Total time</span><span className="svc-sum-val mono">{totalMin} min</span></div>
           </div>
@@ -1064,7 +1064,7 @@ export default function SettingsPage() {
     if (serviceModal?.mode === "edit" && serviceModal.target) {
       const list = data.services.map((item) => item.id === serviceModal.target?.id ? payloadWithCode : item);
       update({ ...data, services: list });
-      showFlash(kind === "bundle" ? "Bundle updated" : "Service updated");
+      showFlash(kind === "bundle" ? "Combo updated" : "Service updated");
       setServiceModal(null);
       return;
     }
@@ -1077,7 +1077,7 @@ export default function SettingsPage() {
       active: payload.active ?? true,
     };
     update({ ...data, services: [...data.services, newItem] });
-    showFlash(kind === "bundle" ? "Bundle created" : "Service added");
+    showFlash(kind === "bundle" ? "Combo created" : "Service added");
     setServiceModal(null);
   };
 
@@ -1085,7 +1085,7 @@ export default function SettingsPage() {
     if (getServiceKind(svc) === "bundle") {
       update({ ...data, services: data.services.filter((item) => item.id !== svc.id) });
       setServiceModal(null);
-      showFlash("Bundle deleted");
+      showFlash("Combo deleted");
       return;
     }
 
@@ -1472,7 +1472,7 @@ export default function SettingsPage() {
               title="Services"
               desc={qServices
                 ? `${serviceResultCount} match${serviceResultCount === 1 ? "" : "es"} for "${serviceSearch}"`
-                : `${totalActiveMenuItems} active · ${totalMenuItems} total · ${bundleServices.length} bundle${bundleServices.length === 1 ? "" : "s"}`}
+                : `${totalActiveMenuItems} active · ${totalMenuItems} total · ${bundleServices.length} combo${bundleServices.length === 1 ? "" : "s"}`}
               action={
                 <button className="btn btn-primary btn-sm" onClick={() => openAddService()}>
                   <I.plus style={{ width: 14, height: 14 }} /> Add
@@ -1551,19 +1551,19 @@ export default function SettingsPage() {
               <div>
                 <div className="p-[12px_20px] text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 bg-bg border-b border-line flex gap-2 items-center">
                   <span className="grid w-[14px] gap-0.5"><span className="h-0.5 rounded bg-current"></span><span className="h-0.5 rounded bg-current"></span><span className="h-0.5 rounded bg-current"></span></span>
-                  Bundles <span className="text-ink-4 font-mono">{filteredBundleServices.length}{qServices && filteredBundleServices.length !== bundleServices.length ? ` / ${bundleServices.length}` : ""}</span>
+                  Combos <span className="text-ink-4 font-mono">{filteredBundleServices.length}{qServices && filteredBundleServices.length !== bundleServices.length ? ` / ${bundleServices.length}` : ""}</span>
                   <span className="normal-case tracking-normal font-normal text-ink-4">Combo packs with a discount</span>
                 </div>
                 {filteredBundleServices.length === 0 && !qServices ? (
                   <div className="p-6 text-center">
-                    <div className="font-semibold text-sm">No bundles yet</div>
+                    <div className="font-semibold text-sm">No combos yet</div>
                     <div className="text-xs text-ink-3 mt-1 max-w-[420px] mx-auto">Group 2+ services into a discounted combo for wedding season, monthly packages, or first-time offers.</div>
                     <button className="btn btn-outline btn-sm mt-3" onClick={() => openAddService("bundle")}>
-                      <I.plus style={{ width: 14, height: 14 }} /> Create bundle
+                      <I.plus style={{ width: 14, height: 14 }} /> Create combo
                     </button>
                   </div>
                 ) : filteredBundleServices.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-ink-3">No matching bundles.</div>
+                  <div className="p-6 text-center text-xs text-ink-3">No matching combos.</div>
                 ) : filteredBundleServices.map((bundle) => {
                   const included = getComponentIds(bundle)
                     .map((id) => serviceById.get(id))
@@ -1580,7 +1580,7 @@ export default function SettingsPage() {
                       <div className="min-w-0">
                         <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
                           {bundle.name}
-                          <span className="text-[10px] uppercase tracking-[0.05em] bg-amber-soft text-amber-ink border border-amber rounded-full px-2 py-0.5">Bundle</span>
+                          <span className="text-[10px] uppercase tracking-[0.05em] bg-amber-soft text-amber-ink border border-amber rounded-full px-2 py-0.5">Combo</span>
                           {save > 0 && <span className="text-[10px] uppercase tracking-[0.05em] bg-teal-soft text-teal border border-teal-soft-2 rounded-full px-2 py-0.5">Save {pct}%</span>}
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap mt-1">
@@ -2183,7 +2183,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* SERVICE / BUNDLE MODAL */}
+      {/* SERVICE / COMBO MODAL */}
       {serviceModal && (
         <ServiceMenuModal
           modal={serviceModal}

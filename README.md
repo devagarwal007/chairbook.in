@@ -1,5 +1,15 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Domain Mapping Notice
+> [!IMPORTANT]
+> **"Combo" (UI) vs "bundle" (Database)**: 
+> For business/product naming, the user-facing term is **Combo** (plural **Combos**).
+> However, to avoid database migration risks, the underlying database schema and queries **must** remain unchanged.
+> - **Database Table**: `public.bundle_components`
+> - **Database Column**: `public.services.bundle_note`
+> - **Database Enum/Value**: `public.services.kind = 'bundle'`
+> - **Types/Queries**: Keep referencing database field names (like `kind === "bundle"` or `bundle_components`) in JavaScript/TypeScript database query structures, but display them as **Combo** / **Combos** in the UI.
+
 ## Getting Started
 
 First, run the development server:

@@ -10,7 +10,7 @@ import { formatDateKey, formatPhone } from "@/lib/utils";
 import { BookingRow, DbServiceRaw, Salon, Service, Stylist } from "@/types";
 
 type Step = 1 | 2 | 3 | 4;
-type ServiceFilter = "all" | "bundles" | `category:${string}`;
+type ServiceFilter = "all" | "combos" | `category:${string}`;
 
 interface BookingState {
   salon: Salon | null;
@@ -150,8 +150,8 @@ function mapPublicBookingService(row: DbServiceRaw): Service {
   return {
     id: row.id,
     name: row.name,
-    cat: row.category || (kind === "bundle" ? "Bundles" : "General"),
-    category: row.category || (kind === "bundle" ? "Bundles" : "General"),
+    cat: row.category || (kind === "bundle" ? "Combos" : "General"),
+    category: row.category || (kind === "bundle" ? "Combos" : "General"),
     duration: Number(row.duration_min || 0),
     duration_min: Number(row.duration_min || 0),
     price,
@@ -199,7 +199,7 @@ function serviceMatchesQuery(service: Service, query: string) {
 
 function serviceMatchesFilter(service: Service, filter: ServiceFilter) {
   if (filter === "all") return true;
-  if (filter === "bundles") return service.kind === "bundle";
+  if (filter === "combos") return service.kind === "bundle";
   return service.kind !== "bundle" && (service.cat || service.category || "General") === filter.replace("category:", "");
 }
 
@@ -299,7 +299,7 @@ function ServiceCard({
           </span>
           {isBundle && (
             <span className="rounded-full border border-amber bg-amber-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-amber-ink">
-              Bundle
+              Combo
             </span>
           )}
           {isBundle && savings > 0 && (
@@ -538,13 +538,13 @@ export default function PublicBookingPage() {
   }, [state.services]);
 
   const filterOptions = useMemo(() => {
-    const bundleCount = state.services.filter((service) => service.kind === "bundle").length;
+    const comboCount = state.services.filter((service) => service.kind === "bundle").length;
     const options: Array<{ id: ServiceFilter; label: string; count: number }> = [
       { id: "all", label: "All", count: state.services.length },
     ];
 
-    if (bundleCount > 0) {
-      options.push({ id: "bundles", label: "Bundles", count: bundleCount });
+    if (comboCount > 0) {
+      options.push({ id: "combos", label: "Combos", count: comboCount });
     }
 
     serviceCategories.forEach((category) => {
@@ -565,9 +565,9 @@ export default function PublicBookingPage() {
 
   const serviceGroups = useMemo(() => {
     const groups: Array<{ label: string; services: Service[] }> = [];
-    const bundles = filteredServices.filter((service) => service.kind === "bundle");
-    if (bundles.length > 0) {
-      groups.push({ label: "Bundles", services: bundles });
+    const combos = filteredServices.filter((service) => service.kind === "bundle");
+    if (combos.length > 0) {
+      groups.push({ label: "Combos", services: combos });
     }
 
     serviceCategories.forEach((category) => {
@@ -729,13 +729,13 @@ export default function PublicBookingPage() {
           {!isLoading && state.salon && step === 1 && (
             <div className="px-5 py-[22px]">
               <h1 className="m-0 text-[22px] font-semibold leading-tight text-ink">What can we do for you?</h1>
-              <p className="mb-4 mt-1.5 text-[15px] leading-relaxed text-ink-3">Search across {state.services.length} services and bundles from {state.salon.name}.</p>
+              <p className="mb-4 mt-1.5 text-[15px] leading-relaxed text-ink-3">Search across {state.services.length} services and combos from {state.salon.name}.</p>
 
               <div className="mb-3 flex h-[46px] items-center gap-2.5 rounded-xl border border-line-2 bg-white px-3.5 transition-colors focus-within:border-teal">
                 <I.search width={16} height={16} className="shrink-0 text-ink-3" />
                 <input
                   className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm text-ink outline-none placeholder:text-ink-4"
-                  placeholder='Search service, bundle, or code "#003"'
+                  placeholder='Search service, combo, or code "#003"'
                   value={serviceSearch}
                   onChange={(event) => setServiceSearch(event.target.value)}
                 />

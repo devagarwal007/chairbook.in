@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { Icons as I, Avatar, PhoneInput } from "@/components/ui";
+import { Icons as I, Avatar, PhoneInput, ComboSaveBadge, ComboServiceChip } from "@/components/ui";
 import { DAY_KEYS } from "@/constants/common";
 import { formatServiceCode } from "@/lib/service-codes";
 import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
@@ -282,61 +282,114 @@ function ServiceCard({
   const originalPrice = service.originalPrice || included.reduce((sum, item) => sum + Number(item.price || 0), 0);
   const savings = service.savings || Math.max(0, originalPrice - Number(service.price || 0));
   const savingsPct = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
+  const price = Number(service.price || 0);
 
-  return (
-    <button
-      type="button"
-      className={cx(
-        "grid w-full grid-cols-[1fr_auto] gap-3 rounded-xl border p-4 text-left font-sans transition-colors",
-        selected ? "border-teal bg-teal-soft" : "border-line bg-white hover:border-line-2"
-      )}
-      onClick={() => onToggle(service)}
-    >
-      <div className="min-w-0">
-        <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <span className="rounded-lg border border-teal-soft-2 bg-teal-soft px-2 py-1 font-mono text-[11px] font-semibold text-teal">
-            {formatServiceCode(service)}
-          </span>
-          {isBundle && (
-            <span className="rounded-full border border-amber bg-amber-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-amber-ink">
-              Combo
-            </span>
-          )}
-          {isBundle && savings > 0 && (
-            <span className="rounded-full border border-teal-soft-2 bg-teal-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-teal">
-              Save {savingsPct}%
-            </span>
-          )}
+  if (isBundle) {
+    return (
+      <button
+        type="button"
+        onClick={() => onToggle(service)}
+        className={cx(
+          "w-full text-left font-sans transition-all relative block rounded-[12px] border p-3 mb-3.5 max-w-[620px] select-none",
+          selected
+            ? "border-teal bg-teal-soft shadow-[0_3px_10px_rgba(15,110,86,0.06)]"
+            : "border-[#0f6e56]/22 bg-gradient-to-b from-[#e6f1ed] to-white hover:border-teal/40 hover:shadow-[0_2px_6px_rgba(15,110,86,0.03)]"
+        )}
+      >
+        <div className="flex justify-between gap-2.5 items-start relative mb-1.5">
+          <div>
+            <h3 className="m-0 text-[14px] font-semibold tracking-tight text-[#101820] leading-snug">
+              {highlightText(service.name, query)}
+            </h3>
+            {service.bundle_note && (
+              <p className="m-0 mt-0.5 text-[11px] font-normal leading-[1.35] text-[#7b848d]">
+                {highlightText(service.bundle_note, query)}
+              </p>
+            )}
+          </div>
+
+          <ComboSaveBadge savings={savings} className="shrink-0" />
         </div>
 
-        <div className="text-[15px] font-semibold leading-snug text-ink">{highlightText(service.name, query)}</div>
-
-        {isBundle && included.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {included.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mb-3 mt-2">
             {included.map((item, index) => (
               <React.Fragment key={item.id}>
-                <span className="rounded-full border border-line bg-bg-2 px-2 py-0.5 text-[11px] text-ink-2">{item.name}</span>
-                {index < included.length - 1 && <span className="text-xs text-ink-4">+</span>}
+                <ComboServiceChip name={item.name} />
+                {index < included.length - 1 && <span className="text-[#9da5aa] text-[10px] font-normal px-0.5">+</span>}
               </React.Fragment>
             ))}
           </div>
         )}
 
-        {isBundle && service.bundle_note && <div className="mt-2 text-xs leading-snug text-ink-3">{highlightText(service.bundle_note, query)}</div>}
+        <div className="my-2.5 border-t border-dashed border-[#d7dddd]" />
 
-        <div className={cx("mt-2 inline-flex items-center gap-1.5 font-mono text-[11px]", selected ? "text-teal-ink" : "text-ink-3")}>
-          <I.clock width={14} height={14} /> {durationOf(service)} min
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex items-center gap-1.5 flex-wrap font-mono">
+            {originalPrice > price && (
+              <span className="text-[12px] text-[#9da5aa] line-through font-normal mr-0.5">
+                {inr(originalPrice)}
+              </span>
+            )}
+            <strong className="text-[14.5px] text-[#050505] font-bold">
+              {inr(price)}
+            </strong>
+            {savingsPct > 0 && (
+              <span className="bg-[#d9f0ed] text-[#006b5c] text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] ml-0.5">
+                -{savingsPct}%
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2.5 text-[#6e777c] text-[12px] font-medium font-mono">
+            <span className="flex items-center gap-1">
+              <I.clock width={12} height={12} className="text-ink-3" />
+              {durationOf(service)} min
+            </span>
+            <div
+              className={cx(
+                "grid h-[20px] w-[20px] place-items-center rounded-[6px] border transition-colors shrink-0",
+                selected ? "border-teal bg-teal text-white" : "border-line-2 bg-white text-transparent"
+              )}
+            >
+              {selected && <I.check width={12} height={12} />}
+            </div>
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={cx(
+        "flex w-full items-center gap-3 rounded-[12px] border p-3 text-left font-sans transition-colors select-none",
+        selected ? "border-teal bg-teal-soft" : "border-line bg-white hover:border-line-2"
+      )}
+      onClick={() => onToggle(service)}
+    >
+      <div className="w-11 h-11 shrink-0 rounded-xl bg-teal-soft flex items-center justify-center font-mono text-[12px] font-bold text-teal">
+        {formatServiceCode(service)}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="text-[15px] font-semibold leading-snug text-ink truncate">
+          {highlightText(service.name, query)}
+        </div>
+        <div className={cx("mt-0.5 flex items-center gap-1 font-mono text-[12px]", selected ? "text-teal-ink" : "text-ink-3")}>
+          <I.clock width={12} height={12} className={selected ? "text-teal-ink" : "text-ink-3"} />
+          <span>{durationOf(service)} min</span>
         </div>
       </div>
 
-      <div className="flex flex-col items-end justify-between gap-3">
-        <div className="text-right">
-          <div className={cx("font-mono text-[15px] font-semibold", selected ? "text-teal-ink" : "text-ink")}>{inr(Number(service.price || 0))}</div>
-          {isBundle && savings > 0 && <div className="mt-1 font-mono text-[11px] text-ink-4 line-through">{inr(originalPrice)}</div>}
-        </div>
+      <div className="shrink-0 flex items-center gap-3">
+        <span className={cx("font-mono text-[15px] font-semibold", selected ? "text-teal-ink" : "text-ink")}>
+          {inr(Number(service.price || 0))}
+        </span>
         <div
           className={cx(
-            "grid h-[22px] w-[22px] place-items-center rounded-[7px] border transition-colors",
+            "grid h-[22px] w-[22px] place-items-center rounded-[7px] border transition-colors shrink-0",
             selected ? "border-teal bg-teal text-white" : "border-line-2 bg-white text-transparent"
           )}
         >
@@ -461,6 +514,15 @@ export default function PublicBookingPage() {
 
   const totalDuration = selectedServices.reduce((sum, service) => sum + durationOf(service), 0);
   const totalPrice = selectedServices.reduce((sum, service) => sum + Number(service.price), 0);
+  const totalSavings = selectedServices.reduce((sum, service) => {
+    if (service.kind === "bundle") {
+      const included = service.includedServices || [];
+      const originalPrice = service.originalPrice || included.reduce((s, item) => s + Number(item.price || 0), 0);
+      const price = Number(service.price || 0);
+      return sum + Math.max(0, originalPrice - price);
+    }
+    return sum;
+  }, 0);
 
   useEffect(() => {
     const loadSalon = async () => {
@@ -777,7 +839,7 @@ export default function PublicBookingPage() {
               ) : (
                 serviceGroups.map((group) => (
                   <div key={group.label} className="mb-[18px]">
-                    <SectionTitle title={group.label}>
+                    <SectionTitle title={group.label === "Combos" ? "✳ COMBOS · SAVE MORE WHEN YOU BOOK TOGETHER" : group.label}>
                       <span className="ml-2 font-mono text-ink-4">{group.services.length}</span>
                     </SectionTitle>
                     <div className="flex flex-col gap-2">
@@ -894,32 +956,97 @@ export default function PublicBookingPage() {
               <h1 className="m-0 text-[22px] font-semibold leading-tight text-ink">Just one last thing.</h1>
               <p className="mb-5 mt-1.5 text-[15px] leading-relaxed text-ink-3">We will send your confirmation and reminder on WhatsApp.</p>
 
-              <div className="rounded-xl border border-line bg-white p-[18px]">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Services ({selectedServices.length})</span>
-                  <button type="button" className="text-xs font-medium text-teal" onClick={() => setStep(1)}>Edit</button>
+              <div className="rounded-xl border border-line bg-bg-2 p-3.5">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">SERVICES ({selectedServices.length})</span>
+                  <button type="button" className="text-xs font-semibold text-teal hover:underline" onClick={() => setStep(1)}>Edit</button>
                 </div>
-                {selectedServices.map((service) => (
-                  <div key={service.id} className="flex items-center justify-between gap-3 border-t border-line py-3 first:border-t-0 first:pt-0">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-ink">{service.name}</div>
-                      <div className="mt-0.5 font-mono text-xs text-ink-3">
-                        {formatServiceCode(service)} · {durationOf(service)} min
+                {selectedServices.map((service) => {
+                  const isCombo = service.kind === "bundle";
+                  const included = service.includedServices || [];
+                  const originalPrice = service.originalPrice || included.reduce((sum, item) => sum + Number(item.price || 0), 0);
+                  const price = Number(service.price || 0);
+
+                  return (
+                    <div key={service.id} className="flex items-start justify-between gap-3 py-1">
+                      <div className="min-w-0">
+                        {isCombo ? (
+                          <>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-sm font-semibold text-ink">{service.name}</span>
+                              <span className="bg-[#0f6e56] text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider leading-none">
+                                COMBO
+                              </span>
+                            </div>
+                            <div className="mt-0.5 font-mono text-[12px] text-ink-3">
+                              {durationOf(service)} min · {included.map((item) => item.name).join(" + ")}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-sm font-semibold text-ink">{service.name}</div>
+                            <div className="mt-0.5 font-mono text-[12px] text-ink-3">
+                              {durationOf(service)} min
+                            </div>
+                          </>
+                        )}
                       </div>
-                      <BundleSummaryDetails service={service} />
+                      <div className="shrink-0 text-right">
+                        {isCombo && originalPrice > price ? (
+                          <>
+                            <div className="font-mono text-[11px] text-ink-4 line-through leading-none mb-0.5">{inr(originalPrice)}</div>
+                            <div className="font-mono text-sm font-semibold text-ink-2 leading-none">{inr(price)}</div>
+                          </>
+                        ) : (
+                          <div className="font-mono text-sm font-semibold text-ink-2 leading-none">{inr(price)}</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <div className="font-mono text-sm font-semibold text-ink">{inr(Number(service.price || 0))}</div>
-                      {service.kind === "bundle" && service.originalPrice && service.originalPrice > Number(service.price || 0) && (
-                        <div className="mt-0.5 font-mono text-[11px] text-ink-4 line-through">{inr(service.originalPrice)}</div>
-                      )}
-                    </div>
+                  );
+                })}
+
+                <div className="my-2.5 border-t border-dashed border-[#d7dddd]" />
+
+                <div className="flex justify-between gap-3 py-0.5 text-sm text-ink-2">
+                  <span>Stylist</span>
+                  <strong className="font-semibold text-ink">{selectedStylistName}</strong>
+                </div>
+
+                <div className="flex justify-between gap-3 py-0.5 text-sm text-ink-2">
+                  <span>When</span>
+                  <strong className="font-semibold text-ink">
+                    {selectedDateLabel?.full} · {selectedTime}
+                  </strong>
+                </div>
+
+                <div className="flex justify-between gap-3 py-0.5 text-sm text-ink-2">
+                  <span>Duration</span>
+                  <strong className="font-semibold text-ink font-mono">{totalDuration} min</strong>
+                </div>
+
+                {totalSavings > 0 && (
+                  <div className="flex justify-between gap-3 py-0.5 text-sm text-ink-2">
+                    <span className="flex items-center gap-1.5 text-ink-2">
+                      <svg
+                        className="w-3.5 h-3.5 stroke-current fill-none shrink-0 text-ink-3"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                        <circle cx="7" cy="7" r="1" fill="currentColor" />
+                      </svg>
+                      You saved
+                    </span>
+                    <strong className="font-semibold text-ink font-mono">{inr(totalSavings)}</strong>
                   </div>
-                ))}
-                <div className="my-3 h-px bg-line" />
-                <div className="flex justify-between gap-3 py-1.5 text-sm text-ink-2"><span>Stylist</span><strong className="text-right font-semibold text-ink">{selectedStylistName}</strong></div>
-                <div className="flex justify-between gap-3 py-1.5 text-sm text-ink-2"><span>When</span><strong className="text-right font-semibold text-ink">{selectedDateLabel?.full} · {selectedTime}</strong></div>
-                <div className="mt-2 flex justify-between gap-3 border-t border-line pt-3 text-base text-ink"><span>Total</span><strong className="font-mono text-xl font-semibold text-teal">{inr(totalPrice)}</strong></div>
+                )}
+
+                <div className="mt-2 flex justify-between gap-3 border-t border-line pt-2.5 text-base text-ink items-center">
+                  <span>Total</span>
+                  <strong className="font-mono text-xl font-bold text-teal">{inr(totalPrice)}</strong>
+                </div>
               </div>
 
               {message && <div className="mt-4 rounded-lg bg-rose-soft p-3 text-[13px] text-rose">{message}</div>}

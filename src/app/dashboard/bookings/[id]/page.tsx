@@ -293,14 +293,10 @@ function BookingComboDetails({ service }: { service: BookingData["services"][num
   return (
     <div className="mt-2 rounded-lg border border-line bg-bg-2 p-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full border border-amber bg-amber-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-amber-ink">Combo</span>
         {savings > 0 && (
           <span className="font-mono text-[11px] font-semibold text-teal">
             Save {savingsPct}% · ₹{savings.toLocaleString("en-IN")}
           </span>
-        )}
-        {originalPrice > Number(service.price || 0) && (
-          <span className="font-mono text-[11px] text-ink-4 line-through">₹{originalPrice.toLocaleString("en-IN")}</span>
         )}
       </div>
       {included.length > 0 && (
@@ -313,19 +309,6 @@ function BookingComboDetails({ service }: { service: BookingData["services"][num
         </div>
       )}
       {service.bundle_note && <div className="mt-1.5 text-[11px] leading-snug text-ink-3">{service.bundle_note}</div>}
-    </div>
-  );
-}
-
-function BookingComboSummary({ services }: { services: BookingData["services"] }) {
-  const bundles = services.filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
-  if (bundles.length === 0) return null;
-
-  return (
-    <div className="mt-3 flex flex-col gap-2">
-      {bundles.map((service) => (
-        <BookingComboDetails key={service.id} service={service} />
-      ))}
     </div>
   );
 }
@@ -1025,10 +1008,21 @@ export default function BookingDetailPage() {
         <div className={`bd-hero card ${isCancelled ? "is-cancelled" : ""}`}>
           <div className="bd-hero-l">
             <Badge tone={status}>{STATUS_LABEL[status]}</Badge>
-            <h1 className="bd-hero-title">
-              {b.services.map(s => s.name).join(" + ")}
+            <h1 className="bd-hero-title flex flex-wrap items-center gap-1.5">
+              {b.services.map((s, i) => (
+                <React.Fragment key={s.id || i}>
+                  <span className="flex items-center gap-1.5">
+                    <span>{s.name}</span>
+                    {s.kind === "bundle" && (
+                      <span className="bg-[#0f6e56] text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider leading-none">
+                        COMBO
+                      </span>
+                    )}
+                  </span>
+                  {i < b.services.length - 1 && <span className="text-ink-3 font-normal">+</span>}
+                </React.Fragment>
+              ))}
             </h1>
-            <BookingComboSummary services={b.services} />
             <div className="bd-hero-meta">
               <span><IBD.clock /> {displayDate} · {displayTime}–{displayEnd} <span style={{ color: "var(--ink-3)" }}>({totalDur} min)</span></span>
               <span><IBD.pin /> {salonInfo.name}{salonInfo.area ? `, ${salonInfo.area}` : ""}</span>
@@ -1109,15 +1103,29 @@ export default function BookingDetailPage() {
             <div className="bd-svc-list">
               {b.services.map((s, i) => (
                 <div key={i} className="bd-svc-row">
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span>{s.name}</span>
-                      {s.kind === "bundle" && <span className="rounded-full border border-amber bg-amber-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-amber-ink">Combo</span>}
+                      {s.kind === "bundle" && (
+                        <span className="bg-[#0f6e56] text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider leading-none">
+                          COMBO
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{s.duration} min</div>
-                    <BookingComboDetails service={s} />
+                    {s.kind === "bundle" && <BookingComboDetails service={s} />}
                   </div>
-                  <div className="bd-svc-price">₹{s.price.toLocaleString("en-IN")}</div>
+                  <div className="flex flex-col items-end justify-center shrink-0">
+                    {s.kind === "bundle" && (() => {
+                      const originalPrice = getBundleOriginalPrice(s);
+                      return originalPrice > Number(s.price || 0) ? (
+                        <span className="font-mono text-[11px] text-ink-3 line-through leading-none mb-1">
+                          ₹{originalPrice.toLocaleString("en-IN")}
+                        </span>
+                      ) : null;
+                    })()}
+                    <div className="bd-svc-price">₹{s.price.toLocaleString("en-IN")}</div>
+                  </div>
                 </div>
               ))}
             </div>

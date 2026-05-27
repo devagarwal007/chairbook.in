@@ -7,3 +7,6 @@ export * from "./PhoneInput";
 export * from "./Toggle";
 export * from "./FilterChip";
 export * from "./StepBar";
+export * from "./ComboSaveBadge";
+export * from "./ComboServiceChip";
+

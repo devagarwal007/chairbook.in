@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
 import { formatDateDisplay } from "@/lib/utils";
 
+const HYDRATION_SAFE_TIME_MIN = 12 * 60;
+
 export function useTimeUpdate(enabled: boolean) {
-  const [nowTimeMin, setNowTimeMin] = useState(() => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  });
-  const [dateDisplayStr, setDateDisplayStr] = useState(() => {
-    const d = new Date();
-    return formatDateDisplay(d);
-  });
+  const [nowTimeMin, setNowTimeMin] = useState(HYDRATION_SAFE_TIME_MIN);
+  const [dateDisplayStr, setDateDisplayStr] = useState("");
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -18,6 +15,7 @@ export function useTimeUpdate(enabled: boolean) {
       const now = new Date();
       setDateDisplayStr(formatDateDisplay(now));
       setNowTimeMin(now.getHours() * 60 + now.getMinutes());
+      setIsReady(true);
     };
 
     updateTime();
@@ -25,5 +23,5 @@ export function useTimeUpdate(enabled: boolean) {
     return () => clearInterval(interval);
   }, [enabled]);
 
-  return { nowTimeMin, dateDisplayStr };
+  return { nowTimeMin, dateDisplayStr, isReady };
 }

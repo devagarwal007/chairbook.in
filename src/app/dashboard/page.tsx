@@ -50,7 +50,7 @@ export default function DashboardPage() {
   const setAppts = day === "today" ? setTodayAppts : setTomorrowAppts;
   const loadingBookings = day === "today" ? loadingToday : loadingTomorrow;
 
-  const { nowTimeMin, dateDisplayStr } = useTimeUpdate(!!salonId);
+  const { nowTimeMin, dateDisplayStr, isReady: timeReady } = useTimeUpdate(!!salonId);
   const { show: showFlash } = useToast();
   const { advanceBooking } = useBookingProgress();
 
@@ -272,7 +272,7 @@ export default function DashboardPage() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
   };
 
-  const greeting = nowTimeMin < 12 * 60 ? "Good morning" : nowTimeMin < 17 * 60 ? "Good afternoon" : "Good evening";
+  const greeting = timeReady ? (nowTimeMin < 12 * 60 ? "Good morning" : nowTimeMin < 17 * 60 ? "Good afternoon" : "Good evening") : "Welcome";
 
   return (
     <div className="min-h-screen pb-[calc(var(--bottom-nav-h)+32px)] animate-[fadeIn_0.22s_cubic-bezier(0.16,1,0.3,1)_forwards]">

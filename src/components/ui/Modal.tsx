@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import { Icons as I } from "@/components/ui/Icons";
 
 export interface ModalProps {
@@ -28,11 +29,11 @@ export function Modal({
   subtitle,
   beforeBody,
 }: ModalProps) {
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
-      className="modal-back fixed inset-0 w-screen h-screen flex items-center justify-center bg-[#0e1512]/45 backdrop-blur-[2px] z-[1000] p-6 box-border"
+      className="modal-back !fixed !inset-0 !w-[100vw] !h-[100dvh] !z-[9000]"
       onClick={onClose}
     >
       <div
@@ -53,6 +54,7 @@ export function Modal({
         <div className={`modal-body${bodyClassName ? ` ${bodyClassName}` : ""}`}>{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { initialsOf, isUUID } from "@/lib/utils";
+import { formatServiceCode } from "@/lib/service-codes";
 import { useToast } from "@/context/ToastContext";
 
 import { Customer, Service, Stylist, NewCustInput, DbBookingSimple, DbStylistRaw, DbServiceRaw, DbBookingSlotRaw, DbBookingStylistRaw } from "@/types";
@@ -32,6 +33,30 @@ function generateDays(baseDate: Date) {
 
 import { ALL_SLOTS_FULL as ALL_SLOTS } from "@/constants/bookings";
 
+const SERVICE_SELECT_WITH_BUNDLES = `
+  id,
+  name,
+  category,
+  duration_min,
+  price,
+  code,
+  kind,
+  bundle_note,
+  bundle_components!bundle_components_bundle_service_id_fkey (
+    position,
+    component_service_id,
+    component:services!bundle_components_component_service_id_fkey (
+      id,
+      name,
+      category,
+      duration_min,
+      price,
+      code,
+      active
+    )
+  )
+`;
+
 
 
 function formatLast(days: number) {
@@ -41,6 +66,50 @@ function formatLast(days: number) {
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;
 };
+
+function mapBookingService(row: DbServiceRaw): Service {
+  const kind = row.kind || "service";
+  const includedServices = (row.bundle_components || [])
+    .slice()
+    .sort((a, b) => Number(a.position || 0) - Number(b.position || 0))
+    .flatMap((item) => {
+      const component = item.component;
+      if (!component || component.active === false) return [];
+      return [{
+        id: component.id,
+        name: component.name,
+        cat: component.category || "General",
+        category: component.category || "General",
+        duration: Number(component.duration_min || 0),
+        duration_min: Number(component.duration_min || 0),
+        price: Number(component.price || 0),
+        code: component.code ?? null,
+        kind: "service" as const,
+        active: true,
+      }];
+    });
+  const price = Number(row.price || 0);
+  const originalPrice = includedServices.reduce((sum, service) => sum + Number(service.price || 0), 0);
+
+  return {
+    id: row.id,
+    name: row.name,
+    cat: row.category || (kind === "bundle" ? "Bundles" : "General"),
+    category: row.category || (kind === "bundle" ? "Bundles" : "General"),
+    duration: row.duration_min,
+    duration_min: row.duration_min,
+    price,
+    code: row.code ?? null,
+    kind,
+    bundle_note: row.bundle_note || "",
+    componentIds: (row.bundle_components || [])
+      .map((item) => item.component_service_id || item.component?.id)
+      .filter((id): id is string | number => Boolean(id)),
+    includedServices,
+    originalPrice: originalPrice || undefined,
+    savings: originalPrice > price ? originalPrice - price : undefined,
+  };
+}
 
 // ===== STEP BAR =====
 function StepBar({ step }: { step: number }) {
@@ -282,9 +351,14 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
       {cats.map(cat => (
         <div key={cat} className="svc-cat" style={{ marginBottom: 18 }}>
           <div className="svc-cat-name" style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>{cat}</div>
-          <div className="svc-list" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="svc-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
             {dbServices.filter(s => s.cat === cat).map(s => {
               const on = services.some(x => x.id === s.id);
+              const isBundle = s.kind === "bundle";
+              const included = s.includedServices || [];
+              const originalPrice = s.originalPrice || included.reduce((sum, service) => sum + Number(service.price || 0), 0);
+              const savings = s.savings || Math.max(0, originalPrice - Number(s.price || 0));
+              const savingsPct = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
               return (
                 <button
                   key={s.id}
@@ -292,9 +366,11 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
                   onClick={() => toggleService(s)}
                   style={{
                     display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
                     justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "14px 16px",
+                    alignItems: "stretch",
+                    padding: isBundle ? "14px 16px 13px" : "14px 16px",
                     borderRadius: 12,
                     border: on ? "1px solid var(--teal)" : "1px solid var(--line-2)",
                     background: on ? "var(--teal-soft)" : "#fff",
@@ -303,21 +379,57 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
                     width: "100%"
                   }}
                 >
-                  <div className="svc-info">
-                    <div className="svc-name" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      {s.name}
-                      {s.kind === "bundle" && <span style={{ fontSize: 10, color: "var(--teal)", background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Bundle</span>}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <div className="svc-info" style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 5 }}>
+                        <span style={{ fontSize: 11, color: "var(--teal)", background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: 8, padding: "2px 6px", fontWeight: 700, fontFamily: "var(--font-mono)" }}>
+                          {formatServiceCode(s)}
+                        </span>
+                        {isBundle && <span style={{ fontSize: 10, color: "var(--amber-ink)", background: "var(--amber-soft)", border: "1px solid var(--amber)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>Bundle</span>}
+                        {isBundle && savings > 0 && <span style={{ fontSize: 10, color: "var(--teal)", background: "var(--teal-soft)", border: "1px solid var(--teal-soft-2)", borderRadius: 999, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>Save {savingsPct}%</span>}
+                      </div>
+                      <div className="svc-name" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", lineHeight: 1.25 }}>
+                        {s.name}
+                      </div>
+                      {isBundle && included.length > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
+                          {included.map((service, index) => (
+                            <React.Fragment key={service.id}>
+                              <span style={{ fontSize: 11, color: "var(--ink-2)", background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 999, padding: "2px 7px" }}>{service.name}</span>
+                              {index < included.length - 1 && <span style={{ color: "var(--ink-4)", fontSize: 11 }}>+</span>}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      )}
+                      {isBundle && s.bundle_note && (
+                        <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 7, lineHeight: 1.35 }}>
+                          {s.bundle_note}
+                        </div>
+                      )}
+                      <div className="svc-meta" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--ink-3)", marginTop: isBundle ? 8 : 4 }}>
+                        <IN.clock /> {s.duration} min
+                      </div>
                     </div>
-                    <div className="svc-meta" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
-                      <IN.clock /> {s.duration} min
+                    <div className="svc-price" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <div className="svc-price-v" style={{ fontSize: 14, fontWeight: 600, fontFamily: "var(--font-mono)" }}>₹{s.price.toLocaleString("en-IN")}</div>
+                        {isBundle && savings > 0 && (
+                          <div style={{ marginTop: 2, fontSize: 11, color: "var(--ink-4)", fontFamily: "var(--font-mono)", textDecoration: "line-through" }}>
+                            ₹{originalPrice.toLocaleString("en-IN")}
+                          </div>
+                        )}
+                      </div>
+                      <div className={`svc-check ${on ? "on" : ""}`} style={{ width: 18, height: 18, borderRadius: "50%", border: on ? "1px solid var(--teal)" : "1px solid var(--line-2)", background: on ? "var(--teal)" : "#fff", display: "grid", placeItems: "center", color: "#fff" }}>
+                        {on && <IN.check />}
+                      </div>
                     </div>
                   </div>
-                  <div className="svc-price" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div className="svc-price-v" style={{ fontSize: 14, fontWeight: 600, fontFamily: "var(--font-mono)" }}>₹{s.price.toLocaleString("en-IN")}</div>
-                    <div className={`svc-check ${on ? "on" : ""}`} style={{ width: 18, height: 18, borderRadius: "50%", border: on ? "1px solid var(--teal)" : "1px solid var(--line-2)", background: on ? "var(--teal)" : "#fff", display: "grid", placeItems: "center", color: "#fff" }}>
-                      {on && <IN.check />}
+                  {isBundle && savings > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, borderTop: "1px dashed var(--line)", paddingTop: 10, fontSize: 12, color: "var(--ink-3)" }}>
+                      <span>If sold separately</span>
+                      <span className="mono" style={{ color: "var(--teal)", fontWeight: 700 }}>Customer saves ₹{savings.toLocaleString("en-IN")}</span>
                     </div>
-                  </div>
+                  )}
                 </button>
               );
             })}
@@ -514,7 +626,12 @@ function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, d
           <div className="nb-summary-lbl">SERVICES</div>
           {services.map(s => (
             <div key={s.id} className="nb-summary-svc">
-              <span>{s.name} <small style={{ color: "var(--ink-3)" }}>· {s.duration} min</small></span>
+              <span>
+                <small className="mono" style={{ color: "var(--teal)", fontWeight: 700, marginRight: 6 }}>{formatServiceCode(s)}</small>
+                {s.name}
+                {s.kind === "bundle" && <small style={{ color: "var(--amber-ink)", marginLeft: 6 }}>Bundle</small>}
+                <small style={{ color: "var(--ink-3)" }}> · {s.duration} min</small>
+              </span>
               <span className="mono">₹{s.price.toLocaleString("en-IN")}</span>
             </div>
           ))}
@@ -703,21 +820,12 @@ export default function NewBookingPage() {
         })));
 
         const { data: servicesData, error: servicesError } = await supabaseClient
-          .from("services").select("id, name, category, duration_min, price, code, kind, bundle_note")
+          .from("services").select(SERVICE_SELECT_WITH_BUNDLES)
           .eq("salon_id", salonId).eq("active", true).is("deleted_at", null);
         if (servicesError) throw servicesError;
 
         const rawServices = (servicesData || []) as unknown as DbServiceRaw[];
-        setDbServices(rawServices.map((s) => ({
-          id: s.id,
-          name: s.name,
-          cat: s.category || (s.kind === "bundle" ? "Bundles" : "General"),
-          duration: s.duration_min,
-          price: Number(s.price),
-          code: s.code ?? null,
-          kind: s.kind || "service",
-          bundle_note: s.bundle_note || "",
-        })));
+        setDbServices(rawServices.map(mapBookingService));
       } catch (err) {
         console.error("Error loading services:", err);
         setDbStylists([]);

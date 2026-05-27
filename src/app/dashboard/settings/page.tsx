@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { signOutCurrentUser } from "@/lib/auth-session";
 import { isUUID } from "@/lib/utils";
+import { findDuplicateServiceCode, findNextServiceCode, formatServiceCode, parseServiceCode } from "@/lib/service-codes";
 import Header from "@/components/layout/Header";
 import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/components/ui";
 import { useProfile } from "@/context/ProfileContext";
@@ -89,7 +89,6 @@ const SERVICE_SELECT_WITH_BUNDLES = `
 const inr = (value: number) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
 const getServiceKind = (service: Service): ServiceKind => service.kind || "service";
 const getComponentIds = (service: Service) => service.componentIds || service.items || [];
-const formatServiceCode = (service: Service) => `#${String(service.code || 0).padStart(3, "0")}`;
 
 function mapDbServiceRow(row: DbServiceRow): Service {
   const kind = row.kind || "service";
@@ -148,8 +147,10 @@ function ServiceMenuModal({
   const initial = modal.target || null;
   const isEdit = modal.mode === "edit";
   const startKind = initial ? getServiceKind(initial) : modal.startKind || "service";
+  const nextAvailableCode = useMemo(() => findNextServiceCode(allServices), [allServices]);
   const [kind, setKind] = useState<ServiceKind>(startKind);
   const [name, setName] = useState(initial?.name || "");
+  const [codeInput, setCodeInput] = useState(initial?.code ? formatServiceCode(initial.code) : formatServiceCode(nextAvailableCode));
   const [cat, setCat] = useState(initial?.cat || initial?.category || "Hair");
   const [duration, setDuration] = useState(initial?.duration || initial?.duration_min || 30);
   const [price, setPrice] = useState(initial?.price || 0);
@@ -168,14 +169,16 @@ function ServiceMenuModal({
   const savings = Math.max(0, originalSum - Number(price || 0));
   const savingsPct = originalSum > 0 ? Math.round((savings / originalSum) * 100) : 0;
   const q = pickerQuery.trim().toLowerCase();
+  const parsedCode = parseServiceCode(codeInput);
+  const hasInvalidCode = codeInput.trim().length > 0 && parsedCode === null;
 
   const toggleComponent = (id: string | number) => {
     setComponentIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   };
 
-  const canSubmit = kind === "service"
+  const canSubmit = !hasInvalidCode && (kind === "service"
     ? name.trim().length > 0 && Number(duration) > 0 && Number(price) >= 0
-    : name.trim().length > 0 && componentIds.length >= 2 && Number(price) > 0;
+    : name.trim().length > 0 && componentIds.length >= 2 && Number(price) > 0);
 
   const submit = () => {
     if (!canSubmit) return;
@@ -189,6 +192,7 @@ function ServiceMenuModal({
         duration: Number(duration),
         duration_min: Number(duration),
         price: Number(price),
+        code: parsedCode,
         active,
         kind: "service",
         componentIds: [],
@@ -205,6 +209,7 @@ function ServiceMenuModal({
       duration: totalMin,
       duration_min: totalMin,
       price: Number(price),
+      code: parsedCode,
       active,
       kind: "bundle",
       componentIds,
@@ -231,7 +236,7 @@ function ServiceMenuModal({
     <Modal
       title={isEdit ? (kind === "bundle" ? "Edit bundle" : "Edit service") : "Add to menu"}
       onClose={onClose}
-      width="min(560px, 100%)"
+      width="min(560px, calc(100vw - 24px))"
       className="svc-modal"
       subtitle={!isEdit ? "A single service or a bundle of two or more." : undefined}
       beforeBody={!isEdit && (
@@ -280,14 +285,21 @@ function ServiceMenuModal({
         />
       </div>
 
+      <div className="field">
+        <label>{kind === "bundle" ? "Bundle code" : "Service code"}</label>
+        <input
+          value={codeInput}
+          onChange={(event) => setCodeInput(event.target.value)}
+          placeholder={formatServiceCode(nextAvailableCode)}
+          inputMode="numeric"
+        />
+        {hasInvalidCode && (
+          <div className="text-xs text-danger mt-1">Use a number like #008, 008, or 8.</div>
+        )}
+      </div>
+
       {kind === "service" ? (
         <>
-          {isEdit && initial?.code && (
-            <div className="svc-code-display">
-              <span className="svc-code-display-lbl">Service code</span>
-              <span className="svc-code-display-val">{formatServiceCode(initial)}</span>
-            </div>
-          )}
           <div className="field-row">
             <div className="field">
               <label>Category</label>
@@ -772,7 +784,7 @@ export default function SettingsPage() {
               duration_min: svc.duration,
               price: svc.price,
               active: svc.active ?? true,
-              code: getServiceKind(svc) === "service" ? svc.code ?? null : null,
+              code: svc.code ?? null,
               kind: getServiceKind(svc),
               bundle_note: getServiceKind(svc) === "bundle" ? svc.bundle_note || null : null,
               deleted_at: null,
@@ -1002,7 +1014,13 @@ export default function SettingsPage() {
         setTimeout(() => setSaved(false), 2000);
       } catch (err) {
         console.error("Error saving settings to Supabase:", err);
-        showFlash("Failed to save changes.", 2500);
+        const dbError = err as { code?: string; message?: string; details?: string };
+        const errorText = `${dbError.message || ""} ${dbError.details || ""}`.toLowerCase();
+        if (dbError.code === "23505" && errorText.includes("code")) {
+          showFlash("That service code is already assigned to another service.", 3000);
+        } else {
+          showFlash("Failed to save changes.", 2500);
+        }
       }
     } else {
       // Local preview mode save
@@ -1027,20 +1045,35 @@ export default function SettingsPage() {
   };
 
   const saveServiceMenuItem = (kind: ServiceKind, payload: Service) => {
+    const editingId = serviceModal?.mode === "edit" ? serviceModal.target?.id : undefined;
+    const resolvedCode = payload.code && payload.code > 0
+      ? payload.code
+      : findNextServiceCode(data.services, editingId);
+    const duplicate = findDuplicateServiceCode(data.services, resolvedCode, editingId);
+
+    if (duplicate) {
+      showFlash(`Service code ${formatServiceCode(resolvedCode)} is already assigned to ${duplicate.name || "another service"}.`, 3000);
+      return;
+    }
+
+    const payloadWithCode: Service = {
+      ...payload,
+      code: resolvedCode,
+    };
+
     if (serviceModal?.mode === "edit" && serviceModal.target) {
-      const list = data.services.map((item) => item.id === serviceModal.target?.id ? payload : item);
+      const list = data.services.map((item) => item.id === serviceModal.target?.id ? payloadWithCode : item);
       update({ ...data, services: list });
       showFlash(kind === "bundle" ? "Bundle updated" : "Service updated");
       setServiceModal(null);
       return;
     }
 
-    const nextCode = Math.max(0, ...data.services.filter((service) => getServiceKind(service) === "service").map((service) => Number(service.code || 0))) + 1;
     const newItem: Service = {
-      ...payload,
+      ...payloadWithCode,
       id: `temp-${kind}-${Date.now()}`,
       kind,
-      code: kind === "service" ? nextCode : null,
+      code: resolvedCode,
       active: payload.active ?? true,
     };
     update({ ...data, services: [...data.services, newItem] });
@@ -1541,10 +1574,13 @@ export default function SettingsPage() {
                   const pct = sum > 0 ? Math.round((save / sum) * 100) : 0;
                   return (
                     <div key={bundle.id} className={`grid grid-cols-[56px_1fr_auto_auto_auto] gap-3 p-[12px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[56px_1fr_auto] ${!bundle.active ? "opacity-55" : ""}`}>
-                      <div className="font-mono text-xs font-semibold text-amber-ink bg-amber-soft border border-amber rounded-lg px-2 py-1 text-center">BNDL</div>
+                      <div className="font-mono text-xs font-semibold text-teal bg-teal-soft border border-teal-soft-2 rounded-lg px-2 py-1 text-center">
+                        {formatServiceCode(bundle)}
+                      </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
                           {bundle.name}
+                          <span className="text-[10px] uppercase tracking-[0.05em] bg-amber-soft text-amber-ink border border-amber rounded-full px-2 py-0.5">Bundle</span>
                           {save > 0 && <span className="text-[10px] uppercase tracking-[0.05em] bg-teal-soft text-teal border border-teal-soft-2 rounded-full px-2 py-0.5">Save {pct}%</span>}
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap mt-1">
@@ -2146,15 +2182,6 @@ export default function SettingsPage() {
           ✓ Changes saved successfully
         </div>
       )}
-
-      {/* Bottom Navigation */}
-      <nav className="bottom-nav">
-        <Link className="bn-item" href="/dashboard"><I.home /><span>Home</span></Link>
-        <Link className="bn-item" href="/dashboard/bookings"><I.calendar /><span>Bookings</span></Link>
-        <Link className="bn-item" href="/dashboard/customers"><I.users /><span>Customers</span></Link>
-        <Link className="bn-item" href="/dashboard/insights"><I.chart /><span>Insights</span></Link>
-        <Link className="bn-item active" href="/dashboard/settings"><I.settings /><span>Settings</span></Link>
-      </nav>
 
       {/* SERVICE / BUNDLE MODAL */}
       {serviceModal && (

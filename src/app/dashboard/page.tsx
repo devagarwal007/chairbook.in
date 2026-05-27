@@ -21,6 +21,14 @@ import { useSalonData, useBookings, useTimeUpdate, useBookingProgress } from "@/
 import { useToast } from "@/context/ToastContext";
 import { Appointment, BookingProgressAction, Stylist, Service } from "@/types";
 import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip, PhoneInput } from "@/components/ui";
+import { formatServiceCode } from "@/lib/service-codes";
+import {
+  getBundleOriginalPrice,
+  getBundleSavings,
+  getBundleSavingsPct,
+  getServiceDuration,
+  serviceMatchesBundleSearch,
+} from "@/lib/service-bundles";
 
 // ===== TYPES =====
 
@@ -185,10 +193,14 @@ export default function DashboardPage() {
     showFlash(`WhatsApp opened for ${a.customer}`, 1800);
   };
 
-  const addWalkIn = async ({ name, phone, svc, stylistId }: { name: string; phone: string; svc: Service; stylistId: string | number }) => {
+  const addWalkIn = async ({ name, phone, services, stylistId }: { name: string; phone: string; services: Service[]; stylistId: string | number }) => {
     const supabase = getSupabaseBrowserClient();
+    const totalDuration = services.reduce((sum, service) => sum + getServiceDuration(service), 0);
+    const totalPrice = services.reduce((sum, service) => sum + Number(service.price || 0), 0);
+    const serviceNames = services.map((service) => service.name).join(" + ") || "services";
+    const serviceIds = services.map((service) => service.id);
     
-    if (supabase && salonId && isUUID(String(svc.id)) && isUUID(String(stylistId))) {
+    if (supabase && salonId && services.length > 0 && serviceIds.every((id) => isUUID(String(id))) && isUUID(String(stylistId))) {
       try {
         const now = new Date();
         const y = now.getFullYear();
@@ -204,8 +216,8 @@ export default function DashboardPage() {
           p_stylist_id: stylistId,
           p_date: dateStr,
           p_start_time: startTimeStr,
-          p_duration: svc.duration,
-          p_service_ids: [svc.id]
+          p_duration: totalDuration,
+          p_service_ids: serviceIds
         });
 
         if (error) throw error;
@@ -215,8 +227,8 @@ export default function DashboardPage() {
           stylist_id: typeof stylistId === "string" && isUUID(stylistId) ? stylistId : null,
           type: "walk_in",
           title: "Walk-in arrived",
-          body: `${name} walked in for ${svc.name}`,
-          meta: { customer_name: name, service: svc.name },
+          body: `${name} walked in for ${serviceNames}`,
+          meta: { customer_name: name, service: serviceNames },
         });
 
         showFlash(`${name} added to schedule`, 2000);
@@ -244,13 +256,14 @@ export default function DashboardPage() {
     const newAppt: Appointment = {
       id: Math.max(...appts.map((a) => typeof a.id === "number" ? a.id : 0), 0) + 1,
       time: "13:30",
-      duration: svc.duration,
+      duration: totalDuration,
       customer: name,
       initials,
       tone,
-      service: svc.name,
+      service: serviceNames,
+      serviceItems: services,
       stylist: stylistId,
-      price: svc.price,
+      price: totalPrice,
       status: "arrived",
       visits: 0,
       phone: phone ? `+91 ${phone}` : "+91 99xxx xxxxx",
@@ -554,6 +567,41 @@ interface ApptRowProps {
   nowTimeMin: number;
 }
 
+function BundleDetailList({ services }: { services?: Service[] }) {
+  const bundles = (services || []).filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
+  if (bundles.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      {bundles.map((bundle) => {
+        const included = bundle.includedServices || [];
+        const savings = getBundleSavings(bundle);
+        const savingsPct = getBundleSavingsPct(bundle);
+
+        return (
+          <div key={bundle.id} className="rounded-lg border border-line bg-bg-2 p-2">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="font-semibold text-ink-2">{bundle.name}</span>
+              <span className="rounded-full border border-amber bg-amber-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-amber-ink">Bundle</span>
+              {savings > 0 && <span className="font-mono text-[10px] font-semibold text-teal">Save {savingsPct}%</span>}
+            </div>
+            {included.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {included.map((item) => (
+                  <span key={item.id} className="rounded-full border border-line bg-white px-2 py-0.5 text-[11px] text-ink-2">
+                    {item.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            {bundle.bundle_note && <div className="mt-1.5 text-[11px] leading-snug text-ink-3">{bundle.bundle_note}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMin }: ApptRowProps) {
   const stylist = stylists.find((s) => s.id === appt.stylist) || stylists[1] || { id: "unknown", name: appt.stylist, tone: "a" };
   const start = toMin(appt.time);
@@ -664,6 +712,7 @@ function ApptRow({ appt, expanded, onToggle, onStatus, onWA, stylists, nowTimeMi
               )}
               <br />
               <span className="text-ink-3">Stylist: {stylist.name}</span>
+              <BundleDetailList services={appt.serviceItems} />
               <br />
               <Link
                 href={`/dashboard/bookings/${bookingParam}`}
@@ -769,7 +818,7 @@ function NowLine({ nowTimeMin, formatTime }: { nowTimeMin: number; formatTime: (
 // Add Walk-In Appointment Modal
 interface WalkInModalProps {
   onClose: () => void;
-  onAdd: (data: { name: string; phone: string; svc: Service; stylistId: string | number }) => void;
+  onAdd: (data: { name: string; phone: string; services: Service[]; stylistId: string | number }) => void;
   services: Service[];
   stylists: Stylist[];
 }
@@ -779,27 +828,29 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
   const [phone, setPhone] = useState("");
   const [svcQuery, setSvcQuery] = useState("");
   
-  const defaultSvcId = services[0]?.id || "s1";
   const defaultStylistId = stylists.filter((s) => s.id !== "all")[0]?.id || "anjali";
 
-  const [svcId, setSvcId] = useState(defaultSvcId);
+  const [svcIds, setSvcIds] = useState<Array<string | number>>(() => services[0] ? [services[0].id] : []);
   const [stylistId, setStylistId] = useState(defaultStylistId);
 
   const filteredServices = React.useMemo(() => {
-    if (!svcQuery.trim()) return services;
-    const q = svcQuery.trim().toLowerCase();
-    return services.filter(
-      (s) => s.name.toLowerCase().includes(q)
-        || (s.cat && s.cat.toLowerCase().includes(q))
-        || (s.kind && s.kind.toLowerCase().includes(q))
-        || String(s.code || "").includes(q)
-        || (s.code ? `#${String(s.code).padStart(3, "0")}`.includes(q) : false)
-    );
+    return services.filter((service) => serviceMatchesBundleSearch(service, svcQuery));
   }, [svcQuery, services]);
 
-  const selectedSvc = services.find((s) => s.id === svcId) || services[0];
+  const selectedServices = React.useMemo(
+    () => services.filter((service) => svcIds.some((id) => String(id) === String(service.id))),
+    [services, svcIds]
+  );
+  const totalDuration = selectedServices.reduce((sum, service) => sum + getServiceDuration(service), 0);
+  const totalPrice = selectedServices.reduce((sum, service) => sum + Number(service.price || 0), 0);
   const isPhoneValid = !phone || phone.length === 10;
-  const canSubmit = name.trim().length > 0 && isPhoneValid && selectedSvc;
+  const canSubmit = name.trim().length > 0 && isPhoneValid && selectedServices.length > 0;
+
+  const toggleService = (id: string | number) => {
+    setSvcIds((current) => current.some((item) => String(item) === String(id))
+      ? current.filter((item) => String(item) !== String(id))
+      : [...current, id]);
+  };
 
   return (
     <Modal
@@ -818,11 +869,11 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
             className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] font-sans text-sm font-medium border border-transparent cursor-pointer bg-teal !text-white hover:bg-teal-ink transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!canSubmit}
             onClick={() => {
-              onAdd({ name, phone, svc: selectedSvc, stylistId });
+              onAdd({ name, phone, services: selectedServices, stylistId });
               onClose();
             }}
           >
-            Add to schedule
+            Add {selectedServices.length || ""} to schedule
           </button>
         </>
       }
@@ -859,31 +910,68 @@ function WalkInModal({ onClose, onAdd, services, stylists }: WalkInModalProps) {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-2 max-h-[180px] overflow-y-auto pr-1">
-          {filteredServices.map((s) => (
-            <button
-              key={s.id}
-              className={`p-[10px_12px] border rounded-[10px] cursor-pointer text-[13px] text-left font-sans flex justify-between items-center transition-all duration-150 ${
-                svcId === s.id ? "border-teal bg-teal-soft text-teal-ink font-medium" : "border-line bg-white text-ink hover:border-ink-3"
-              }`}
-              onClick={() => setSvcId(s.id)}
-            >
-              <span className="min-w-0 mr-1 flex items-center gap-1.5 flex-wrap">
-                <span className="truncate">{s.name}</span>
-                {s.kind === "bundle" && (
-                  <span className="text-[9px] text-teal bg-teal-soft border border-teal-soft-2 rounded-full px-1.5 py-0.5 uppercase tracking-[0.04em]">
-                    Bundle
+        <div className="grid grid-cols-2 gap-2 max-h-[230px] overflow-y-auto pr-1">
+          {filteredServices.map((s) => {
+            const selected = svcIds.some((id) => String(id) === String(s.id));
+            const isBundle = s.kind === "bundle";
+            const included = s.includedServices || [];
+            const savings = getBundleSavings(s);
+            const originalPrice = getBundleOriginalPrice(s);
+            const savingsPct = getBundleSavingsPct(s);
+
+            return (
+              <button
+                key={s.id}
+                className={`p-[10px_12px] border rounded-[10px] cursor-pointer text-[13px] text-left font-sans transition-all duration-150 ${
+                  selected ? "border-teal bg-teal-soft text-teal-ink font-medium" : "border-line bg-white text-ink hover:border-ink-3"
+                }`}
+                onClick={() => toggleService(s.id)}
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <span className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono text-[10px] text-teal bg-teal-soft border border-teal-soft-2 rounded-md px-1.5 py-0.5">
+                      {formatServiceCode(s)}
+                    </span>
+                    <span className="font-semibold leading-snug">{s.name}</span>
+                    {isBundle && (
+                      <span className="text-[9px] text-amber-ink bg-amber-soft border border-amber rounded-full px-1.5 py-0.5 uppercase tracking-[0.04em]">
+                        Bundle
+                      </span>
+                    )}
                   </span>
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-[7px] border ${
+                    selected ? "border-teal bg-teal text-white" : "border-line-2 bg-white text-transparent"
+                  }`}>
+                    <I.check className="w-3 h-3" />
+                  </span>
+                </div>
+                {isBundle && included.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {included.map((item) => (
+                      <span key={item.id} className="rounded-full border border-line bg-bg-2 px-2 py-0.5 text-[11px] leading-tight text-ink-2">
+                        {item.name}
+                      </span>
+                    ))}
+                  </div>
                 )}
-              </span>
-              <small className={`font-mono text-xs shrink-0 ${svcId === s.id ? "text-teal" : "text-ink-3"}`}>
-                {s.duration}m · ₹{s.price}
-              </small>
-            </button>
-          ))}
+                {isBundle && s.bundle_note && <div className="mt-1.5 text-[11px] leading-snug text-ink-3">{s.bundle_note}</div>}
+                <div className={`mt-2 flex items-center justify-between gap-2 font-mono text-[11px] ${selected ? "text-teal" : "text-ink-3"}`}>
+                  <span>{getServiceDuration(s)}m · ₹{Number(s.price || 0).toLocaleString("en-IN")}</span>
+                  {isBundle && savings > 0 && (
+                    <span className="text-teal font-semibold">
+                      Save {savingsPct}% <span className="text-ink-4 line-through">₹{originalPrice.toLocaleString("en-IN")}</span>
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
           {filteredServices.length === 0 && (
             <div className="col-span-2 text-center text-xs text-ink-3 py-4">No services match your search.</div>
           )}
+        </div>
+        <div className="mt-2 text-xs text-ink-3">
+          {selectedServices.length} selected · {totalDuration} min · ₹{totalPrice.toLocaleString("en-IN")}
         </div>
       </FormField>
       <FormField label="Stylist">

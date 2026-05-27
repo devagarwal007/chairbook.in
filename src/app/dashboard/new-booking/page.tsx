@@ -7,6 +7,14 @@ import { useProfile } from "@/context/ProfileContext";
 import { insertNotification } from "@/lib/notifications";
 import { initialsOf, isUUID } from "@/lib/utils";
 import { formatServiceCode } from "@/lib/service-codes";
+import {
+  SERVICE_SELECT_WITH_BUNDLES,
+  getBundleOriginalPrice,
+  getBundleSavings,
+  getBundleSavingsPct,
+  mapServiceWithBundleDetails,
+  serviceMatchesBundleSearch,
+} from "@/lib/service-bundles";
 import { useToast } from "@/context/ToastContext";
 
 import { Customer, Service, Stylist, NewCustInput, DbBookingSimple, DbStylistRaw, DbServiceRaw, DbBookingSlotRaw, DbBookingStylistRaw } from "@/types";
@@ -33,30 +41,6 @@ function generateDays(baseDate: Date) {
 
 import { ALL_SLOTS_FULL as ALL_SLOTS } from "@/constants/bookings";
 
-const SERVICE_SELECT_WITH_BUNDLES = `
-  id,
-  name,
-  category,
-  duration_min,
-  price,
-  code,
-  kind,
-  bundle_note,
-  bundle_components!bundle_components_bundle_service_id_fkey (
-    position,
-    component_service_id,
-    component:services!bundle_components_component_service_id_fkey (
-      id,
-      name,
-      category,
-      duration_min,
-      price,
-      code,
-      active
-    )
-  )
-`;
-
 
 
 function formatLast(days: number) {
@@ -66,50 +50,6 @@ function formatLast(days: number) {
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;
 };
-
-function mapBookingService(row: DbServiceRaw): Service {
-  const kind = row.kind || "service";
-  const includedServices = (row.bundle_components || [])
-    .slice()
-    .sort((a, b) => Number(a.position || 0) - Number(b.position || 0))
-    .flatMap((item) => {
-      const component = item.component;
-      if (!component || component.active === false) return [];
-      return [{
-        id: component.id,
-        name: component.name,
-        cat: component.category || "General",
-        category: component.category || "General",
-        duration: Number(component.duration_min || 0),
-        duration_min: Number(component.duration_min || 0),
-        price: Number(component.price || 0),
-        code: component.code ?? null,
-        kind: "service" as const,
-        active: true,
-      }];
-    });
-  const price = Number(row.price || 0);
-  const originalPrice = includedServices.reduce((sum, service) => sum + Number(service.price || 0), 0);
-
-  return {
-    id: row.id,
-    name: row.name,
-    cat: row.category || (kind === "bundle" ? "Bundles" : "General"),
-    category: row.category || (kind === "bundle" ? "Bundles" : "General"),
-    duration: row.duration_min,
-    duration_min: row.duration_min,
-    price,
-    code: row.code ?? null,
-    kind,
-    bundle_note: row.bundle_note || "",
-    componentIds: (row.bundle_components || [])
-      .map((item) => item.component_service_id || item.component?.id)
-      .filter((id): id is string | number => Boolean(id)),
-    includedServices,
-    originalPrice: originalPrice || undefined,
-    savings: originalPrice > price ? originalPrice - price : undefined,
-  };
-}
 
 // ===== STEP BAR =====
 function StepBar({ step }: { step: number }) {
@@ -327,10 +267,16 @@ interface StepServicesProps {
 }
 
 function StepServices({ services, toggleService, dbServices, loading }: StepServicesProps) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredServices = useMemo(
+    () => dbServices.filter((service) => serviceMatchesBundleSearch(service, normalizedQuery)),
+    [dbServices, normalizedQuery]
+  );
   const cats = useMemo(() => {
-    const unique = new Set(dbServices.map(s => s.cat));
+    const unique = new Set(filteredServices.map(s => s.cat));
     return Array.from(unique).sort();
-  }, [dbServices]);
+  }, [filteredServices]);
 
   if (loading) {
     return (
@@ -348,17 +294,36 @@ function StepServices({ services, toggleService, dbServices, loading }: StepServ
     <div className="nb-step-content">
       <h1 className="nb-title">What service{services.length > 1 ? "s" : ""}?</h1>
       <p className="nb-sub">Pick one or more. Total duration and price update at the bottom.</p>
+      <div className="flex items-center gap-2.5 bg-white border border-line-2 rounded-xl px-3.5 h-11 focus-within:border-teal mb-4">
+        <IN.search />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder='Search service, bundle, or code "#003"'
+          className="flex-1 h-full border-0 outline-0 bg-transparent text-sm min-w-0"
+        />
+        {query && (
+          <button className="border-0 bg-transparent cursor-pointer text-ink-3 grid place-items-center" onClick={() => setQuery("")} aria-label="Clear search">
+            <IN.x />
+          </button>
+        )}
+      </div>
+      {filteredServices.length === 0 && (
+        <div className="rounded-xl border border-line bg-white p-5 text-sm text-ink-3">
+          No services match &ldquo;{query}&rdquo;. Try a shorter search, another code, or clear the search.
+        </div>
+      )}
       {cats.map(cat => (
         <div key={cat} className="svc-cat" style={{ marginBottom: 18 }}>
           <div className="svc-cat-name" style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>{cat}</div>
           <div className="svc-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
-            {dbServices.filter(s => s.cat === cat).map(s => {
+            {filteredServices.filter(s => s.cat === cat).map(s => {
               const on = services.some(x => x.id === s.id);
               const isBundle = s.kind === "bundle";
               const included = s.includedServices || [];
-              const originalPrice = s.originalPrice || included.reduce((sum, service) => sum + Number(service.price || 0), 0);
-              const savings = s.savings || Math.max(0, originalPrice - Number(s.price || 0));
-              const savingsPct = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
+              const originalPrice = getBundleOriginalPrice(s);
+              const savings = getBundleSavings(s);
+              const savingsPct = getBundleSavingsPct(s);
               return (
                 <button
                   key={s.id}
@@ -825,7 +790,7 @@ export default function NewBookingPage() {
         if (servicesError) throw servicesError;
 
         const rawServices = (servicesData || []) as unknown as DbServiceRaw[];
-        setDbServices(rawServices.map(mapBookingService));
+        setDbServices(rawServices.map(mapServiceWithBundleDetails));
       } catch (err) {
         console.error("Error loading services:", err);
         setDbStylists([]);

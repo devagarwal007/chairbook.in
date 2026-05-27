@@ -8,6 +8,7 @@ import { useProfile } from "@/context/ProfileContext";
 import { toMinHours, initialsOf, formatDateKey, formatTime12hFromMin } from "@/lib/utils";
 import { Stylist, CalAppt, DbCalBookingRow } from "@/types";
 import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
+import { BOOKING_SERVICE_SELECT_WITH_BUNDLE_DETAILS, getBundleSavings, getBundleSavingsPct, getServiceDuration, mapServiceWithBundleDetails } from "@/lib/service-bundles";
 
 import { START_HOUR, SLOT_HEIGHT, MONTH_NAMES, DOW_FULL, STATUS_LABEL, TIME_LABELS } from "@/constants/bookings";
 
@@ -89,6 +90,34 @@ function ApptBlock({ a, onClick, narrow }: ApptBlockProps) {
       {height > 28 && (
         <div className="text-[10px] opacity-85 whitespace-nowrap overflow-hidden text-ellipsis">{a.service}</div>
       )}
+    </div>
+  );
+}
+
+function BundleServiceDetails({ services }: { services?: CalAppt["serviceItems"] }) {
+  const bundles = (services || []).filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
+  if (bundles.length === 0) return null;
+
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      {bundles.map((bundle) => {
+        const included = bundle.includedServices || [];
+        const savings = getBundleSavings(bundle);
+
+        return (
+          <div key={bundle.id} className="text-[11px] leading-snug text-ink-3">
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="rounded-full border border-amber bg-amber-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-amber-ink">Bundle</span>
+              {included.slice(0, 3).map((item) => (
+                <span key={item.id} className="rounded-full border border-line bg-bg-2 px-1.5 py-0.5 text-[10px] text-ink-2">{item.name}</span>
+              ))}
+              {included.length > 3 && <span className="text-[10px] text-ink-4">+{included.length - 3}</span>}
+              {savings > 0 && <span className="font-mono text-[10px] font-semibold text-teal">Save {getBundleSavingsPct(bundle)}%</span>}
+            </div>
+            {bundle.bundle_note && <div className="mt-1 truncate">{bundle.bundle_note}</div>}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -476,7 +505,10 @@ function ListView({ weekDays, appts, stylists, stylistFilter, onSelect, todayKey
                     </div>
 
                     {/* Service (hidden on mobile) */}
-                    <div className="hidden md:block text-[13px] text-ink-2 truncate">{a.service}</div>
+                    <div className="hidden md:block min-w-0 text-[13px] text-ink-2">
+                      <div className="truncate">{a.service}</div>
+                      <BundleServiceDetails services={a.serviceItems} />
+                    </div>
 
                     {/* Stylist (hidden on mobile) */}
                     <div className="hidden md:flex items-center gap-2">
@@ -594,7 +626,7 @@ export default function BookingsPage() {
           payment_status, bill_total, amount_paid, amount_due,
           customer:customers(id, name, phone),
           stylist:stylists(id, name, tone),
-          booking_services(price_at_booking, service:services(name))`)
+          booking_services(${BOOKING_SERVICE_SELECT_WITH_BUNDLE_DETAILS})`)
         .eq("salon_id", sid)
         .neq("status", "Cancelled")
         .gte("date", fromDate)
@@ -612,7 +644,19 @@ export default function BookingsPage() {
           const startH = parseInt(timeParts[0]) || 9;
           const startM = parseInt(timeParts[1]) || 0;
           const tone = (b.stylist?.tone || "tone-a").replace("tone-", "");
-          const serviceNames = b.booking_services?.map((bs) => bs.service?.name).filter(Boolean).join(" + ") || "Service";
+          const serviceItems = (b.booking_services || []).flatMap((bs) => {
+            if (!bs.service) return [];
+            const service = mapServiceWithBundleDetails(bs.service);
+            const duration = getServiceDuration(service);
+            return [{
+              ...service,
+              qty: bs.qty || 1,
+              duration,
+              duration_min: duration,
+              price: Number(bs.price_at_booking || service.price || 0),
+            }];
+          });
+          const serviceNames = serviceItems.map((service) => service.name).join(" + ") || "Service";
           const mapStatus = (s: string): "confirmed" | "arrived" | "in_service" | "completed" | "noshow" | "cancelled" => {
             const l = (s || "").toLowerCase();
             if (l === "arrived") return "arrived";
@@ -642,6 +686,7 @@ export default function BookingsPage() {
             initials,
             tone,
             service: serviceNames,
+            serviceItems,
             status: mapStatus(b.status),
             arrivedAt: b.arrived_at,
             startedAt: b.started_at,
@@ -1042,6 +1087,7 @@ export default function BookingsPage() {
                   <div className="text-xs text-ink-3 mt-0.5">
                      {selected.service} · {String(selected.startH).padStart(2,"0")}:{String(selected.startM).padStart(2,"0")} · {selected.duration} min
                   </div>
+                  <BundleServiceDetails services={selected.serviceItems} />
                 </div>
                 <Badge tone={selected.status} showDot>
                   {STATUS_LABEL[selected.status]}

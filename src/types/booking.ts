@@ -1,6 +1,12 @@
+import type { DbServiceRaw, Service } from "./service";
+
 export type BookingStatus = "confirmed" | "arrived" | "in_service" | "completed" | "noshow" | "cancelled";
 
 export type BookingProgressAction = "mark_arrived" | "start_service" | "complete_service";
+
+export type BookingServiceSummary = Service & {
+  qty?: number | null;
+};
 
 export interface BookingTimingFields {
   arrivedAt?: string | null;
@@ -24,6 +30,7 @@ export interface Appointment extends BookingTimingFields {
   visits: number;
   phone: string;
   note: string;
+  serviceItems?: BookingServiceSummary[];
   paymentStatus?: "paid" | "partial" | "due" | null;
   amountPaid?: number;
   amountDue?: number;
@@ -41,6 +48,7 @@ export interface CalAppt extends BookingTimingFields {
   initials: string;
   tone: string;
   service: string;
+  serviceItems?: BookingServiceSummary[];
   status: BookingStatus;
   phone?: string;
   paymentStatus?: "paid" | "partial" | "due" | null;
@@ -75,7 +83,7 @@ export interface BookingData {
     spend: number;
     memberSince: string;
   };
-  services: { name: string; duration: number; price: number }[];
+  services: BookingServiceSummary[];
   stylist: { name: string; short: string; tone: string };
   notes: string;
   payment: {
@@ -105,7 +113,7 @@ export interface BookingRow {
 export interface DbBookingServiceItem {
   qty: number | null;
   price_at_booking: number;
-  service: { id: string | number; name: string } | null;
+  service: DbServiceRaw | null;
 }
 
 export interface DbBookingListItem {
@@ -148,10 +156,9 @@ export interface DbCalBookingRow {
   customer: { id: string; name: string; phone: string | null } | null;
   stylist: { id: string; name: string; tone: string | null } | null;
   booking_services: Array<{
+    qty?: number | null;
     price_at_booking?: number;
-    service: {
-      name: string;
-    } | null;
+    service: DbServiceRaw | null;
   }> | null;
 }
 

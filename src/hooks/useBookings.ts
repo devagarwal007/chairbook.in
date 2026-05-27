@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Appointment, DbBookingListItem } from "@/types";
 import { mapDbStatusToUi, formatDateKey } from "@/lib/utils";
+import { BOOKING_SERVICE_SELECT_WITH_BUNDLE_DETAILS, getServiceDuration, mapServiceWithBundleDetails } from "@/lib/service-bundles";
 
 
 export function useBookings(salonId: string | null, day: string) {
@@ -56,11 +57,7 @@ export function useBookings(salonId: string | null, day: string) {
           notes,
           customer:customers (id, name, phone),
           stylist:stylists (id, name, tone),
-          booking_services (
-            qty,
-            price_at_booking,
-            service:services (id, name)
-          )
+          booking_services (${BOOKING_SERVICE_SELECT_WITH_BUNDLE_DETAILS})
         `)
         .eq("salon_id", salonId)
         .eq("date", dateStr)
@@ -101,9 +98,20 @@ export function useBookings(salonId: string | null, day: string) {
             .slice(0, 2) || "WC";
           
           const cleanToneVal = b.stylist?.tone ? cleanTone(b.stylist.tone) : "a";
-          const serviceNames = (b.booking_services || [])
-            .map((bs) => bs.service?.name)
-            .filter(Boolean)
+          const serviceItems = (b.booking_services || [])
+            .flatMap((bs) => {
+              if (!bs.service) return [];
+              const service = mapServiceWithBundleDetails(bs.service);
+              return [{
+                ...service,
+                qty: bs.qty || 1,
+                duration: getServiceDuration(service),
+                duration_min: getServiceDuration(service),
+                price: Number(bs.price_at_booking),
+              }];
+            });
+          const serviceNames = serviceItems
+            .map((service) => service.name)
             .join(" + ") || "No service";
           
           const amountPaid = Number(b.amount_paid || 0);
@@ -132,6 +140,7 @@ export function useBookings(salonId: string | null, day: string) {
             visits: b.customer_id ? (visitsMap[b.customer_id] || 0) : 0,
             phone: b.customer?.phone || "",
             note: b.notes || "",
+            serviceItems,
             paymentStatus,
             amountPaid,
             amountDue,

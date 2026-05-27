@@ -17,9 +17,17 @@ import {
   PROGRESS_ACTION_LABEL,
 } from "@/lib/booking-progress";
 import { useBookingProgress } from "@/hooks";
-import { BookingData, BookingProgressAction, BookingStatus } from "@/types";
+import { BookingData, BookingProgressAction, BookingStatus, DbServiceRaw } from "@/types";
 import { isUUID } from "@/lib/utils";
 import { Modal, Badge, Avatar, FormField } from "@/components/ui";
+import {
+  BOOKING_SERVICE_SELECT_WITH_BUNDLE_DETAILS,
+  getBundleOriginalPrice,
+  getBundleSavings,
+  getBundleSavingsPct,
+  getServiceDuration,
+  mapServiceWithBundleDetails,
+} from "@/lib/service-bundles";
 
 // ===== ICONS =====
 type IconProps = React.SVGProps<SVGSVGElement>;
@@ -272,6 +280,56 @@ function CancelModal({ booking, onClose, onConfirm }: CancelModalProps) {
   );
 }
 
+function BookingBundleDetails({ service }: { service: BookingData["services"][number] }) {
+  if (service.kind !== "bundle") return null;
+
+  const included = service.includedServices || [];
+  if (included.length === 0 && !service.bundle_note) return null;
+
+  const savings = getBundleSavings(service);
+  const savingsPct = getBundleSavingsPct(service);
+  const originalPrice = getBundleOriginalPrice(service);
+
+  return (
+    <div className="mt-2 rounded-lg border border-line bg-bg-2 p-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="rounded-full border border-amber bg-amber-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-amber-ink">Bundle</span>
+        {savings > 0 && (
+          <span className="font-mono text-[11px] font-semibold text-teal">
+            Save {savingsPct}% · ₹{savings.toLocaleString("en-IN")}
+          </span>
+        )}
+        {originalPrice > Number(service.price || 0) && (
+          <span className="font-mono text-[11px] text-ink-4 line-through">₹{originalPrice.toLocaleString("en-IN")}</span>
+        )}
+      </div>
+      {included.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {included.map((item) => (
+            <span key={item.id} className="rounded-full border border-line bg-white px-2 py-0.5 text-[11px] leading-tight text-ink-2">
+              {item.name}
+            </span>
+          ))}
+        </div>
+      )}
+      {service.bundle_note && <div className="mt-1.5 text-[11px] leading-snug text-ink-3">{service.bundle_note}</div>}
+    </div>
+  );
+}
+
+function BookingBundleSummary({ services }: { services: BookingData["services"] }) {
+  const bundles = services.filter((service) => service.kind === "bundle" && ((service.includedServices || []).length > 0 || service.bundle_note));
+  if (bundles.length === 0) return null;
+
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      {bundles.map((service) => (
+        <BookingBundleDetails key={service.id} service={service} />
+      ))}
+    </div>
+  );
+}
+
 // ===== MAIN PAGE COMPONENT =====
 export default function BookingDetailPage() {
   const params = useParams();
@@ -384,11 +442,7 @@ export default function BookingDetailPage() {
             source,
             customer:customers (id, name, phone, created_at),
             stylist:stylists (id, name, tone),
-            booking_services (
-              qty,
-              price_at_booking,
-              service:services (id, name, duration_min, price)
-            )
+            booking_services (${BOOKING_SERVICE_SELECT_WITH_BUNDLE_DETAILS})
           `)
           .eq("id", bookingId)
           .maybeSingle();
@@ -531,18 +585,20 @@ export default function BookingDetailPage() {
           interface DbBookingServiceRow {
             qty: number | null;
             price_at_booking: number;
-            service: {
-              id: string;
-              name: string;
-              duration_min: number;
-              price: number;
-            } | null;
+            service: DbServiceRaw | null;
           }
-          const services = (data.booking_services as unknown as DbBookingServiceRow[] | null)?.map((bs) => ({
-            name: bs.service?.name || "Unknown Service",
-            duration: bs.service?.duration_min || 30,
-            price: Number(bs.price_at_booking)
-          })) || [];
+          const services = (data.booking_services as unknown as DbBookingServiceRow[] | null)?.flatMap((bs) => {
+            if (!bs.service) return [];
+            const service = mapServiceWithBundleDetails(bs.service);
+            const duration = getServiceDuration(service);
+            return [{
+              ...service,
+              qty: bs.qty || 1,
+              duration,
+              duration_min: duration,
+              price: Number(bs.price_at_booking)
+            }];
+          }) || [];
 
           const bData: BookingData = {
             id: data.id,
@@ -972,6 +1028,7 @@ export default function BookingDetailPage() {
             <h1 className="bd-hero-title">
               {b.services.map(s => s.name).join(" + ")}
             </h1>
+            <BookingBundleSummary services={b.services} />
             <div className="bd-hero-meta">
               <span><IBD.clock /> {displayDate} · {displayTime}–{displayEnd} <span style={{ color: "var(--ink-3)" }}>({totalDur} min)</span></span>
               <span><IBD.pin /> {salonInfo.name}{salonInfo.area ? `, ${salonInfo.area}` : ""}</span>
@@ -1052,9 +1109,13 @@ export default function BookingDetailPage() {
             <div className="bd-svc-list">
               {b.services.map((s, i) => (
                 <div key={i} className="bd-svc-row">
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span>{s.name}</span>
+                      {s.kind === "bundle" && <span className="rounded-full border border-amber bg-amber-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-amber-ink">Bundle</span>}
+                    </div>
                     <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{s.duration} min</div>
+                    <BookingBundleDetails service={s} />
                   </div>
                   <div className="bd-svc-price">₹{s.price.toLocaleString("en-IN")}</div>
                 </div>

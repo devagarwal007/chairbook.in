@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { SERVICE_SELECT_WITH_BUNDLES, mapServiceWithBundleDetails } from "@/lib/service-bundles";
 
 import { Stylist, Service, Customer, DbStylistRaw, DbServiceRaw, DbCustomerRaw } from "@/types";
 
@@ -37,7 +38,7 @@ export function useSalonData(salonId: string | null) {
       try {
         const [stRes, svRes, custRes] = await Promise.all([
           supabase.from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true),
-          supabase.from("services").select("id, name, category, duration_min, price, code, kind, bundle_note").eq("salon_id", salonId).eq("active", true).is("deleted_at", null),
+          supabase.from("services").select(SERVICE_SELECT_WITH_BUNDLES).eq("salon_id", salonId).eq("active", true).is("deleted_at", null),
           supabase.from("customers").select("id, name, phone, created_at").eq("salon_id", salonId).order("created_at", { ascending: false }),
         ]);
 
@@ -54,16 +55,7 @@ export function useSalonData(salonId: string | null) {
 
         if (svRes.data) {
           const rawServices = svRes.data as unknown as DbServiceRaw[];
-          setServices(rawServices.map((s) => ({
-            id: s.id,
-            name: s.name,
-            cat: s.category || (s.kind === "bundle" ? "Bundles" : "General"),
-            duration: s.duration_min,
-            price: Number(s.price),
-            code: s.code ?? null,
-            kind: s.kind || "service",
-            bundle_note: s.bundle_note || "",
-          })));
+          setServices(rawServices.map(mapServiceWithBundleDetails));
         }
 
         if (custRes.data) {

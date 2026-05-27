@@ -29,6 +29,7 @@ export interface DbServiceRaw {
   code?: number | null;
   kind?: ServiceKind | null;
   bundle_note?: string | null;
+  active?: boolean | null;
   deleted_at?: string | null;
   bundle_components?: DbBundleComponentRow[] | null;
 }

@@ -27,6 +27,7 @@ export const STEPS = [
   { id: "hours", label: "Hours" },
   { id: "team", label: "Team" },
   { id: "services", label: "Services" },
+  { id: "gst", label: "GST" },
   { id: "whatsapp", label: "WhatsApp" },
   { id: "done", label: "Done" },
 ];

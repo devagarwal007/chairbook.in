@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { GST_SCHEMA_MISSING_MESSAGE, getSupabaseErrorMessage, isMissingGstSchemaError } from "@/lib/supabase-errors";
 import { signOutCurrentUser } from "@/lib/auth-session";
 import { isUUID } from "@/lib/utils";
 import { findDuplicateServiceCode, findNextServiceCode, formatServiceCode, parseServiceCode } from "@/lib/service-codes";
@@ -11,9 +12,11 @@ import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/compo
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
-import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice } from "@/types";
+import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice, SalonGstSettings, DEFAULT_GST_SETTINGS, GstInvoice } from "@/types";
 
 import { DAYS, TABS, PLANS, INITIAL_DATA } from "@/constants/settings";
+import { validateGstin, INDIAN_STATE_OPTIONS } from "@/lib/gst";
+import { buildInvoiceShareUrl } from "@/lib/whatsapp-invoice";
 
 // ===== SHARED HELPER COMPONENTS =====
 interface SectionHeadProps {
@@ -424,6 +427,7 @@ export default function SettingsPage() {
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
   const [supabaseSalonId, setSupabaseSalonId] = useState<string | null>(null);
   const [supabaseOrgId, setSupabaseOrgId] = useState<string | null>(null);
+  const [gstSchemaAvailable, setGstSchemaAvailable] = useState(true);
 
   // Service menu state
   const [serviceModal, setServiceModal] = useState<ServiceModalState | null>(null);
@@ -448,6 +452,7 @@ export default function SettingsPage() {
 
   // Dynamic Invoices and Delete Modal state
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+  const [gstInvoices, setGstInvoices] = useState<GstInvoice[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -626,6 +631,44 @@ export default function SettingsPage() {
           }
         }
 
+        // Load GST Settings
+        let dbGst: SalonGstSettings | undefined = undefined;
+        if (currentSalonId) {
+          try {
+            const { data: gstData, error: gstError } = await supabase
+              .from("salon_gst_settings")
+              .select("*")
+              .eq("salon_id", currentSalonId)
+              .maybeSingle();
+
+            if (gstError) throw gstError;
+            setGstSchemaAvailable(true);
+
+            if (gstData) {
+              dbGst = {
+                id: gstData.id,
+                salon_id: gstData.salon_id,
+                gst_enabled: gstData.gst_enabled,
+                gstin: gstData.gstin || "",
+                legal_name: gstData.legal_name || "",
+                registered_address: gstData.registered_address || "",
+                state: gstData.state || "",
+                state_code: gstData.state_code || "",
+                gst_rate: Number(gstData.gst_rate),
+                sac_code: gstData.sac_code || "999721",
+                pricing_mode: gstData.pricing_mode || "tax_exclusive",
+                invoice_prefix: gstData.invoice_prefix || "SAL",
+              };
+            }
+          } catch (err) {
+            if (isMissingGstSchemaError(err)) {
+              setGstSchemaAvailable(false);
+            } else {
+              console.error("Error loading GST settings:", getSupabaseErrorMessage(err));
+            }
+          }
+        }
+
         // Load Billing Invoices
         let dbInvoices: BillingInvoice[] = [];
         if (userProfile.org_id) {
@@ -656,6 +699,30 @@ export default function SettingsPage() {
         }
         setInvoices(dbInvoices);
 
+        // Load GST Invoices
+        let dbGstInvoices: GstInvoice[] = [];
+        if (currentSalonId) {
+          try {
+            const { data: gstInvData, error: gstInvError } = await supabase
+              .from("gst_invoices")
+              .select("*")
+              .eq("salon_id", currentSalonId)
+              .order("created_at", { ascending: false })
+              .limit(50);
+            if (gstInvError) throw gstInvError;
+            if (gstInvData) {
+              dbGstInvoices = gstInvData as unknown as GstInvoice[];
+            }
+          } catch (err) {
+            if (isMissingGstSchemaError(err)) {
+              setGstSchemaAvailable(false);
+            } else {
+              console.error("Error loading GST invoices:", getSupabaseErrorMessage(err));
+            }
+          }
+        }
+        setGstInvoices(dbGstInvoices);
+
         setData({
           salon: {
             name: salonName,
@@ -681,7 +748,8 @@ export default function SettingsPage() {
             name: userName,
             email: userEmail,
             phone: userPhone,
-          }
+          },
+          gst: dbGst || DEFAULT_GST_SETTINGS,
         });
 
       } catch (err) {
@@ -753,6 +821,35 @@ export default function SettingsPage() {
             })
             .eq("id", supabaseSalonId);
           if (salonError) throw salonError;
+
+          // 1.5. Save GST details
+          if (data.gst) {
+            const shouldSaveGst = gstSchemaAvailable || activeTab === "gst" || data.gst.gst_enabled;
+
+            if (shouldSaveGst) {
+              const gstPayload = {
+                salon_id: supabaseSalonId,
+                gst_enabled: data.gst.gst_enabled,
+                gstin: data.gst.gstin ? data.gst.gstin.trim().toUpperCase() : null,
+                legal_name: data.gst.legal_name ? data.gst.legal_name.trim() : null,
+                registered_address: data.gst.registered_address ? data.gst.registered_address.trim() : null,
+                state: data.gst.state || null,
+                state_code: data.gst.state_code || null,
+                gst_rate: data.gst.gst_rate,
+                sac_code: data.gst.sac_code ? data.gst.sac_code.trim() : "999721",
+                pricing_mode: data.gst.pricing_mode,
+                invoice_prefix: data.gst.invoice_prefix ? data.gst.invoice_prefix.trim().toUpperCase() : "SAL",
+                updated_at: new Date().toISOString(),
+              };
+
+              const { error: gstError } = await supabase
+                .from("salon_gst_settings")
+                .upsert(gstPayload, { onConflict: "salon_id" });
+
+              if (gstError) throw gstError;
+              setGstSchemaAvailable(true);
+            }
+          }
 
           // 2. Save services and bundles first so new bundle components can point at real IDs.
           const { data: dbServicesList } = await supabase
@@ -1013,7 +1110,13 @@ export default function SettingsPage() {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       } catch (err) {
-        console.error("Error saving settings to Supabase:", err);
+        if (isMissingGstSchemaError(err)) {
+          setGstSchemaAvailable(false);
+          showFlash(GST_SCHEMA_MISSING_MESSAGE, 4000);
+          return;
+        }
+
+        console.error("Error saving settings to Supabase:", getSupabaseErrorMessage(err));
         const dbError = err as { code?: string; message?: string; details?: string };
         const errorText = `${dbError.message || ""} ${dbError.details || ""}`.toLowerCase();
         if (dbError.code === "23505" && errorText.includes("code")) {
@@ -1863,6 +1966,159 @@ export default function SettingsPage() {
             </div>
           </div>
         );
+
+      case "gst": {
+        const gstForm = data.gst || DEFAULT_GST_SETTINGS;
+        const gstinResult = gstForm.gstin ? validateGstin(gstForm.gstin) : null;
+        const gstinValid = gstForm.gstin ? (gstinResult?.valid ?? false) : true;
+        const updateGst = (patch: Partial<SalonGstSettings>) => {
+          const updated = { ...gstForm, ...patch };
+          if (patch.gstin && patch.gstin.length === 15) {
+            const result = validateGstin(patch.gstin);
+            if (result.valid && result.stateCode && result.stateName) {
+              updated.state = result.stateName;
+              updated.state_code = result.stateCode;
+            }
+          }
+          update({ ...data, gst: updated });
+        };
+        return (
+          <div className="flex flex-col gap-[18px]">
+            <SectionHead title="GST & Billing" desc="Configure GST for customer invoices." />
+            {/* Enable / Disable Toggle */}
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="text-sm font-semibold">GST invoicing</div>
+                  <div className="text-xs text-ink-3 mt-0.5">
+                    {gstForm.gst_enabled
+                      ? "Tax invoices will be generated for every completed payment."
+                      : "Enable to generate GST-compliant invoices for customers."}
+                  </div>
+                </div>
+                <label className="inline-flex cursor-pointer items-center relative shrink-0">
+                  <input type="checkbox" className="absolute opacity-0 pointer-events-none peer" checked={gstForm.gst_enabled} onChange={e => updateGst({ gst_enabled: e.target.checked })} />
+                  <div className="w-[44px] h-[24px] rounded-full bg-line peer-checked:bg-teal transition" />
+                  <div className="absolute left-[3px] top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow transition peer-checked:translate-x-[20px]" />
+                </label>
+              </div>
+            </div>
+            {gstForm.gst_enabled && (
+              <>
+                {/* Business details */}
+                <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+                  <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-3">Business details</div>
+                  <FormField label="GSTIN">
+                    <input value={gstForm.gstin} onChange={e => updateGst({ gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15) })} placeholder="e.g. 27AABCU9603R1ZM" maxLength={15} style={{ padding: "10px 12px", border: `1px solid ${gstForm.gstin && !gstinValid ? "var(--red)" : "var(--line-2)"}`, borderRadius: 8, outline: 0, fontSize: 14, fontFamily: "monospace", letterSpacing: "0.05em" }} />
+                    {gstForm.gstin && !gstinValid && <div className="text-xs text-red-500 mt-1">Invalid GSTIN format</div>}
+                    {gstinResult?.valid && <div className="text-xs text-teal-ink mt-1">{"\u2713"} {gstinResult.stateName} ({gstinResult.stateCode})</div>}
+                  </FormField>
+                  <FormField label="Legal business name" style={{ marginTop: 14 }}>
+                    <input value={gstForm.legal_name} onChange={e => updateGst({ legal_name: e.target.value })} placeholder="As on GST certificate" style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }} />
+                  </FormField>
+                  <FormField label="Registered address" style={{ marginTop: 14 }}>
+                    <textarea value={gstForm.registered_address} onChange={e => updateGst({ registered_address: e.target.value })} placeholder="Full address as per GST registration" rows={2} style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, resize: "vertical" }} />
+                  </FormField>
+                  <div className="field-row" style={{ marginTop: 14 }}>
+                    <FormField label="State">
+                      <select value={gstForm.state_code || ""} onChange={e => { const opt = INDIAN_STATE_OPTIONS.find(s => s.code === e.target.value); if (opt) updateGst({ state: opt.name, state_code: opt.code }); }} style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, background: "#fff" }}>
+                        <option value="">Select state</option>
+                        {INDIAN_STATE_OPTIONS.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+                      </select>
+                    </FormField>
+                    <FormField label="State code">
+                      <input value={gstForm.state_code || ""} readOnly style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, background: "var(--bg)", maxWidth: 80 }} />
+                    </FormField>
+                  </div>
+                </div>
+                {/* Tax configuration */}
+                <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+                  <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-3">Tax configuration</div>
+                  <div className="text-xs font-semibold text-ink-2 mb-2">Pricing mode</div>
+                  <div className="flex gap-2 mb-4">
+                    {(["tax_inclusive", "tax_exclusive"] as const).map(mode => (
+                      <button key={mode} className={`flex-1 p-3 rounded-lg border text-sm font-medium text-left transition ${gstForm.pricing_mode === mode ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white text-ink-2 hover:border-ink-3"}`} onClick={() => updateGst({ pricing_mode: mode })}>
+                        <div className="font-semibold">{mode === "tax_inclusive" ? "Tax inclusive" : "Tax exclusive"}</div>
+                        <div className="text-xs mt-0.5 opacity-70">{mode === "tax_inclusive" ? "Prices already include GST" : "GST added on top of prices"}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="field-row">
+                    <FormField label="GST rate (%)">
+                      <input type="number" value={gstForm.gst_rate} onChange={e => updateGst({ gst_rate: parseFloat(e.target.value) || 0 })} min={0} max={100} step={0.5} style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, maxWidth: 100 }} />
+                      <div className="text-xs text-ink-3 mt-1">CGST {(gstForm.gst_rate / 2).toFixed(1)}% + SGST {(gstForm.gst_rate / 2).toFixed(1)}%</div>
+                    </FormField>
+                    <FormField label="SAC code">
+                      <input value={gstForm.sac_code} onChange={e => updateGst({ sac_code: e.target.value.replace(/\D/g, "").slice(0, 8) })} style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, fontFamily: "monospace", maxWidth: 120 }} />
+                      <div className="text-xs text-ink-3 mt-1">Default: 999721 (Salon services)</div>
+                    </FormField>
+                    <FormField label="Invoice prefix">
+                      <input value={gstForm.invoice_prefix} onChange={e => updateGst({ invoice_prefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) })} maxLength={6} style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, fontFamily: "monospace", maxWidth: 100 }} />
+                      <div className="text-xs text-ink-3 mt-1">e.g. SAL = SAL-2627-000001</div>
+                    </FormField>
+                  </div>
+                </div>
+
+                {/* Invoice History Section */}
+                <div className="bg-white border border-line rounded-xl p-[20px_22px] mt-2">
+                  <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-3">Invoice history</div>
+                  <div className="flex flex-col border border-line rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-2 p-[12px_16px] bg-bg border-b border-line text-[10px] font-semibold tracking-[0.04em] uppercase text-ink-3 max-[720px]:hidden">
+                      <div>Invoice Number</div>
+                      <div>Customer</div>
+                      <div>Date</div>
+                      <div>Amount</div>
+                      <div className="text-right">Actions</div>
+                    </div>
+                    {gstInvoices.length > 0 ? (
+                      gstInvoices.map((inv) => {
+                        let formattedDate = inv.invoice_date;
+                        try {
+                          formattedDate = new Date(inv.invoice_date).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          });
+                        } catch {}
+
+                        return (
+                          <div key={inv.id} className="grid grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-2 p-[14px_16px] items-center border-b border-line last:border-b-0 text-sm max-[720px]:grid-cols-2 max-[720px]:gap-y-2">
+                            <div>
+                              <div className="font-semibold text-ink">{inv.invoice_number}</div>
+                              <div className="hidden max-[720px]:block text-xs text-ink-3 mt-0.5">{formattedDate}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-ink-2">{inv.customer_name}</div>
+                              {inv.customer_phone && <div className="text-xs text-ink-3">{inv.customer_phone}</div>}
+                            </div>
+                            <div className="text-ink-2 max-[720px]:hidden">{formattedDate}</div>
+                            <div className="font-semibold font-mono text-ink">₹{Number(inv.total_amount).toLocaleString("en-IN")}</div>
+                            <div className="flex gap-2 justify-end max-[720px]:col-span-2">
+                              <a
+                                href={`/api/invoice/${inv.share_token}/pdf`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-ghost btn-xs text-teal font-medium flex items-center gap-1.5 px-2 py-1 rounded"
+                                style={{ textDecoration: "none" }}
+                              >
+                                <I.download width={14} height={14} /> PDF
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div style={{ padding: 24, textAlign: "center", color: "var(--ink-3)", fontSize: 13, fontStyle: "italic" }}>
+                        No invoices generated yet. Invoices are generated automatically on payment checkout.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
 
       case "notifs":
         const rows = [

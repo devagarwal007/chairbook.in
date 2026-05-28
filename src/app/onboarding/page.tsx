@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { makeSalonSlug, saveOnboarding } from "@/lib/onboarding";
 
 import { DayHour, HoursData, OnboardingData } from "@/types";
+import { validateGstin, INDIAN_STATE_OPTIONS } from "@/lib/gst";
 
 import { Icons as IO, StepBar, FormField, Avatar, PhoneInput } from "@/components/ui";
 
@@ -502,6 +503,103 @@ function StepWhatsApp({ data, onChange, onNext, onBack, isSaving, error }: StepW
   );
 }
 
+// 5b. GST (skippable)
+interface StepGstProps {
+  data: OnboardingData;
+  onChange: (d: OnboardingData) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+function StepGst({ data, onChange, onNext, onBack }: StepGstProps) {
+  const gstEnabled = data.gst_enabled ?? false;
+  const gstin = data.gstin || "";
+  const legalName = data.legal_name || "";
+  const gstinResult = gstin ? validateGstin(gstin) : null;
+  const gstinValid = gstin ? (gstinResult?.valid ?? false) : true;
+
+  const canContinue = !gstEnabled || (gstinValid && gstin.length === 15 && legalName.trim().length > 0);
+
+  return (
+    <div className="ob-step">
+      <h2 className="ob-h2">GST invoicing</h2>
+      <p className="ob-sub" style={{ marginBottom: 20, maxWidth: 520 }}>
+        Generate GST-compliant tax invoices for every customer payment. You can always set this up later from Settings.
+      </p>
+
+      {/* Enable/Skip Toggle */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+        <button
+          className={`flex-1 p-4 rounded-lg border text-sm font-medium text-left transition ${!gstEnabled ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white text-ink-2 hover:border-ink-3"}`}
+          onClick={() => onChange({ ...data, gst_enabled: false })}
+        >
+          <div className="font-semibold">Skip for now</div>
+          <div className="text-xs mt-0.5 opacity-70">I&apos;ll set up GST later</div>
+        </button>
+        <button
+          className={`flex-1 p-4 rounded-lg border text-sm font-medium text-left transition ${gstEnabled ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white text-ink-2 hover:border-ink-3"}`}
+          onClick={() => onChange({ ...data, gst_enabled: true })}
+        >
+          <div className="font-semibold">Set up GST</div>
+          <div className="text-xs mt-0.5 opacity-70">Enter GSTIN to enable invoicing</div>
+        </button>
+      </div>
+
+      {gstEnabled && (
+        <div className="bg-white border border-line rounded-xl p-[20px_22px]" style={{ marginBottom: 20 }}>
+          <FormField label="GSTIN">
+            <input
+              value={gstin}
+              onChange={e => {
+                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15);
+                const patch: Partial<OnboardingData> = { gstin: val };
+                if (val.length === 15) {
+                  const result = validateGstin(val);
+                  if (result.valid && result.stateCode && result.stateName) {
+                    patch.gst_state = result.stateName;
+                    patch.gst_state_code = result.stateCode;
+                  }
+                }
+                onChange({ ...data, ...patch });
+              }}
+              placeholder="e.g. 27AABCU9603R1ZM"
+              maxLength={15}
+              style={{ padding: "10px 12px", border: `1px solid ${gstin && !gstinValid ? "var(--red)" : "var(--line-2)"}`, borderRadius: 8, outline: 0, fontSize: 14, fontFamily: "monospace", letterSpacing: "0.05em" }}
+            />
+            {gstin && !gstinValid && <div className="text-xs text-red-500 mt-1">Invalid GSTIN format</div>}
+            {gstinResult?.valid && <div className="text-xs text-teal-ink mt-1">{"\u2713"} {gstinResult.stateName} ({gstinResult.stateCode})</div>}
+          </FormField>
+
+          <FormField label="Legal business name" style={{ marginTop: 14 }}>
+            <input
+              value={legalName}
+              onChange={e => onChange({ ...data, legal_name: e.target.value })}
+              placeholder="As on GST certificate"
+              style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
+            />
+          </FormField>
+
+          <div className="text-xs font-semibold text-ink-2 mt-4 mb-2">Pricing mode</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(["tax_inclusive", "tax_exclusive"] as const).map(mode => (
+              <button
+                key={mode}
+                className={`flex-1 p-3 rounded-lg border text-sm font-medium text-left transition ${(data.gst_pricing_mode || "tax_exclusive") === mode ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white text-ink-2 hover:border-ink-3"}`}
+                onClick={() => onChange({ ...data, gst_pricing_mode: mode })}
+              >
+                <div className="font-semibold text-xs">{mode === "tax_inclusive" ? "Tax inclusive" : "Tax exclusive"}</div>
+                <div className="text-xs mt-0.5 opacity-70">{mode === "tax_inclusive" ? "Prices include GST" : "GST added on top"}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <ObFooter onBack={onBack} onNext={onNext} canNext={canContinue} hint={!gstEnabled ? "You can set up GST anytime from Settings" : null} />
+    </div>
+  );
+}
+
 // 6. Done
 interface StepDoneProps {
   data: OnboardingData;
@@ -654,7 +752,7 @@ export default function OnboardingPage() {
             <div className="brand-mark">C</div>
             <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.015em" }}>ChairBook</span>
           </div>
-          {step.id !== "done" && step.id !== "welcome" && <div className="ob-step-count">Step {stepIdx} of 5</div>}
+          {step.id !== "done" && step.id !== "welcome" && <div className="ob-step-count">Step {stepIdx} of 6</div>}
           {step.id !== "done" && (
             <button className="ob-exit" onClick={() => router.push("/")}>
               Save &amp; exit
@@ -672,6 +770,7 @@ export default function OnboardingPage() {
         {step.id === "hours" && <StepHours data={data} onChange={setData} onNext={next} onBack={back} />}
         {step.id === "team" && <StepTeam data={data} onChange={setData} onNext={next} onBack={back} />}
         {step.id === "services" && <StepServices data={data} onChange={setData} onNext={next} onBack={back} />}
+        {step.id === "gst" && <StepGst data={data} onChange={setData} onNext={next} onBack={back} />}
         {step.id === "whatsapp" && (
           <StepWhatsApp
             data={data}

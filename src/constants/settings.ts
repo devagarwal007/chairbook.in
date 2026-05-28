@@ -17,6 +17,7 @@ export const TABS = [
   { id: "team",     label: "Team",          icon: I.team },
   { id: "whatsapp", label: "WhatsApp",      icon: I.wa },
   { id: "plan",     label: "Subscription",  icon: I.card },
+  { id: "gst",      label: "GST & Billing", icon: I.invoice },
   { id: "notifs",   label: "Notifications", icon: I.bell },
   { id: "account",  label: "Account",       icon: I.user },
 ];

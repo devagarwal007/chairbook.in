@@ -21,6 +21,12 @@ export interface OnboardingInput {
   stylists: StylistInput[];
   services: ServiceInput[];
   waNumber: string;
+  gst_enabled?: boolean;
+  gstin?: string;
+  legal_name?: string;
+  gst_state?: string;
+  gst_state_code?: string;
+  gst_pricing_mode?: "tax_inclusive" | "tax_exclusive";
 }
 
 export interface SavedOnboarding {
@@ -152,6 +158,27 @@ export async function saveOnboarding(data: OnboardingInput): Promise<SavedOnboar
 
     if (error) {
       throw error;
+    }
+  }
+
+  // Save GST settings if enabled during onboarding
+  if (data.gst_enabled && data.gstin) {
+    const { error: gstError } = await supabase
+      .from("salon_gst_settings")
+      .insert({
+        salon_id: salon.id,
+        gst_enabled: true,
+        gstin: data.gstin.trim().toUpperCase(),
+        legal_name: (data.legal_name || data.name).trim(),
+        state: data.gst_state || null,
+        state_code: data.gst_state_code || null,
+        gst_rate: 18,
+        sac_code: "999721",
+        pricing_mode: data.gst_pricing_mode || "tax_exclusive",
+        invoice_prefix: "SAL",
+      });
+    if (gstError) {
+      console.error("GST settings save error (non-fatal):", gstError);
     }
   }
 

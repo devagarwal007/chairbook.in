@@ -10,4 +10,10 @@ export interface OnboardingData {
   stylists: Stylist[];
   services: Service[];
   waNumber: string;
+  gst_enabled?: boolean;
+  gstin?: string;
+  legal_name?: string;
+  gst_state?: string;
+  gst_state_code?: string;
+  gst_pricing_mode?: "tax_inclusive" | "tax_exclusive";
 }

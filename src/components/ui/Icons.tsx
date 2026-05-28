@@ -297,4 +297,14 @@ export const Icons = {
       <path d="M9 17h6M11 13h2M12 9V5"/>
     </svg>
   ),
+  invoice: ({ width = 16, height = 16, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8M8 9h2"/>
+    </svg>
+  ),
+  share: ({ width = 16, height = 16, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>
+    </svg>
+  ),
 };

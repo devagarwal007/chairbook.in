@@ -10,4 +10,5 @@ export * from "./notification";
 export * from "./user";
 export * from "./revenue";
 export * from "./stylistAccount";
+export * from "./gst";
 

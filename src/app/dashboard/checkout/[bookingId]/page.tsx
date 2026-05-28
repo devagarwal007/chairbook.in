@@ -10,7 +10,9 @@ import { insertNotification } from "@/lib/notifications";
 import { isUUID } from "@/lib/utils";
 import { Icons as IC } from "@/components/ui/Icons";
 import { Avatar } from "@/components/ui";
-import { Customer, DbCheckoutServiceItemRow } from "@/types";
+import { Customer, DbCheckoutServiceItemRow, SalonGstSettings, DEFAULT_GST_SETTINGS, GstTaxBreakdown } from "@/types";
+import { calculateGst, calculateItemGst, validateGstin, shouldUseIgst } from "@/lib/gst";
+import { useGstSettings } from "@/hooks/useGstSettings";
 
 interface ServiceItem {
   id: number;
@@ -78,6 +80,18 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const { show: triggerFlash } = useToast();
   const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
+  const [invoiceShareToken, setInvoiceShareToken] = useState<string | null>(null);
+
+  // B2B GST Customer Details
+  const [showB2b, setShowB2b] = useState<boolean>(false);
+  const [customerGstin, setCustomerGstin] = useState<string>("");
+  const [customerBusinessName, setCustomerBusinessName] = useState<string>("");
+  const [customerBillingAddress, setCustomerBillingAddress] = useState<string>("");
+  const [customerBillingState, setCustomerBillingState] = useState<string>("");
+  const [customerBillingStateCode, setCustomerBillingStateCode] = useState<string>("");
+
+  // GST settings
+  const { settings: gstSettings, isGstEnabled } = useGstSettings(salonId);
 
   // Fetch Booking details if UUID
   useEffect(() => {
@@ -286,9 +300,28 @@ export default function CheckoutPage() {
     return Math.min(subtotal, discountValue);
   }, [discountType, discountValue, subtotal]);
 
+  // IGST state check
+  const isIgst = useMemo(() => {
+    if (!isGstEnabled || !customerGstin) return false;
+    const result = validateGstin(customerGstin);
+    if (!result.valid || !result.stateCode) return false;
+    return shouldUseIgst(gstSettings.state_code, result.stateCode);
+  }, [isGstEnabled, customerGstin, gstSettings.state_code]);
+
+  // GST tax breakdown
+  const gstBreakdown = useMemo(() => {
+    if (!isGstEnabled) return null;
+    const afterDiscount = Math.max(0, subtotal - discountAmount);
+    return calculateGst(afterDiscount, gstSettings.gst_rate, gstSettings.pricing_mode, isIgst);
+  }, [isGstEnabled, subtotal, discountAmount, gstSettings.gst_rate, gstSettings.pricing_mode, isIgst]);
+
   const beforeRound = useMemo(() => {
-    return Math.max(0, subtotal - discountAmount + tip);
-  }, [subtotal, discountAmount, tip]);
+    const base = Math.max(0, subtotal - discountAmount);
+    const tax = (isGstEnabled && gstSettings.pricing_mode === "tax_exclusive" && gstBreakdown)
+      ? gstBreakdown.totalTax
+      : 0;
+    return Math.max(0, base + tax + tip);
+  }, [subtotal, discountAmount, tip, isGstEnabled, gstSettings.pricing_mode, gstBreakdown]);
 
   const roundedTotal = useMemo(() => {
     return roundOff ? Math.round(beforeRound / 10) * 10 : beforeRound;
@@ -299,6 +332,7 @@ export default function CheckoutPage() {
   }, [roundedTotal, beforeRound]);
 
   const total = roundedTotal;
+
   const balanceDue = useMemo(() => {
     return Math.max(0, total - existingPaidAmount);
   }, [existingPaidAmount, total]);
@@ -459,6 +493,81 @@ export default function CheckoutPage() {
                 body: notificationBody,
                 meta: { booking_id: bookingId, amount: amountToRecord, due: amountDueAfter, method: p.method },
               });
+            }
+
+            // Generate GST invoice if enabled and payment completed
+            if (isGstEnabled && salonId && baseBooking && gstBreakdown && (nextPaymentStatus === "paid")) {
+              try {
+                const { data: invNumData } = await supabase.rpc("next_gst_invoice_number", {
+                  p_salon_id: salonId,
+                  p_prefix: gstSettings.invoice_prefix || "SAL",
+                });
+                const invoiceNumber = invNumData || "SAL-0000-000001";
+                const now = new Date();
+                const yr = now.getFullYear();
+                const mo = now.getMonth() + 1;
+                const fy = mo < 4 ? `${(yr-1).toString().slice(2)}${yr.toString().slice(2)}` : `${yr.toString().slice(2)}${(yr+1).toString().slice(2)}`;
+
+                const { data: invData, error: invError } = await supabase
+                  .from("gst_invoices")
+                  .insert({
+                    salon_id: salonId,
+                    booking_id: bookingId,
+                    invoice_number: invoiceNumber,
+                    financial_year: fy,
+                    salon_legal_name: gstSettings.legal_name || baseBooking.customer.name,
+                    salon_gstin: gstSettings.gstin,
+                    salon_address: gstSettings.registered_address || null,
+                    salon_state: gstSettings.state || null,
+                    salon_state_code: gstSettings.state_code || null,
+                    customer_name: baseBooking.customer.name,
+                    customer_phone: baseBooking.customer.phone || null,
+                    // B2B fields
+                    customer_gstin: customerGstin ? customerGstin.trim().toUpperCase() : null,
+                    customer_business_name: customerBusinessName ? customerBusinessName.trim() : null,
+                    customer_billing_address: customerBillingAddress ? customerBillingAddress.trim() : null,
+                    customer_billing_state: customerBillingState || null,
+                    customer_billing_state_code: customerBillingStateCode || null,
+                    is_igst: isIgst,
+                    sac_code: gstSettings.sac_code || "999721",
+                    taxable_amount: gstBreakdown.taxableAmount,
+                    cgst_rate: gstBreakdown.cgstRate,
+                    cgst_amount: gstBreakdown.cgstAmount,
+                    sgst_rate: gstBreakdown.sgstRate,
+                    sgst_amount: gstBreakdown.sgstAmount,
+                    igst_rate: gstBreakdown.igstRate,
+                    igst_amount: gstBreakdown.igstAmount,
+                    discount_amount: discountAmount,
+                    total_amount: total,
+                    payment_method: p.method,
+                  })
+                  .select("id, share_token")
+                  .single();
+
+                if (invError) {
+                  console.error("GST invoice creation error:", invError);
+                } else if (invData) {
+                  setInvoiceShareToken(invData.share_token);
+                  const lineItems = items.map(it => {
+                    const itemTax = calculateItemGst(it.name, gstSettings.sac_code || "999721", it.price, it.qty, gstSettings.gst_rate, gstSettings.pricing_mode, isIgst);
+                    return {
+                      invoice_id: invData.id,
+                      service_name: it.name,
+                      sac_code: gstSettings.sac_code || "999721",
+                      qty: it.qty,
+                      unit_price: it.price,
+                      taxable_amount: itemTax.taxableAmount,
+                      cgst_amount: itemTax.cgstAmount,
+                      sgst_amount: itemTax.sgstAmount,
+                      igst_amount: itemTax.igstAmount,
+                      total_amount: itemTax.totalAmount
+                    };
+                  });
+                  await supabase.from("gst_invoice_items").insert(lineItems);
+                }
+              } catch (invErr) {
+                console.error("GST invoice generation error (non-fatal):", invErr);
+              }
             }
 
           } catch (err) {
@@ -822,6 +931,76 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Optional B2B Section (collapsible) */}
+              {isGstEnabled && (
+                <div className="bg-white border border-line rounded-xl p-[14px_18px] mb-3">
+                  <button
+                    type="button"
+                    className="flex justify-between items-center w-full text-sm font-semibold text-ink cursor-pointer outline-none bg-transparent border-0 p-0"
+                    onClick={() => setShowB2b(!showB2b)}
+                  >
+                    <span>Add business GST details (B2B)</span>
+                    <span className={`transform transition-transform duration-200 ${showB2b ? "rotate-180" : ""}`}>
+                      <IC.chev width={16} height={16} />
+                    </span>
+                  </button>
+                  {showB2b && (
+                    <div className="mt-4 flex flex-col gap-3.5 border-t border-line pt-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Customer GSTIN</label>
+                        <input
+                          type="text"
+                          value={customerGstin}
+                          maxLength={15}
+                          placeholder="e.g. 27AABCU9603R1ZM"
+                          className="w-full bg-transparent border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-teal font-mono uppercase tracking-[0.05em]"
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15);
+                            setCustomerGstin(val);
+                            if (val.length === 15) {
+                              const result = validateGstin(val);
+                              if (result.valid && result.stateCode && result.stateName) {
+                                setCustomerBillingState(result.stateName);
+                                setCustomerBillingStateCode(result.stateCode);
+                              }
+                            }
+                          }}
+                        />
+                        {customerGstin && !validateGstin(customerGstin).valid && (
+                          <span className="text-xs text-rose">Invalid GSTIN format</span>
+                        )}
+                        {customerGstin && validateGstin(customerGstin).valid && (
+                          <span className="text-xs text-teal-ink flex items-center gap-1 font-medium">
+                            ✓ {customerBillingState} ({customerBillingStateCode}) 
+                            {isIgst ? " · Inter-state (IGST will apply)" : " · Intra-state (CGST + SGST will apply)"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Business Name</label>
+                        <input
+                          type="text"
+                          value={customerBusinessName}
+                          placeholder="Legal business name"
+                          className="w-full bg-transparent border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-teal"
+                          onChange={(e) => setCustomerBusinessName(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Billing Address</label>
+                        <textarea
+                          value={customerBillingAddress}
+                          placeholder="Full address"
+                          rows={2}
+                          className="w-full bg-transparent border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-teal resize-none"
+                          onChange={(e) => setCustomerBillingAddress(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <TotalSummary
                 subtotal={subtotal}
                 discount={discountAmount}
@@ -832,6 +1011,7 @@ export default function CheckoutPage() {
                 total={total}
                 amountPaid={existingPaidAmount}
                 amountDue={balanceDue}
+                gstBreakdown={gstBreakdown}
               />
             </>
           )}
@@ -964,6 +1144,8 @@ export default function CheckoutPage() {
               customer={baseBooking.customer}
               amountPaid={existingPaidAmount}
               amountDue={payment.amountDue}
+              invoiceShareToken={invoiceShareToken}
+              gstBreakdown={gstBreakdown}
               onWhatsApp={() => triggerFlash("Receipt sent on WhatsApp ✓")}
               onPrint={() => triggerFlash("Sent to printer ✓")}
               onClose={() => router.push("/dashboard")}
@@ -1006,9 +1188,10 @@ interface TotalSummaryProps {
   total: number;
   amountPaid: number;
   amountDue: number;
+  gstBreakdown?: GstTaxBreakdown | null;
 }
 
-function TotalSummary({ subtotal, discount, discountType, discountValue, tip, roundOffAmt, total, amountPaid, amountDue }: TotalSummaryProps) {
+function TotalSummary({ subtotal, discount, discountType, discountValue, tip, roundOffAmt, total, amountPaid, amountDue, gstBreakdown }: TotalSummaryProps) {
   return (
     <div className="bg-white border border-line rounded-xl p-[14px_18px]">
       <div className="flex justify-between items-center py-1.5 text-[13px] text-ink-2">
@@ -1020,6 +1203,31 @@ function TotalSummary({ subtotal, discount, discountType, discountValue, tip, ro
           <span>Discount{discountType === "percent" ? ` (${discountValue}%)` : ""}</span>
           <span className="font-mono">− ₹{discount.toLocaleString("en-IN")}</span>
         </div>
+      )}
+      {gstBreakdown && (
+        <>
+          <div className="flex justify-between items-center py-1 text-[12px] text-ink-3">
+            <span>Taxable value</span>
+            <span className="font-mono">₹{gstBreakdown.taxableAmount.toLocaleString("en-IN")}</span>
+          </div>
+          {gstBreakdown.isIgst ? (
+            <div className="flex justify-between items-center py-1 text-[12px] text-ink-3">
+              <span>IGST ({gstBreakdown.igstRate}%)</span>
+              <span className="font-mono">₹{gstBreakdown.igstAmount.toLocaleString("en-IN")}</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between items-center py-1 text-[12px] text-ink-3">
+                <span>CGST ({gstBreakdown.cgstRate}%)</span>
+                <span className="font-mono">₹{gstBreakdown.cgstAmount.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 text-[12px] text-ink-3">
+                <span>SGST ({gstBreakdown.sgstRate}%)</span>
+                <span className="font-mono">₹{gstBreakdown.sgstAmount.toLocaleString("en-IN")}</span>
+              </div>
+            </>
+          )}
+        </>
       )}
       {tip > 0 && (
         <div className="flex justify-between items-center py-1.5 text-[13px] text-ink-2">
@@ -1244,6 +1452,8 @@ interface ReceiptProps {
   customer: Customer;
   amountPaid: number;
   amountDue: number;
+  invoiceShareToken?: string | null;
+  gstBreakdown?: GstTaxBreakdown | null;
   onWhatsApp: () => void;
   onPrint: () => void;
   onClose: () => void;
@@ -1258,6 +1468,8 @@ function Receipt({
   customer,
   amountPaid,
   amountDue,
+  invoiceShareToken,
+  gstBreakdown,
   onWhatsApp,
   onPrint,
   onClose,
@@ -1368,6 +1580,48 @@ function Receipt({
           </div>
         )}
       </div>
+
+      {invoiceShareToken && (
+        <div className="p-[18px_24px_24px] bg-teal-soft border-t border-dashed border-teal-soft-2 flex flex-col gap-2">
+          <div className="flex justify-between items-center text-[13px] text-teal-ink font-medium">
+            <span>GST Tax Invoice</span>
+            <a
+              href={`/api/invoice/${invoiceShareToken}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-xs text-teal font-semibold flex items-center gap-1.5 px-2.5 py-1 rounded bg-white shadow-sm border border-teal-soft-2"
+              style={{ textDecoration: "none", height: "auto" }}
+            >
+              <IC.download width={14} height={14} /> Download PDF
+            </a>
+          </div>
+          {gstBreakdown && (
+            <div className="text-xs text-ink-3 flex flex-col gap-1 mt-1 border-t border-teal-soft-2 pt-2">
+              <div className="flex justify-between">
+                <span>Taxable Value</span>
+                <span className="font-mono">₹{gstBreakdown.taxableAmount.toLocaleString("en-IN")}</span>
+              </div>
+              {gstBreakdown.isIgst ? (
+                <div className="flex justify-between">
+                  <span>IGST ({gstBreakdown.igstRate}%)</span>
+                  <span className="font-mono">₹{gstBreakdown.igstAmount.toLocaleString("en-IN")}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span>CGST ({gstBreakdown.cgstRate}%)</span>
+                    <span className="font-mono">₹{gstBreakdown.cgstAmount.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>SGST ({gstBreakdown.sgstRate}%)</span>
+                    <span className="font-mono">₹{gstBreakdown.sgstAmount.toLocaleString("en-IN")}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="p-[18px_24px_24px] bg-bg border-t border-dashed border-line">
         <button

@@ -1,4 +1,5 @@
 import { HoursData, Service, Stylist } from ".";
+import type { SalonGstSettings } from "./gst";
 
 export interface SalonInfo {
   name: string;
@@ -60,4 +61,5 @@ export interface SettingsData {
   plan: string;
   notifs: Notifications;
   account: AccountInfo;
+  gst?: SalonGstSettings;
 }

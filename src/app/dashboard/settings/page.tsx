@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { GST_SCHEMA_MISSING_MESSAGE, getSupabaseErrorMessage, isMissingGstSchemaError } from "@/lib/supabase-errors";
@@ -12,11 +12,19 @@ import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/compo
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
-import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice, SalonGstSettings, DEFAULT_GST_SETTINGS, GstInvoice } from "@/types";
+import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, WhatsAppSenderPreference, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice, SalonGstSettings, DEFAULT_GST_SETTINGS, GstInvoice } from "@/types";
 
 import { DAYS, TABS, PLANS, INITIAL_DATA } from "@/constants/settings";
 import { validateGstin, INDIAN_STATE_OPTIONS } from "@/lib/gst";
-import { buildInvoiceShareUrl } from "@/lib/whatsapp-invoice";
+import { WHATSAPP_CREDIT_PACKS } from "@/lib/whatsapp/credit-packs";
+import { buildBookingConfirmationPayload } from "@/lib/whatsapp/message-payloads";
+import { sendWhatsAppTemplateFromClient } from "@/lib/whatsapp-client";
+import { buildWalletSummary, type MessageCreditWalletRow } from "@/lib/whatsapp/wallet-view";
+import {
+  extractEmbeddedSignupCode,
+  parseEmbeddedSignupMessage,
+  type EmbeddedSignupInfo,
+} from "@/lib/whatsapp/embedded-signup";
 
 // ===== SHARED HELPER COMPONENTS =====
 interface SectionHeadProps {
@@ -62,6 +70,173 @@ type ServiceModalState = {
   target?: Service | null;
   startKind?: ServiceKind;
 };
+
+type WhatsAppChannelView = {
+  id: string;
+  mode: "salon_owned" | "chairbook_fallback";
+  status: "pending" | "active" | "inactive" | "error";
+  credit_line_status: "pending" | "active" | "missing" | "error";
+  webhook_status: "unknown" | "subscribed" | "error";
+  phone_number_id: string | null;
+  display_number: string | null;
+  updated_at: string | null;
+};
+
+type MessageCreditTopupView = {
+  id: string;
+  razorpay_order_id: string | null;
+  credits: number;
+  amount_paise: number;
+  status: "created" | "paid" | "failed";
+  created_at: string | null;
+};
+
+type MessageCreditLedgerView = {
+  id: string;
+  action: "reserve" | "consume" | "release" | "topup" | "monthly_grant";
+  plan_credits: number;
+  refill_credits: number;
+  created_at: string | null;
+};
+
+type WhatsAppTemplateView = {
+  id: string;
+  template_key: string;
+  template_name: string;
+  category: string;
+  language_code: string;
+  status: string;
+};
+
+type RazorpayCheckoutInstance = { open: () => void };
+type RazorpayCheckoutConstructor = new (options: Record<string, unknown>) => RazorpayCheckoutInstance;
+type FacebookSdk = {
+  init: (options: Record<string, unknown>) => void;
+  login: (callback: (response: unknown) => void, options: Record<string, unknown>) => void;
+};
+type FacebookWindow = Window & {
+  FB?: FacebookSdk;
+  fbAsyncInit?: () => void;
+};
+
+type WhatsAppConnectConfig = {
+  loading: boolean;
+  configured: boolean;
+  chairbookSenderConfigured: boolean;
+  missing: string[];
+  appId: string | null;
+  configId: string | null;
+  graphApiVersion: string;
+};
+
+type PendingEmbeddedSignup = {
+  code?: string;
+  info?: EmbeddedSignupInfo;
+  saving?: boolean;
+};
+
+function normalizeWhatsAppSenderPreference(value: unknown): WhatsAppSenderPreference {
+  return value === "salon_owned" ? "salon_owned" : "chairbook";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readWhatsAppSenderPreference(settings: unknown): WhatsAppSenderPreference {
+  return isRecord(settings) ? normalizeWhatsAppSenderPreference(settings.senderPreference) : "chairbook";
+}
+
+function withWhatsAppSenderPreference(settings: unknown, preference: WhatsAppSenderPreference) {
+  return {
+    ...(isRecord(settings) ? settings : {}),
+    senderPreference: preference,
+  };
+}
+
+function buildWhatsAppSettingsPayload(wa: SettingsData["wa"]) {
+  return {
+    reminder: wa.reminder,
+    autoConfirm: wa.autoConfirm,
+    sendOffers: false,
+    verified: wa.verified ?? true,
+    senderPreference: normalizeWhatsAppSenderPreference(wa.senderPreference),
+    templates: wa.templates,
+  };
+}
+
+function loadFacebookSdk(appId: string, graphApiVersion: string): Promise<FacebookSdk> {
+  const facebookWindow = window as FacebookWindow;
+  if (facebookWindow.FB) {
+    facebookWindow.FB.init({
+      appId,
+      autoLogAppEvents: true,
+      xfbml: false,
+      version: graphApiVersion,
+    });
+    return Promise.resolve(facebookWindow.FB);
+  }
+
+  return new Promise((resolve, reject) => {
+    facebookWindow.fbAsyncInit = () => {
+      if (!facebookWindow.FB) {
+        reject(new Error("Meta SDK did not initialize."));
+        return;
+      }
+      facebookWindow.FB.init({
+        appId,
+        autoLogAppEvents: true,
+        xfbml: false,
+        version: graphApiVersion,
+      });
+      resolve(facebookWindow.FB);
+    };
+
+    if (document.getElementById("facebook-jssdk")) {
+      const startedAt = Date.now();
+      const poll = window.setInterval(() => {
+        if (facebookWindow.FB) {
+          window.clearInterval(poll);
+          facebookWindow.fbAsyncInit?.();
+        } else if (Date.now() - startedAt > 10000) {
+          window.clearInterval(poll);
+          reject(new Error("Meta SDK did not load."));
+        }
+      }, 100);
+      return;
+    }
+    const firstScript = document.getElementsByTagName("script")[0];
+    const sdkScript = document.createElement("script");
+    sdkScript.id = "facebook-jssdk";
+    sdkScript.async = true;
+    sdkScript.defer = true;
+    sdkScript.crossOrigin = "anonymous";
+    sdkScript.src = "https://connect.facebook.net/en_US/sdk.js";
+    sdkScript.onerror = () => reject(new Error("Could not load Meta SDK."));
+    firstScript.parentNode?.insertBefore(sdkScript, firstScript);
+  });
+}
+
+function loadRazorpayCheckout(): Promise<RazorpayCheckoutConstructor> {
+  return new Promise((resolve, reject) => {
+    const existing = (window as Window & { Razorpay?: RazorpayCheckoutConstructor }).Razorpay;
+    if (existing) {
+      resolve(existing);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => {
+      const loaded = (window as Window & { Razorpay?: RazorpayCheckoutConstructor }).Razorpay;
+      if (loaded) resolve(loaded);
+      else reject(new Error("Razorpay checkout did not load."));
+    };
+    script.onerror = () => reject(new Error("Razorpay checkout did not load."));
+    document.body.appendChild(script);
+  });
+}
 
 const SERVICE_CATEGORIES = ["Hair", "Skin", "Hands", "Nails", "General"];
 const SERVICE_SELECT_WITH_BUNDLES = `
@@ -453,6 +628,28 @@ export default function SettingsPage() {
   // Dynamic Invoices and Delete Modal state
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [gstInvoices, setGstInvoices] = useState<GstInvoice[]>([]);
+  const [whatsappChannels, setWhatsappChannels] = useState<WhatsAppChannelView[]>([]);
+  const [whatsappTemplates, setWhatsappTemplates] = useState<WhatsAppTemplateView[]>([]);
+  const [messageWallet, setMessageWallet] = useState<MessageCreditWalletRow | null>(null);
+  const [creditTopups, setCreditTopups] = useState<MessageCreditTopupView[]>([]);
+  const [creditLedger, setCreditLedger] = useState<MessageCreditLedgerView[]>([]);
+  const [creditRefilling, setCreditRefilling] = useState<string | null>(null);
+  const [waTestPhone, setWaTestPhone] = useState("");
+  const [waTestSending, setWaTestSending] = useState(false);
+  const [waConnectConfig, setWaConnectConfig] = useState<WhatsAppConnectConfig>({
+    loading: true,
+    configured: false,
+    chairbookSenderConfigured: false,
+    missing: [],
+    appId: null,
+    configId: null,
+    graphApiVersion: "v24.0",
+  });
+  const [waConnectBusy, setWaConnectBusy] = useState(false);
+  const [waConnectStatus, setWaConnectStatus] = useState<string | null>(null);
+  const [waSenderSaving, setWaSenderSaving] = useState(false);
+  const [showWaSenderSwitchModal, setShowWaSenderSwitchModal] = useState(false);
+  const pendingEmbeddedSignup = useRef<PendingEmbeddedSignup>({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -574,6 +771,7 @@ export default function SettingsPage() {
               salonWaSettings = {
                 ...INITIAL_DATA.wa,
                 ...selectedSalon.wa_settings,
+                senderPreference: readWhatsAppSenderPreference(selectedSalon.wa_settings),
                 templates: {
                   ...INITIAL_DATA.wa.templates,
                   ...(selectedSalon.wa_settings.templates || {})
@@ -723,6 +921,69 @@ export default function SettingsPage() {
         }
         setGstInvoices(dbGstInvoices);
 
+        if (currentSalonId) {
+          try {
+            const [
+              { data: channelData, error: channelError },
+              { data: walletData, error: walletError },
+              { data: topupData, error: topupError },
+              { data: ledgerData, error: ledgerError },
+              { data: templateData, error: templateError },
+            ] = await Promise.all([
+              supabase
+                .from("whatsapp_channels")
+                .select("id,mode,status,credit_line_status,webhook_status,phone_number_id,display_number,updated_at")
+                .eq("salon_id", currentSalonId)
+                .order("mode", { ascending: false }),
+              supabase
+                .from("message_credit_wallets")
+                .select("plan_credits,refill_credits,reserved_plan_credits,reserved_refill_credits,reset_period_start,reset_period_end")
+                .eq("salon_id", currentSalonId)
+                .maybeSingle(),
+              supabase
+                .from("message_credit_topups")
+                .select("id,razorpay_order_id,credits,amount_paise,status,created_at")
+                .eq("salon_id", currentSalonId)
+                .order("created_at", { ascending: false })
+                .limit(5),
+              supabase
+                .from("message_credit_ledger")
+                .select("id,action,plan_credits,refill_credits,created_at")
+                .eq("salon_id", currentSalonId)
+                .order("created_at", { ascending: false })
+                .limit(8),
+              supabase
+                .from("whatsapp_message_templates")
+                .select("id,template_key,template_name:meta_template_name,category,language_code,status")
+                .or(`salon_id.eq.${currentSalonId},salon_id.is.null`)
+                .order("template_key"),
+            ]);
+
+            if (channelError || walletError || topupError || ledgerError || templateError) {
+              throw channelError || walletError || topupError || ledgerError || templateError;
+            }
+
+            setWhatsappChannels((channelData || []) as unknown as WhatsAppChannelView[]);
+            setMessageWallet((walletData || null) as unknown as MessageCreditWalletRow | null);
+            setCreditTopups((topupData || []) as unknown as MessageCreditTopupView[]);
+            setCreditLedger((ledgerData || []) as unknown as MessageCreditLedgerView[]);
+            setWhatsappTemplates((templateData || []) as unknown as WhatsAppTemplateView[]);
+          } catch (err) {
+            console.error("Error loading WhatsApp billing settings:", getSupabaseErrorMessage(err));
+            setWhatsappChannels([]);
+            setMessageWallet(null);
+            setCreditTopups([]);
+            setCreditLedger([]);
+            setWhatsappTemplates([]);
+          }
+        } else {
+          setWhatsappChannels([]);
+          setMessageWallet(null);
+          setCreditTopups([]);
+          setCreditLedger([]);
+          setWhatsappTemplates([]);
+        }
+
         setData({
           salon: {
             name: salonName,
@@ -762,9 +1023,333 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+
+    const loadConnectConfig = async () => {
+      try {
+        const response = await fetch("/api/whatsapp/connect/config");
+        const body = await response.json().catch(() => null);
+        if (!alive) return;
+
+        if (!response.ok || !body?.ok) {
+          setWaConnectConfig((current) => ({
+            ...current,
+            loading: false,
+            configured: false,
+            chairbookSenderConfigured: false,
+            missing: [],
+          }));
+          return;
+        }
+
+        setWaConnectConfig({
+          loading: false,
+          configured: Boolean(body.configured),
+          chairbookSenderConfigured: Boolean(body.chairbookSenderConfigured),
+          missing: Array.isArray(body.missing) ? body.missing : [],
+          appId: body.appId || null,
+          configId: body.configId || null,
+          graphApiVersion: body.graphApiVersion || "v24.0",
+        });
+      } catch {
+        if (alive) {
+          setWaConnectConfig((current) => ({
+            ...current,
+            loading: false,
+            configured: false,
+          }));
+        }
+      }
+    };
+
+    void loadConnectConfig();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const update = (next: SettingsData) => {
     setData(next);
     setDirty(true);
+  };
+
+  const refreshWhatsAppBilling = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !supabaseSalonId) return;
+
+    const [
+      { data: walletData },
+      { data: topupData },
+      { data: ledgerData },
+    ] = await Promise.all([
+      supabase
+        .from("message_credit_wallets")
+        .select("plan_credits,refill_credits,reserved_plan_credits,reserved_refill_credits,reset_period_start,reset_period_end")
+        .eq("salon_id", supabaseSalonId)
+        .maybeSingle(),
+      supabase
+        .from("message_credit_topups")
+        .select("id,razorpay_order_id,credits,amount_paise,status,created_at")
+        .eq("salon_id", supabaseSalonId)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("message_credit_ledger")
+        .select("id,action,plan_credits,refill_credits,created_at")
+        .eq("salon_id", supabaseSalonId)
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+
+    setMessageWallet((walletData || null) as unknown as MessageCreditWalletRow | null);
+    setCreditTopups((topupData || []) as unknown as MessageCreditTopupView[]);
+    setCreditLedger((ledgerData || []) as unknown as MessageCreditLedgerView[]);
+  };
+
+  const saveWhatsAppSenderPreference = useCallback(async (preference: WhatsAppSenderPreference) => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !supabaseSalonId) {
+      showFlash("Salon is still loading.");
+      return;
+    }
+
+    setWaSenderSaving(true);
+    try {
+      const { data: salon, error: loadError } = await supabase
+        .from("salons")
+        .select("wa_settings")
+        .eq("id", supabaseSalonId)
+        .maybeSingle();
+      if (loadError) throw loadError;
+
+      const { error } = await supabase
+        .from("salons")
+        .update({
+          wa_settings: withWhatsAppSenderPreference(salon?.wa_settings, preference),
+        })
+        .eq("id", supabaseSalonId);
+      if (error) throw error;
+
+      setData((current) => ({
+        ...current,
+        wa: {
+          ...current.wa,
+          senderPreference: preference,
+        },
+      }));
+      setShowWaSenderSwitchModal(false);
+      showFlash(preference === "salon_owned" ? "Using salon WhatsApp sender" : "Using ChairBook WhatsApp sender");
+    } catch (err) {
+      const message = getSupabaseErrorMessage(err) || "Could not update WhatsApp sender.";
+      showFlash(message);
+    } finally {
+      setWaSenderSaving(false);
+    }
+  }, [showFlash, supabaseSalonId]);
+
+  const completeEmbeddedSignup = useCallback(async () => {
+    const pending = pendingEmbeddedSignup.current;
+    if (!supabaseSalonId || !pending.code || !pending.info || pending.saving) {
+      return;
+    }
+
+    pending.saving = true;
+    setWaConnectBusy(true);
+    setWaConnectStatus("Saving WhatsApp sender...");
+
+    try {
+      const response = await fetch("/api/whatsapp/connect/embedded-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId: supabaseSalonId,
+          code: pending.code,
+          wabaId: pending.info.wabaId,
+          phoneNumberId: pending.info.phoneNumberId,
+          displayNumber: pending.info.displayNumber,
+          businessAccountId: pending.info.businessAccountId,
+        }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.ok) {
+        throw new Error(body?.error || "Could not connect WhatsApp.");
+      }
+
+      setWhatsappChannels((current) => {
+        const nextChannel: WhatsAppChannelView = {
+          id: body.channelId,
+          mode: "salon_owned",
+          status: "active",
+          credit_line_status: body.creditLineStatus || "pending",
+          webhook_status: body.webhookStatus || "unknown",
+          phone_number_id: pending.info?.phoneNumberId || null,
+          display_number: pending.info?.displayNumber || null,
+          updated_at: new Date().toISOString(),
+        };
+        return [nextChannel, ...current.filter((channel) => channel.mode !== "salon_owned")];
+      });
+
+      pendingEmbeddedSignup.current = {};
+      setShowWaSenderSwitchModal(true);
+      setWaConnectStatus("WhatsApp connected. ChairBook remains the default sender.");
+      showFlash("WhatsApp connected");
+    } catch (err) {
+      pendingEmbeddedSignup.current.saving = false;
+      const message = err instanceof Error ? err.message : "Could not connect WhatsApp.";
+      setWaConnectStatus(message);
+      showFlash(message);
+    } finally {
+      setWaConnectBusy(false);
+    }
+  }, [showFlash, supabaseSalonId]);
+
+  useEffect(() => {
+    const handleEmbeddedSignupMessage = (event: MessageEvent) => {
+      if (!["https://www.facebook.com", "https://web.facebook.com"].includes(event.origin)) {
+        return;
+      }
+
+      const info = parseEmbeddedSignupMessage(event.data);
+      if (!info) return;
+
+      pendingEmbeddedSignup.current.info = info;
+      setWaConnectStatus("Meta signup finished. Waiting for authorization code...");
+      void completeEmbeddedSignup();
+    };
+
+    window.addEventListener("message", handleEmbeddedSignupMessage);
+    return () => window.removeEventListener("message", handleEmbeddedSignupMessage);
+  }, [completeEmbeddedSignup]);
+
+  const startWhatsAppConnect = async () => {
+    if (!supabaseSalonId) {
+      showFlash("Salon is still loading.");
+      return;
+    }
+    if (waConnectConfig.loading) {
+      showFlash("WhatsApp setup is still loading.");
+      return;
+    }
+    if (!waConnectConfig.configured || !waConnectConfig.appId || !waConnectConfig.configId) {
+      const missing = waConnectConfig.missing.length ? waConnectConfig.missing.join(", ") : "Meta settings";
+      setWaConnectStatus(`Add ${missing} to enable Embedded Signup.`);
+      showFlash("WhatsApp setup credentials are missing.");
+      return;
+    }
+
+    pendingEmbeddedSignup.current = {};
+    setWaConnectBusy(true);
+    setWaConnectStatus("Opening Meta Embedded Signup...");
+
+    try {
+      const facebook = await loadFacebookSdk(waConnectConfig.appId, waConnectConfig.graphApiVersion);
+      facebook.login((response) => {
+        const code = extractEmbeddedSignupCode(response);
+        if (!code) {
+          setWaConnectBusy(false);
+          setWaConnectStatus("Meta signup was cancelled or did not return an authorization code.");
+          return;
+        }
+
+        pendingEmbeddedSignup.current.code = code;
+        setWaConnectStatus("Authorization received. Finish the Meta signup window if it is still open.");
+        void completeEmbeddedSignup();
+      }, {
+        config_id: waConnectConfig.configId,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          feature: "whatsapp_embedded_signup",
+          sessionInfoVersion: "3",
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not open Meta Embedded Signup.";
+      setWaConnectBusy(false);
+      setWaConnectStatus(message);
+      showFlash(message);
+    }
+  };
+
+  const startCreditRefill = async (packId: string) => {
+    if (!supabaseSalonId) {
+      showFlash("Salon is still loading.");
+      return;
+    }
+
+    const pack = Object.values(WHATSAPP_CREDIT_PACKS).find((item) => item.id === packId);
+    setCreditRefilling(packId);
+    try {
+      const response = await fetch("/api/billing/credits/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ salonId: supabaseSalonId, packId }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.ok) {
+        throw new Error(body?.error || "Could not start credit refill.");
+      }
+
+      const Razorpay = await loadRazorpayCheckout();
+      const checkout = new Razorpay({
+        key: body.keyId,
+        amount: body.amountPaise,
+        currency: body.currency,
+        name: "ChairBook",
+        description: `${body.credits} WhatsApp credits`,
+        order_id: body.orderId,
+        prefill: {
+          name: data.account.name,
+          email: data.account.email,
+          contact: data.account.phone,
+        },
+        notes: {
+          salon_id: supabaseSalonId,
+          pack_id: packId,
+        },
+        handler: () => {
+          showFlash("Payment received. Credits will update after Razorpay confirms it.");
+          void refreshWhatsAppBilling();
+        },
+        modal: {
+          ondismiss: () => showFlash("Credit refill was not completed."),
+        },
+      });
+      checkout.open();
+      showFlash(pack ? `Opening Razorpay for ${pack.credits.toLocaleString("en-IN")} credits...` : "Opening Razorpay...");
+    } catch (err) {
+      showFlash(err instanceof Error ? err.message : "Could not start credit refill.");
+    } finally {
+      setCreditRefilling(null);
+    }
+  };
+
+  const sendWhatsAppTestMessage = async () => {
+    const to = waTestPhone.trim() || data.wa.number;
+    if (!supabaseSalonId || !to) {
+      showFlash("Add a test phone number first.");
+      return;
+    }
+
+    setWaTestSending(true);
+    try {
+      const result = await sendWhatsAppTemplateFromClient(buildBookingConfirmationPayload({
+        salonId: supabaseSalonId,
+        to,
+        customerName: data.account.name || "there",
+        serviceNames: ["ChairBook test"],
+        dateLabel: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+        time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+        stylistName: data.salon.name || "ChairBook",
+      }));
+      showFlash(result.ok ? "Test WhatsApp sent" : (result.message || "Could not send test WhatsApp."));
+    } catch {
+      showFlash("Could not send test WhatsApp.");
+    } finally {
+      setWaTestSending(false);
+    }
   };
 
   const handleSave = async () => {
@@ -809,13 +1394,7 @@ export default function SettingsPage() {
               currency: data.salon.currency || "INR",
               language: data.salon.language || "en",
               is_active: data.salon.is_active !== false,
-              wa_settings: {
-                reminder: data.wa.reminder,
-                autoConfirm: data.wa.autoConfirm,
-                sendOffers: data.wa.sendOffers,
-                verified: data.wa.verified ?? true,
-                templates: data.wa.templates
-              },
+              wa_settings: buildWhatsAppSettingsPayload(data.wa),
               notification_settings: data.notifs,
               photos: data.salon.photos || []
             })
@@ -1797,31 +2376,156 @@ export default function SettingsPage() {
           </div>
         );
 
-      case "whatsapp":
+      case "whatsapp": {
+        const ownedChannel = whatsappChannels.find((channel) => channel.mode === "salon_owned");
+        const senderPreference = normalizeWhatsAppSenderPreference(data.wa.senderPreference);
+        const ownedChannelUsable = Boolean(
+          ownedChannel?.status === "active"
+          && ownedChannel.credit_line_status === "active"
+          && ownedChannel.phone_number_id
+        );
+        const usingSalonOwnedSender = senderPreference === "salon_owned" && ownedChannelUsable;
+        const activeChannel = usingSalonOwnedSender ? ownedChannel : null;
+        const walletSummary = buildWalletSummary(messageWallet);
+        const availableCredits = walletSummary.availableCredits;
+        const templateStatus = new Map(whatsappTemplates.map((template) => [template.template_key, template.status]));
+        const activeSenderLabel = usingSalonOwnedSender
+          ? ownedChannel?.display_number || "Salon-owned WhatsApp"
+          : "ChairBook WhatsApp";
+        const activeSenderMode = usingSalonOwnedSender
+          ? "Salon-owned number"
+          : senderPreference === "salon_owned"
+            ? "ChairBook sender while your number finishes activation"
+            : "ChairBook sender";
+        const channelTone = usingSalonOwnedSender
+          ? "green"
+          : waConnectConfig.chairbookSenderConfigured ? "green" : "amber";
+        const creditTone = usingSalonOwnedSender
+          ? "green"
+          : waConnectConfig.chairbookSenderConfigured ? "green" : "amber";
+        const webhookTone = usingSalonOwnedSender
+          ? ownedChannel?.webhook_status === "subscribed" ? "green" : ownedChannel?.webhook_status === "error" ? "rose" : "gray"
+          : "gray";
+
         return (
           <div className="flex flex-col gap-[18px]">
-            <SectionHead title="WhatsApp integration" desc="The number customers receive messages from." />
+            <SectionHead title="WhatsApp integration" desc="ChairBook WhatsApp is the default sender. Salons can switch to their own number after activation." />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
-              <div className="flex justify-between items-center gap-3.5">
-                <div className="flex items-center gap-3.5">
-                  <I.wa style={{ color: "var(--wa)", width: 22, height: 22 }} />
+              <div className="flex justify-between items-start gap-4 max-[720px]:flex-col">
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <I.wa style={{ color: "var(--wa)", width: 24, height: 24 }} />
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>+91 {data.wa.number}</div>
-                    <div style={{ fontSize: 12, color: "var(--green)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
-                      <span className="engage-dot green"></span> Verified · Active since Oct 2023
+                    <div className="text-sm font-semibold">{activeSenderLabel}</div>
+                    <div className="text-xs text-ink-3 mt-1">Sender mode: {activeSenderMode}</div>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Badge tone={channelTone}>{usingSalonOwnedSender ? `Channel ${activeChannel?.status}` : `ChairBook ${waConnectConfig.chairbookSenderConfigured ? "configured" : "missing"}`}</Badge>
+                      <Badge tone={creditTone}>{usingSalonOwnedSender ? `Credit line ${activeChannel?.credit_line_status}` : "ChairBook credit line"}</Badge>
+                      <Badge tone={webhookTone}>Webhook {usingSalonOwnedSender ? activeChannel?.webhook_status || "unknown" : "managed by ChairBook"}</Badge>
                     </div>
                   </div>
                 </div>
-                <button className="btn btn-outline btn-sm" onClick={openWaChange}>Change number</button>
+                <div className="flex flex-col items-end gap-2 max-[720px]:items-start">
+                  <div className="flex gap-2 max-[520px]:flex-col">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={startWhatsAppConnect}
+                      disabled={waConnectBusy || waConnectConfig.loading}
+                    >
+                      <I.wa style={{ width: 15, height: 15 }} />
+                      {waConnectBusy ? "Connecting" : ownedChannel ? "Reconnect WhatsApp" : "Connect WhatsApp"}
+                    </button>
+                    <button className="btn btn-outline btn-sm" onClick={openWaChange}>Update display number</button>
+                  </div>
+                  {!waConnectConfig.loading && !waConnectConfig.configured && (
+                    <div className="text-xs text-ink-3 max-w-[260px] text-right max-[720px]:text-left">
+                      Missing: {waConnectConfig.missing.length ? waConnectConfig.missing.join(", ") : "WhatsApp setup env"}
+                    </div>
+                  )}
+                  {!waConnectConfig.loading && !waConnectConfig.chairbookSenderConfigured && (
+                    <div className="text-xs max-w-[300px] text-right max-[720px]:text-left" style={{ color: "var(--amber)" }}>
+                      Add WHATSAPP_CHAIRBOOK_ACCESS_TOKEN and WHATSAPP_CHAIRBOOK_PHONE_NUMBER_ID to enable the default sender.
+                    </div>
+                  )}
+                  {waConnectStatus && (
+                    <div className="text-xs text-ink-3 max-w-[300px] text-right max-[720px]:text-left">
+                      {waConnectStatus}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-5 max-[720px]:grid-cols-1">
+                <button
+                  type="button"
+                  aria-pressed={senderPreference === "chairbook"}
+                  className={`text-left rounded-lg border p-3 cursor-pointer transition ${senderPreference === "chairbook" ? "border-teal bg-teal-soft" : "border-line bg-white hover:bg-bg-2"}`}
+                  onClick={() => void saveWhatsAppSenderPreference("chairbook")}
+                  disabled={waSenderSaving}
+                >
+                  <div className="text-sm font-semibold">ChairBook sender</div>
+                  <div className="text-xs text-ink-3 mt-1">Customers receive messages from ChairBook WhatsApp, branded for your salon.</div>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={senderPreference === "salon_owned"}
+                  className={`text-left rounded-lg border p-3 transition ${senderPreference === "salon_owned" ? "border-teal bg-teal-soft" : "border-line bg-white hover:bg-bg-2"} ${ownedChannelUsable ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+                  onClick={() => void saveWhatsAppSenderPreference("salon_owned")}
+                  disabled={!ownedChannelUsable || waSenderSaving}
+                >
+                  <div className="text-sm font-semibold">My WhatsApp number</div>
+                  <div className="text-xs text-ink-3 mt-1">
+                    {ownedChannel
+                      ? ownedChannelUsable
+                        ? "Customers receive messages from your WhatsApp Business profile."
+                        : "Connected, but waiting for active channel and credit line status."
+                      : "Connect your WhatsApp Business number to enable this sender."}
+                  </div>
+                </button>
               </div>
             </div>
 
-            <SectionHead title="Automations" desc="Reduce no-shows and bring people back without lifting a finger." />
+            <div className="grid grid-cols-3 gap-3 max-[900px]:grid-cols-1">
+              <div className="bg-white border border-line rounded-xl p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Available credits</div>
+                <div className="text-2xl font-semibold text-ink mt-1 font-mono">{availableCredits.toLocaleString("en-IN")}</div>
+                <div className="text-xs text-ink-3 mt-1">Plan and refill credits after reserved sends.</div>
+              </div>
+              <div className="bg-white border border-line rounded-xl p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Plan balance</div>
+                <div className="text-2xl font-semibold text-ink mt-1 font-mono">{walletSummary.planCredits.toLocaleString("en-IN")}</div>
+                <div className="text-xs text-ink-3 mt-1">Resets monthly. No rollover.</div>
+              </div>
+              <div className="bg-white border border-line rounded-xl p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Refill balance</div>
+                <div className="text-2xl font-semibold text-ink mt-1 font-mono">{walletSummary.refillCredits.toLocaleString("en-IN")}</div>
+                <div className="text-xs text-ink-3 mt-1">Rolls over until used.</div>
+              </div>
+            </div>
+
+            {availableCredits <= 25 && (
+              <div className="bg-amber-soft border border-amber-soft rounded-xl p-[14px_16px] text-sm text-ink-2">
+                WhatsApp credits are low. Automated billable sends will stop when the balance reaches zero.
+              </div>
+            )}
+
+            <SectionHead title="Test message" desc="Send one approved utility template to verify the active sender." />
+            <div className="bg-white border border-line rounded-xl p-[20px_22px] flex gap-3 max-[720px]:flex-col">
+              <input
+                value={waTestPhone}
+                onChange={(event) => setWaTestPhone(event.target.value)}
+                placeholder={data.wa.number ? `+91 ${data.wa.number}` : "Customer WhatsApp number"}
+                className="flex-1 h-10 rounded-lg border border-line-2 px-3 text-sm outline-none focus:border-teal"
+              />
+              <button className="btn btn-wa btn-sm" style={{ background: "var(--wa)", color: "#fff" }} onClick={sendWhatsAppTestMessage} disabled={waTestSending || availableCredits <= 0}>
+                <I.wa style={{ width: 15, height: 15 }} /> {waTestSending ? "Sending" : "Send test"}
+              </button>
+            </div>
+
+            <SectionHead title="Automations" desc="Only utility messages are enabled in this release." />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
               <div className="flex justify-between items-center gap-4 py-3.5 border-b border-line first:pt-0 last:border-b-0 last:pb-0">
                 <div>
                   <div className="text-sm font-semibold">Auto-confirm via WhatsApp</div>
-                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">When a customer books, send them a WhatsApp confirmation immediately.</div>
+                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">New bookings send the approved confirmation template when credits and sender are active.</div>
                 </div>
                 <label className="inline-flex cursor-pointer items-center relative shrink-0">
                   <input
@@ -1836,7 +2540,7 @@ export default function SettingsPage() {
               <div className="flex justify-between items-center gap-4 py-3.5 border-b border-line first:pt-0 last:border-b-0 last:pb-0">
                 <div>
                   <div className="text-sm font-semibold">Send reminders {data.wa.reminder} hours before</div>
-                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">Customers reply YES to confirm. Studies show this cuts no-shows by 60%.</div>
+                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">The protected cron sends each reminder once and records the WhatsApp message.</div>
                 </div>
                 <select
                   value={data.wa.reminder}
@@ -1852,25 +2556,20 @@ export default function SettingsPage() {
               <div className="flex justify-between items-center gap-4 py-3.5 border-b border-line first:pt-0 last:border-b-0 last:pb-0">
                 <div>
                   <div className="text-sm font-semibold">Promotional broadcasts</div>
-                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">Allow sending offers / campaigns to your customer list. Off by default.</div>
+                  <div className="text-xs text-ink-3 mt-0.5 max-w-[480px]">Locked until opt-in, unsubscribe, template approval, and cost preview are implemented.</div>
                 </div>
-                <label className="inline-flex cursor-pointer items-center relative shrink-0">
-                  <input
-                    type="checkbox"
-                    className="absolute opacity-0 pointer-events-none peer"
-                    checked={data.wa.sendOffers}
-                    onChange={e => update({ ...data, wa: { ...data.wa, sendOffers: e.target.checked } })}
-                  />
-                  <span className="w-9 h-5.5 rounded-full bg-line-2 relative transition-colors duration-150 before:content-[''] before:absolute before:left-[2px] before:top-[2px] before:w-[18px] before:h-[18px] before:rounded-full before:bg-white before:transition-transform before:duration-[180ms] before:ease-[cubic-bezier(0.2,0.9,0.3,1.2)] before:shadow-[0_1px_2px_rgba(0,0,0,0.1)] peer-checked:bg-teal peer-checked:before:translate-x-[14px]"></span>
-                </label>
+                <Badge tone="gray">Disabled</Badge>
               </div>
             </div>
 
-            <SectionHead title="Message templates" desc="Edit what your customers see. Variables like {name} are replaced automatically." />
+            <SectionHead title="Message templates" desc="Meta-approved template status from the server." />
             <div className="bg-white border border-line rounded-xl p-[20px_22px]">
               <div className="flex gap-3.5 py-3 border-b border-line items-start first:pt-0 last:border-b-0 last:pb-0">
                 <div className="flex-1">
-                  <div className="text-[13px] font-semibold">Booking confirmation</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-[13px] font-semibold">Booking confirmation</div>
+                    <Badge tone={templateStatus.get("booking_confirmation") === "approved" ? "green" : "amber"}>{templateStatus.get("booking_confirmation") || "pending"}</Badge>
+                  </div>
                   <div className="text-xs text-ink-3 mt-1 bg-bg-2 p-[8px_10px] rounded-lg font-mono leading-[1.45]">{data.wa.templates?.confirmation}</div>
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => openEditTemplate("confirmation")}>
@@ -1879,7 +2578,10 @@ export default function SettingsPage() {
               </div>
               <div className="flex gap-3.5 py-3 border-b border-line items-start first:pt-0 last:border-b-0 last:pb-0">
                 <div className="flex-1">
-                  <div className="text-[13px] font-semibold">Reminder</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-[13px] font-semibold">Reminder</div>
+                    <Badge tone={templateStatus.get("booking_reminder") === "approved" ? "green" : "amber"}>{templateStatus.get("booking_reminder") || "pending"}</Badge>
+                  </div>
                   <div className="text-xs text-ink-3 mt-1 bg-bg-2 p-[8px_10px] rounded-lg font-mono leading-[1.45]">{data.wa.templates?.reminder}</div>
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => openEditTemplate("reminder")}>
@@ -1888,19 +2590,25 @@ export default function SettingsPage() {
               </div>
               <div className="flex gap-3.5 py-3 border-b border-line items-start first:pt-0 last:border-b-0 last:pb-0">
                 <div className="flex-1">
-                  <div className="text-[13px] font-semibold">Re-engagement</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-[13px] font-semibold">Re-engagement</div>
+                    <Badge tone="gray">Marketing disabled</Badge>
+                  </div>
                   <div className="text-xs text-ink-3 mt-1 bg-bg-2 p-[8px_10px] rounded-lg font-mono leading-[1.45]">{data.wa.templates?.reengagement}</div>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => openEditTemplate("reengagement")}>
+                <button className="btn btn-ghost btn-sm" disabled style={{ opacity: 0.5 }}>
                   <I.edit style={{ marginRight: 4 }} /> Edit
                 </button>
               </div>
             </div>
           </div>
         );
+      }
 
       case "plan":
         const current = PLANS.find(p => p.id === data.plan) || PLANS[1];
+        const walletSummary = buildWalletSummary(messageWallet);
+        const planAvailableCredits = walletSummary.availableCredits;
         return (
           <div className="flex flex-col gap-[18px]">
             <SectionHead title="Current plan" />
@@ -1919,6 +2627,85 @@ export default function SettingsPage() {
                 <button className="btn btn-ghost btn-sm" style={{ color: "var(--rose)" }} onClick={() => showFlash("Plan cancellation is a mockup")}>Cancel plan</button>
               </div>
             </div>
+
+            <SectionHead title="WhatsApp credits" desc="ChairBook pays Meta; salons use prepaid ChairBook credits." />
+            <div className="bg-white border border-line rounded-xl p-[20px_22px]">
+              <div className="grid grid-cols-4 gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Included monthly</div>
+                  <div className="text-xl font-semibold font-mono mt-1">{current.whatsappCredits.toLocaleString("en-IN")}</div>
+                  <div className="text-xs text-ink-3 mt-1">Resets every billing period.</div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Available now</div>
+                  <div className="text-xl font-semibold font-mono mt-1">{planAvailableCredits.toLocaleString("en-IN")}</div>
+                  <div className="text-xs text-ink-3 mt-1">Plan plus refill credits.</div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Reserved</div>
+                  <div className="text-xl font-semibold font-mono mt-1">{walletSummary.reservedCredits.toLocaleString("en-IN")}</div>
+                  <div className="text-xs text-ink-3 mt-1">Held while sends are in progress.</div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">Refill rollover</div>
+                  <div className="text-xl font-semibold font-mono mt-1">{walletSummary.refillCredits.toLocaleString("en-IN")}</div>
+                  <div className="text-xs text-ink-3 mt-1">Unused refill credits stay available.</div>
+                </div>
+              </div>
+            </div>
+
+            <SectionHead title="Refill packs" desc="Razorpay payment credits the wallet after webhook confirmation." />
+            <div className="grid grid-cols-3 gap-3 max-[720px]:grid-cols-1">
+              {Object.values(WHATSAPP_CREDIT_PACKS).map((pack) => (
+                <div key={pack.id} className="bg-white border border-line rounded-xl p-4">
+                  <div className="text-sm font-semibold">{pack.label}</div>
+                  <div className="text-2xl font-semibold tracking-[-0.02em] mt-1.5">
+                    ₹{(pack.amountPaise / 100).toLocaleString("en-IN")}<span className="text-xs font-normal text-ink-3"> / {pack.credits.toLocaleString("en-IN")} credits</span>
+                  </div>
+                  <button className="btn btn-outline btn-sm w-full mt-3" onClick={() => startCreditRefill(pack.id)} disabled={creditRefilling === pack.id}>
+                    {creditRefilling === pack.id ? "Opening Razorpay" : "Refill credits"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <SectionHead title="Credit usage" />
+            <div className="bg-white border border-line rounded-xl p-0">
+              {creditLedger.length > 0 ? (
+                creditLedger.map((entry) => (
+                  <div key={entry.id} className="grid grid-cols-[1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto]">
+                    <div>
+                      <div className="text-[13px] font-semibold capitalize">{entry.action.replace("_", " ")}</div>
+                      <div className="text-xs text-ink-3 mt-0.5">{entry.created_at ? new Date(entry.created_at).toLocaleString("en-IN") : "Pending"}</div>
+                    </div>
+                    <div className="text-xs text-ink-3">Plan {entry.plan_credits}</div>
+                    <div className="text-xs text-ink-3">Refill {entry.refill_credits}</div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--ink-3)", fontSize: 13, fontStyle: "italic" }}>
+                  No WhatsApp credit activity yet.
+                </div>
+              )}
+            </div>
+
+            {creditTopups.length > 0 && (
+              <>
+                <SectionHead title="Recent refills" />
+                <div className="bg-white border border-line rounded-xl p-0">
+                  {creditTopups.map((topup) => (
+                    <div key={topup.id} className="grid grid-cols-[1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto]">
+                      <div>
+                        <div className="text-[13px] font-semibold">{topup.credits.toLocaleString("en-IN")} credits</div>
+                        <div className="text-xs text-ink-3 mt-0.5">{topup.razorpay_order_id || "Razorpay order pending"}</div>
+                      </div>
+                      <Badge tone={topup.status === "paid" ? "green" : topup.status === "failed" ? "rose" : "amber"}>{topup.status}</Badge>
+                      <div className="text-sm font-semibold font-mono">₹{(topup.amount_paise / 100).toLocaleString("en-IN")}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             <SectionHead title="Change plan" desc="Upgrade or downgrade anytime. Pro-rated to your next bill." />
             <div className="grid grid-cols-3 gap-3 max-[720px]:grid-cols-1">
@@ -2308,6 +3095,13 @@ export default function SettingsPage() {
     );
   }
 
+  const modalOwnedChannel = whatsappChannels.find((channel) => channel.mode === "salon_owned");
+  const modalOwnedChannelUsable = Boolean(
+    modalOwnedChannel?.status === "active"
+    && modalOwnedChannel.credit_line_status === "active"
+    && modalOwnedChannel.phone_number_id
+  );
+
   return (
     <div className="app settings-app animate-fade-in">
       <Header title="Settings" subtitle="CONFIGURE YOUR SALON" />
@@ -2505,6 +3299,38 @@ export default function SettingsPage() {
                 style={{ padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14, width: "100%" }}
               />
             </FormField>
+          </div>
+        </Modal>
+      )}
+
+      {/* WHATSAPP SENDER SWITCH MODAL */}
+      {showWaSenderSwitchModal && (
+        <Modal
+          title="WhatsApp number connected"
+          onClose={() => setShowWaSenderSwitchModal(false)}
+          width="min(460px, 100%)"
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => void saveWhatsAppSenderPreference("chairbook")} disabled={waSenderSaving}>
+                Keep ChairBook
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => void saveWhatsAppSenderPreference("salon_owned")}
+                disabled={!modalOwnedChannelUsable || waSenderSaving}
+              >
+                Switch to my number
+              </button>
+            </>
+          }
+        >
+          <div className="text-sm text-ink-2 leading-relaxed">
+            ChairBook WhatsApp remains the default sender. Customers will see ChairBook as the WhatsApp profile, with your salon name inside each message.
+          </div>
+          <div className="text-sm text-ink-2 leading-relaxed mt-3">
+            {modalOwnedChannelUsable
+              ? "Your WhatsApp Business number is active, so you can switch now or change it later from this page."
+              : "Your WhatsApp Business number was saved, but it needs active channel and credit line status before it can become the sender."}
           </div>
         </Modal>
       )}

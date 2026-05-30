@@ -23,9 +23,9 @@ export const TABS = [
 ];
 
 export const PLANS = [
-  { id: "solo",  name: "Solo",  price: 499,  desc: "For independent stylists" },
-  { id: "salon", name: "Salon", price: 999,  desc: "Up to 5 stylists" },
-  { id: "chain", name: "Chain", price: 2499, desc: "Multi-branch" },
+  { id: "solo",  name: "Solo",  price: 499,  desc: "For independent stylists", whatsappCredits: 100 },
+  { id: "salon", name: "Salon", price: 999,  desc: "Up to 5 stylists", whatsappCredits: 500 },
+  { id: "chain", name: "Chain", price: 2499, desc: "Multi-branch", whatsappCredits: 2000 },
 ];
 
 export const INITIAL_DATA: SettingsData = {
@@ -63,6 +63,7 @@ export const INITIAL_DATA: SettingsData = {
     reminder: 24,
     autoConfirm: true,
     sendOffers: false,
+    senderPreference: "chairbook",
     templates: {
       confirmation: "Hi {name} 🙏 Your booking at Glow Salon is confirmed for {date} at {time} with {stylist}.",
       reminder: "Hi {name}, reminder: {service} with {stylist} tomorrow at {time}. Reply YES to confirm.",

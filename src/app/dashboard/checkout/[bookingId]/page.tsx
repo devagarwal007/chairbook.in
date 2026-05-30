@@ -13,6 +13,9 @@ import { Avatar } from "@/components/ui";
 import { Customer, DbCheckoutServiceItemRow, SalonGstSettings, DEFAULT_GST_SETTINGS, GstTaxBreakdown } from "@/types";
 import { calculateGst, calculateItemGst, validateGstin, shouldUseIgst } from "@/lib/gst";
 import { useGstSettings } from "@/hooks/useGstSettings";
+import { buildReceiptLinkPayload } from "@/lib/whatsapp/message-payloads";
+import { sendWhatsAppTemplateFromClient } from "@/lib/whatsapp-client";
+import { buildInvoiceShareUrl } from "@/lib/whatsapp-invoice";
 
 interface ServiceItem {
   id: number;
@@ -81,6 +84,7 @@ export default function CheckoutPage() {
   const { show: triggerFlash } = useToast();
   const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
   const [invoiceShareToken, setInvoiceShareToken] = useState<string | null>(null);
+  const [receiptWhatsAppSending, setReceiptWhatsAppSending] = useState(false);
 
   // B2B GST Customer Details
   const [showB2b, setShowB2b] = useState<boolean>(false);
@@ -636,6 +640,37 @@ export default function CheckoutPage() {
     }
   }, [stage, method]);
 
+  const sendReceiptOnWhatsApp = async () => {
+    if (!salonId || !baseBooking) {
+      triggerFlash("Salon details are still loading.");
+      return;
+    }
+    if (!baseBooking.customer.phone) {
+      triggerFlash("Customer phone number is missing.");
+      return;
+    }
+    if (!invoiceShareToken) {
+      triggerFlash("Invoice link is not ready yet.");
+      return;
+    }
+
+    setReceiptWhatsAppSending(true);
+    try {
+      const result = await sendWhatsAppTemplateFromClient(buildReceiptLinkPayload({
+        salonId,
+        to: baseBooking.customer.phone,
+        bookingId: baseBooking.id,
+        customerName: baseBooking.customer.name,
+        invoiceUrl: buildInvoiceShareUrl(invoiceShareToken),
+      }));
+      triggerFlash(result.ok ? "Receipt sent on WhatsApp" : (result.message || "Could not send receipt on WhatsApp."));
+    } catch {
+      triggerFlash("Could not send receipt on WhatsApp.");
+    } finally {
+      setReceiptWhatsAppSending(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="ck-stage">
@@ -1146,7 +1181,8 @@ export default function CheckoutPage() {
               amountDue={payment.amountDue}
               invoiceShareToken={invoiceShareToken}
               gstBreakdown={gstBreakdown}
-              onWhatsApp={() => triggerFlash("Receipt sent on WhatsApp ✓")}
+              whatsAppSending={receiptWhatsAppSending}
+              onWhatsApp={sendReceiptOnWhatsApp}
               onPrint={() => triggerFlash("Sent to printer ✓")}
               onClose={() => router.push("/dashboard")}
             />
@@ -1454,7 +1490,8 @@ interface ReceiptProps {
   amountDue: number;
   invoiceShareToken?: string | null;
   gstBreakdown?: GstTaxBreakdown | null;
-  onWhatsApp: () => void;
+  whatsAppSending?: boolean;
+  onWhatsApp: () => void | Promise<void>;
   onPrint: () => void;
   onClose: () => void;
 }
@@ -1470,6 +1507,7 @@ function Receipt({
   amountDue,
   invoiceShareToken,
   gstBreakdown,
+  whatsAppSending = false,
   onWhatsApp,
   onPrint,
   onClose,
@@ -1626,10 +1664,11 @@ function Receipt({
       <div className="p-[18px_24px_24px] bg-bg border-t border-dashed border-line">
         <button
           className="btn btn-wa btn-lg w-full flex items-center justify-center gap-2"
-          style={{ background: "var(--wa)", color: "#fff" }}
+          style={{ background: "var(--wa)", color: "#fff", opacity: whatsAppSending ? 0.7 : 1 }}
           onClick={onWhatsApp}
+          disabled={whatsAppSending}
         >
-          <IC.wa /> Send receipt on WhatsApp
+          <IC.wa /> {whatsAppSending ? "Sending receipt..." : "Send receipt on WhatsApp"}
         </button>
         <div className="flex gap-2.5 mt-2">
           <button className="btn btn-outline flex-1 justify-center" onClick={onPrint}>

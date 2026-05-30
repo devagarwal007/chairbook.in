@@ -16,6 +16,8 @@ import {
   serviceMatchesBundleSearch,
 } from "@/lib/service-bundles";
 import { useToast } from "@/context/ToastContext";
+import { buildBookingConfirmationPayload } from "@/lib/whatsapp/message-payloads";
+import { sendWhatsAppTemplateFromClient } from "@/lib/whatsapp-client";
 
 import { Customer, Service, Stylist, NewCustInput, DbBookingSimple, DbStylistRaw, DbServiceRaw, DbBookingSlotRaw, DbBookingStylistRaw } from "@/types";
 import { Icons as IN, FormField, PhoneInput, Avatar, Badge } from "@/components/ui";
@@ -659,6 +661,8 @@ export default function NewBookingPage() {
   const [created, setCreated] = useState(false);
   const { show: showFlash } = useToast();
   const [newBookingId, setNewBookingId] = useState<string | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
 
   // DB-loaded data
   const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
@@ -1024,8 +1028,39 @@ export default function NewBookingPage() {
           });
 
           setNewBookingId(bookingData.id);
+          setWhatsappStatus("idle");
+          setWhatsappMessage(null);
           setCreated(true);
           showFlash(`Booking created · ${customer.name} · ${date} · ${time}`);
+
+          if (sendConfirm && customer.phone) {
+            const finalStylistName = dbStylists.find((s) => s.id === finalStylistId)?.name || "your stylist";
+            const dateLabel = days.find((d) => d.key === date)?.full || date;
+            setWhatsappStatus("sending");
+
+            void sendWhatsAppTemplateFromClient(buildBookingConfirmationPayload({
+              salonId,
+              to: customer.phone,
+              bookingId: bookingData.id,
+              customerId: String(customerId),
+              customerName: customer.name,
+              serviceNames: services.map((service) => service.name),
+              dateLabel,
+              time: time || "",
+              stylistName: finalStylistName,
+            })).then((result) => {
+              if (result.ok) {
+                setWhatsappStatus("sent");
+                setWhatsappMessage(null);
+              } else {
+                setWhatsappStatus("failed");
+                setWhatsappMessage(result.message || "WhatsApp confirmation could not be sent.");
+              }
+            }).catch(() => {
+              setWhatsappStatus("failed");
+              setWhatsappMessage("WhatsApp confirmation could not be sent.");
+            });
+          }
         } catch (err) {
           const error = err as Error;
           console.error("Error creating booking:", error);
@@ -1034,6 +1069,8 @@ export default function NewBookingPage() {
         }
       } else {
         // No Supabase — just show success locally
+        setWhatsappStatus("idle");
+        setWhatsappMessage(null);
         setCreated(true);
         showFlash(`Booking created · ${customer?.name} · ${date} · ${time}`);
       }
@@ -1132,8 +1169,14 @@ export default function NewBookingPage() {
             <h1 className="nb-title" style={{ textAlign: "center" }}>Booking created</h1>
             <p className="nb-sub" style={{ textAlign: "center" }}>
               {customer.name} · {days.find(d => d.key === date)?.full} at {time}
-              {sendConfirm && customer.phone && <> · WhatsApp confirmation sent ✓</>}
+              {sendConfirm && customer.phone && whatsappStatus === "sending" && <> · WhatsApp sending...</>}
+              {sendConfirm && customer.phone && whatsappStatus === "sent" && <> · WhatsApp confirmation sent ✓</>}
             </p>
+            {sendConfirm && customer.phone && whatsappStatus === "failed" && (
+              <div className="bg-amber-soft border border-amber-soft rounded-xl p-3 text-sm text-ink-2" style={{ maxWidth: 460, margin: "14px auto 0", textAlign: "center" }}>
+                {whatsappMessage || "Booking is saved, but WhatsApp could not be sent."}
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 28, alignItems: "center" }}>
               <div style={{ display: "flex", gap: 10 }}>
                 <Link className="btn btn-outline btn-lg" href="/dashboard">Back to calendar</Link>
@@ -1146,7 +1189,7 @@ export default function NewBookingPage() {
               )}
             </div>
             <button className="btn btn-ghost btn-sm" style={{ marginTop: 24 }} onClick={() => {
-              setCreated(false); setStep(1); setCustomer(null); setServices([]); setTime(null); setNote(""); setNewBookingId(null);
+              setCreated(false); setStep(1); setCustomer(null); setServices([]); setTime(null); setNote(""); setNewBookingId(null); setWhatsappStatus("idle"); setWhatsappMessage(null);
             }}>
               Create another booking
             </button>

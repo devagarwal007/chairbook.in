@@ -511,6 +511,7 @@ export default function PublicBookingPage() {
   const [serviceSearch, setServiceSearch] = useState("");
   const [activeServiceFilter, setActiveServiceFilter] = useState<ServiceFilter>("all");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [confirmationStatus, setConfirmationStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
 
   const totalDuration = selectedServices.reduce((sum, service) => sum + durationOf(service), 0);
   const totalPrice = selectedServices.reduce((sum, service) => sum + Number(service.price), 0);
@@ -719,6 +720,21 @@ export default function PublicBookingPage() {
     }));
     setStep(4);
     setIsSubmitting(false);
+    setConfirmationStatus("sending");
+
+    void fetch("/api/whatsapp/public-booking-confirmation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        salonId: state.salon.id,
+        bookingId: booking.booking_id,
+      }),
+    }).then(async (response) => {
+      const body = await response.json().catch(() => null);
+      setConfirmationStatus(response.ok && body?.ok ? "sent" : "failed");
+    }).catch(() => {
+      setConfirmationStatus("failed");
+    });
   };
 
   const reset = () => {
@@ -729,6 +745,7 @@ export default function PublicBookingPage() {
     setCustomerName("");
     setPhone("");
     setMessage(null);
+    setConfirmationStatus("idle");
     setServiceSearch("");
     setActiveServiceFilter("all");
     setIsFilterOpen(false);
@@ -1115,8 +1132,20 @@ export default function PublicBookingPage() {
               <div className="mt-4 flex items-start gap-3 rounded-xl bg-wa-soft p-3.5 text-sm text-ink-2">
                 <I.wa width={22} height={22} className="shrink-0 text-wa" />
                 <div>
-                  <strong className="block text-ink">WhatsApp confirmation is queued</strong>
-                  <div className="mt-0.5 text-[13px] text-ink-3">Automated delivery will be connected in the WhatsApp phase.</div>
+                  <strong className="block text-ink">
+                    {confirmationStatus === "sent"
+                      ? "WhatsApp confirmation sent"
+                      : confirmationStatus === "failed"
+                        ? "Booking confirmed"
+                        : "Sending WhatsApp confirmation"}
+                  </strong>
+                  <div className="mt-0.5 text-[13px] text-ink-3">
+                    {confirmationStatus === "sent"
+                      ? "Your appointment details were sent to the number you entered."
+                      : confirmationStatus === "failed"
+                        ? "The salon has your booking and will follow up if WhatsApp is not available."
+                        : "This usually takes a few seconds."}
+                  </div>
                 </div>
               </div>
 

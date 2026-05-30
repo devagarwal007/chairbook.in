@@ -23,6 +23,7 @@ export interface SalonWhatsAppSettings {
   autoConfirm?: boolean;
   sendOffers?: boolean;
   verified?: boolean;
+  senderPreference?: "chairbook" | "salon_owned";
   templates?: Record<string, string>;
   [key: string]: unknown;
 }

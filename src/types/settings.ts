@@ -27,12 +27,15 @@ export interface WhatsAppTemplates {
   reengagement: string;
 }
 
+export type WhatsAppSenderPreference = "chairbook" | "salon_owned";
+
 export interface WhatsAppInfo {
   number: string;
   verified: boolean;
   reminder: number;
   autoConfirm: boolean;
   sendOffers: boolean;
+  senderPreference: WhatsAppSenderPreference;
   templates: WhatsAppTemplates;
 }
 

@@ -3,6 +3,7 @@ import "server-only";
 export interface WhatsAppServerConfig {
   graphApiVersion: string;
   metaAppId: string;
+  embeddedSignupConfigId: string;
   metaAppSecret: string;
   webhookVerifyToken: string;
   tokenEncryptionKey: string;
@@ -18,6 +19,7 @@ export function getWhatsAppServerConfig(): WhatsAppServerConfig {
   return {
     graphApiVersion: process.env.META_GRAPH_API_VERSION || "v24.0",
     metaAppId: process.env.META_APP_ID || "",
+    embeddedSignupConfigId: process.env.META_EMBEDDED_SIGNUP_CONFIG_ID || process.env.META_LOGIN_CONFIG_ID || "",
     metaAppSecret: process.env.META_APP_SECRET || "",
     webhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "",
     tokenEncryptionKey: process.env.WHATSAPP_TOKEN_ENCRYPTION_KEY || "",

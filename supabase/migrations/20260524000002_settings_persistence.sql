@@ -10,6 +10,7 @@ ADD COLUMN IF NOT EXISTS wa_settings JSONB DEFAULT '{
     "autoConfirm": true,
     "sendOffers": false,
     "verified": true,
+    "senderPreference": "chairbook",
     "templates": {
         "confirmation": "Hi {name} 🙏 Your booking at Glow Salon is confirmed for {date} at {time} with {stylist}.",
         "reminder": "Hi {name}, reminder: {service} with {stylist} tomorrow at {time}. Reply YES to confirm.",

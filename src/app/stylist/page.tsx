@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import StylistShell from "@/components/layout/StylistShell";
+import MyShiftCard from "@/components/features/attendance/MyShiftCard";
 import { Avatar, Badge, Icons as I, Toggle } from "@/components/ui";
 import { getActualServiceMinutes, getNextProgressAction, PROGRESS_ACTION_LABEL } from "@/lib/booking-progress";
 import { STYLIST_STATUS_LABEL } from "@/constants/stylist";
@@ -183,7 +184,11 @@ export default function StylistDashboardPage() {
         const nowIdx = sortedAppts.findIndex((a) => toMin(a.time) > nowTimeMin);
 
         return (
-          <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-7">
+          <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-7 animate-fade-in">
+            <MyShiftCard
+              stylistId={profile?.stylistId || null}
+              salonId={profile?.salonId || null}
+            />
             <div className="grid grid-cols-1 min-[620px]:grid-cols-3 gap-3 mb-6">
               {[
                 { label: "Appointments", value: weekAppointments.filter(item => item.date === todayKey).length, hint: "today", icon: <I.calendar /> },

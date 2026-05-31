@@ -31,20 +31,14 @@ export interface WhatsAppInvoiceDelivery {
  * All methods return 'not_available' until WhatsApp API is configured.
  */
 export const whatsAppInvoice: WhatsAppInvoiceDelivery = {
-  async sendInvoice(
-    _invoiceId: string,
-    _phone: string,
-    _shareUrl: string
-  ): Promise<WhatsAppDeliveryResult> {
+  async sendInvoice(): Promise<WhatsAppDeliveryResult> {
     return {
       status: "not_available",
       message: "WhatsApp Business API is not yet configured.",
     };
   },
 
-  async getDeliveryStatus(
-    _invoiceId: string
-  ): Promise<WhatsAppDeliveryStatus> {
+  async getDeliveryStatus(): Promise<WhatsAppDeliveryStatus> {
     return "not_available";
   },
 };

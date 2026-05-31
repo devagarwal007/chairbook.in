@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { GST_SCHEMA_MISSING_MESSAGE, getSupabaseErrorMessage, isMissingGstSchemaError } from "@/lib/supabase-errors";
@@ -11,6 +12,7 @@ import Header from "@/components/layout/Header";
 import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/components/ui";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
+import AttendanceSettingsForm from "@/components/features/attendance/AttendanceSettingsForm";
 
 import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, WhatsAppSenderPreference, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice, SalonGstSettings, DEFAULT_GST_SETTINGS, GstInvoice } from "@/types";
 
@@ -2068,7 +2070,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-4 gap-2.5 max-[720px]:grid-cols-2">
                 {(data.salon.photos || []).map((url, i) => (
                   <div key={url || i} className="relative aspect-[3/2] rounded-lg overflow-hidden border border-line group">
-                    <img src={url} alt={`Salon photo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <Image src={url} alt={`Salon photo ${i + 1}`} fill sizes="(max-width: 720px) 50vw, 25vw" unoptimized className="object-cover" />
                     <button
                       className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 hover:bg-rose text-white flex items-center justify-center border-0 cursor-pointer transition-colors duration-150"
                       onClick={() => deletePhoto(url)}
@@ -2966,6 +2968,9 @@ export default function SettingsPage() {
             </div>
           </div>
         );
+
+      case "attendance":
+        return <AttendanceSettingsForm salonId={supabaseSalonId} />;
 
       case "account":
         return (

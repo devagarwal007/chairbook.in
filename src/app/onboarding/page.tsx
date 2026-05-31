@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { makeSalonSlug, saveOnboarding } from "@/lib/onboarding";
 
 import { DayHour, HoursData, OnboardingData } from "@/types";
-import { validateGstin, INDIAN_STATE_OPTIONS } from "@/lib/gst";
+import { validateGstin } from "@/lib/gst";
 
 import { Icons as IO, StepBar, FormField, Avatar, PhoneInput } from "@/components/ui";
 

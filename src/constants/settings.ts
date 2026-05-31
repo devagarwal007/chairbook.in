@@ -19,6 +19,7 @@ export const TABS = [
   { id: "plan",     label: "Subscription",  icon: I.card },
   { id: "gst",      label: "GST & Billing", icon: I.invoice },
   { id: "notifs",   label: "Notifications", icon: I.bell },
+  { id: "attendance", label: "Attendance",   icon: I.clock },
   { id: "account",  label: "Account",       icon: I.user },
 ];
 

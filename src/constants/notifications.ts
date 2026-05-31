@@ -7,6 +7,7 @@ export const KINDS = {
   cancelled:      { icon: 'cancel' as const,   tone: 'rose',  label: 'Booking cancelled' },
   noshow:         { icon: 'alert' as const,    tone: 'rose',  label: 'No-show' },
   payment:        { icon: 'cash' as const,     tone: 'green', label: 'Payment received' },
+  attendance_correction: { icon: 'clock' as const, tone: 'amber', label: 'Attendance correction' },
   review:         { icon: 'star' as const,     tone: 'amber', label: 'New review' },
   wa_reply:       { icon: 'wa' as const,       tone: 'wa',    label: 'WhatsApp reply' },
   daily:          { icon: 'summary' as const,  tone: 'neutral', label: 'Daily summary' },
@@ -30,7 +31,7 @@ export const FILTERS = [
   { id: 'all',      label: 'All' },
   { id: 'unread',   label: 'Unread' },
   { id: 'bookings', label: 'Bookings',   kinds: ['new_booking', 'confirmed', 'rescheduled', 'cancelled'] },
-  { id: 'alerts',   label: 'Alerts',     kinds: ['noshow'] },
+  { id: 'alerts',   label: 'Alerts',     kinds: ['noshow', 'attendance_correction'] },
   { id: 'payments', label: 'Payments',   kinds: ['payment'] },
   { id: 'wa',       label: 'WhatsApp',   kinds: ['wa_reply', 'review'] },
 ];

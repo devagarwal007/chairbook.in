@@ -6,6 +6,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 import { DbBlockRow } from "@/types";
+import { BLOCK_COUNTS_AS_OPTIONS } from "@/constants/attendanceConfig";
+import { buildAbsentSessionDrafts } from "@/lib/attendance";
 
 import { Icons as IBT } from "@/components/ui/Icons";
 
@@ -29,6 +31,7 @@ interface UIBlock {
   to?: string;
   recurring: "once" | "daily" | "weekly";
   note: string;
+  countsAs?: string;
 }
 
 // ===== CONSTANTS =====
@@ -146,6 +149,7 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
   const [note, setNote] = useState(block?.note || "");
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [countsAs, setCountsAs] = useState(block?.countsAs || "service_unavailable");
 
   const toggleStylist = (id: string) => {
     if (id === "all") {
@@ -179,6 +183,7 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
       to: allDay ? undefined : to,
       recurring,
       note,
+      countsAs,
     });
     setSaving(false);
   };
@@ -303,6 +308,16 @@ function BlockModal({ block, onClose, onSave, stylists: allStylists }: BlockModa
             />
           </div>
 
+          {/* Counts as (Attendance) */}
+          <div className="field" style={{ marginTop: 14 }}>
+            <label>Counts as <small style={{ color: "var(--ink-3)", fontWeight: 400 }}>(for attendance)</small></label>
+            <select value={countsAs} onChange={e => setCountsAs(e.target.value)}>
+              {BLOCK_COUNTS_AS_OPTIONS.map(opt => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Notify customers? */}
           <label className="flex items-center gap-2.5 text-[13px] cursor-pointer mt-3 bg-wa-soft py-2.5 px-3.5 rounded-[10px] text-[#1f5a37]">
             <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} className="accent-teal w-4 h-4 shrink-0" />
@@ -379,7 +394,8 @@ export default function BlockTimePage() {
           all_day,
           recurring,
           note,
-          stylist_id
+          stylist_id,
+          counts_as
         `)
         .eq("salon_id", salonId)
         .order("date_from", { ascending: true });
@@ -420,6 +436,7 @@ export default function BlockTimePage() {
             to: row.time_to ? row.time_to.slice(0, 5) : undefined,
             recurring: rec,
             note,
+            countsAs: row.counts_as || "service_unavailable",
           };
         });
         setBlocks(mapped);
@@ -504,6 +521,38 @@ export default function BlockTimePage() {
     }
   };
 
+  const createAbsentSessionsForLeaveBlock = async (
+    supabase: NonNullable<ReturnType<typeof getSupabaseBrowserClient>>,
+    block: Omit<UIBlock, "id"> & { id?: string | number },
+  ) => {
+    if (block.countsAs !== "leave_absent") return;
+
+    const stylistIds = block.stylists.includes("all")
+      ? stylists.map((stylist) => stylist.id)
+      : block.stylists.filter((stylistId) => stylistId !== "all");
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const drafts = buildAbsentSessionDrafts({
+      salonId: salonId!,
+      stylistIds,
+      dateFrom: block.date,
+      dateTo: block.dateTo || block.date,
+      countsAs: block.countsAs,
+      userId: user?.id || null,
+    });
+
+    if (drafts.length === 0) return;
+
+    const { error } = await supabase
+      .from("attendance_sessions")
+      .upsert(drafts, {
+        onConflict: "salon_id,stylist_id,session_date",
+        ignoreDuplicates: true,
+      });
+
+    if (error) throw error;
+  };
+
   const save = async (b: Omit<UIBlock, "id"> & { id?: string | number }) => {
     const supabase = getSupabaseBrowserClient();
     const isEdit = !!b.id && typeof b.id === "string" && b.id.length > 10;
@@ -539,6 +588,7 @@ export default function BlockTimePage() {
             all_day: b.allDay,
             recurring: b.recurring !== "once",
             note: noteToSave,
+            counts_as: b.countsAs || "service_unavailable",
           })
           .eq("id", b.id);
 
@@ -557,10 +607,12 @@ export default function BlockTimePage() {
             all_day: b.allDay,
             recurring: b.recurring !== "once",
             note: noteToSave,
+            counts_as: b.countsAs || "service_unavailable",
           }));
           await supabase.from("blocks").insert(extraInserts);
         }
 
+        await createAbsentSessionsForLeaveBlock(supabase, b);
         flashMsg("Block updated");
       } else {
         // Create new blocks
@@ -578,6 +630,7 @@ export default function BlockTimePage() {
               all_day: b.allDay,
               recurring: b.recurring !== "once",
               note: noteToSave,
+              counts_as: b.countsAs || "service_unavailable",
             });
 
           if (error) throw error;
@@ -594,12 +647,14 @@ export default function BlockTimePage() {
             all_day: b.allDay,
             recurring: b.recurring !== "once",
             note: noteToSave,
+            counts_as: b.countsAs || "service_unavailable",
           }));
 
           const { error } = await supabase.from("blocks").insert(inserts);
           if (error) throw error;
         }
 
+        await createAbsentSessionsForLeaveBlock(supabase, b);
         flashMsg("Time blocked off");
       }
       

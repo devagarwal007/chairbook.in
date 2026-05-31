@@ -284,6 +284,7 @@ export interface DbBlockRow {
   recurring: boolean;
   note: string | null;
   stylist_id: string | null;
+  counts_as: string | null;
 }
 
 

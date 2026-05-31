@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { NotificationPayload } from "@/types";
+import { describeNotificationError } from "./notification-errors";
 
 export async function insertNotification(payload: NotificationPayload) {
   const supabase = getSupabaseBrowserClient();
@@ -18,9 +19,9 @@ export async function insertNotification(payload: NotificationPayload) {
       });
 
     if (error) {
-      console.error("Error inserting notification:", error);
+      console.warn("Notification insert skipped:", describeNotificationError(error));
     }
   } catch (err) {
-    console.error("Failed to insert notification:", err);
+    console.warn("Notification insert skipped:", describeNotificationError(err));
   }
 }

@@ -10,7 +10,7 @@ import { insertNotification } from "@/lib/notifications";
 import { isUUID } from "@/lib/utils";
 import { Icons as IC } from "@/components/ui/Icons";
 import { Avatar } from "@/components/ui";
-import { Customer, DbCheckoutServiceItemRow, SalonGstSettings, DEFAULT_GST_SETTINGS, GstTaxBreakdown } from "@/types";
+import { Customer, DbCheckoutServiceItemRow, GstTaxBreakdown } from "@/types";
 import { calculateGst, calculateItemGst, validateGstin, shouldUseIgst } from "@/lib/gst";
 import { useGstSettings } from "@/hooks/useGstSettings";
 import { buildReceiptLinkPayload } from "@/lib/whatsapp/message-payloads";

@@ -5,7 +5,6 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
 } from "@react-pdf/renderer";
 import type { GstInvoice, GstInvoiceItem } from "@/types/gst";
 

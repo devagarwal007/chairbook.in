@@ -288,7 +288,6 @@ function BookingComboDetails({ service }: { service: BookingData["services"][num
 
   const savings = getBundleSavings(service);
   const savingsPct = getBundleSavingsPct(service);
-  const originalPrice = getBundleOriginalPrice(service);
 
   return (
     <div className="mt-2 rounded-lg border border-line bg-bg-2 p-2">

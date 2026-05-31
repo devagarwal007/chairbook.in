@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/components/ui/Icons";
@@ -49,7 +50,7 @@ export default function StylistHeader({ title, subtitle, profile, unreadCount = 
           </Link>
           <Link href="/stylist/profile" className="no-underline text-inherit">
             {profile?.photoUrl ? (
-              <img src={profile.photoUrl} alt="" className="w-[30px] h-[30px] rounded-full object-cover border-2 border-teal" />
+              <Image src={profile.photoUrl} alt="" width={30} height={30} unoptimized className="w-[30px] h-[30px] rounded-full object-cover border-2 border-teal" />
             ) : (
               <Avatar initials={profile?.initials || "S"} tone={profile?.tone || "b"} size="sm" className="w-[30px] h-[30px]" />
             )}

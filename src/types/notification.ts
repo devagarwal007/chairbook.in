@@ -1,7 +1,7 @@
 export interface NotificationPayload {
   salon_id: string;
   stylist_id?: string | null;
-  type: 'new_booking' | 'walk_in' | 'status_update' | 'cancellation' | 'reschedule' | 'payment' | 'daily_summary';
+  type: 'new_booking' | 'walk_in' | 'status_update' | 'cancellation' | 'reschedule' | 'payment' | 'daily_summary' | 'attendance_correction';
   title: string;
   body: string;
   meta?: Record<string, unknown>;

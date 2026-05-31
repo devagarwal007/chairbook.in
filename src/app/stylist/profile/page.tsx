@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import Image from "next/image";
 import StylistShell from "@/components/layout/StylistShell";
 import { Avatar, FormField, Icons as I } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
@@ -72,7 +73,7 @@ function ProfileEditor({ profile, updateProfile, uploadProfilePhoto }: ProfileEd
       <div className="bg-white border border-line rounded-xl p-5 md:p-6">
         <div className="flex items-center gap-4 pb-5 border-b border-line">
           {profile.photoUrl ? (
-            <img src={profile.photoUrl} alt="" className="w-16 h-16 rounded-full object-cover border border-line" />
+            <Image src={profile.photoUrl} alt="" width={64} height={64} unoptimized className="w-16 h-16 rounded-full object-cover border border-line" />
           ) : (
             <Avatar initials={profile.initials} tone={profile.tone} size="lg" className="!w-16 !h-16 !text-xl" />
           )}

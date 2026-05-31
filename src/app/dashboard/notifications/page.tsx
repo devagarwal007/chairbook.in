@@ -29,7 +29,7 @@ export default function NotificationsPage() {
         if (stored) {
           try {
             setNotifs(JSON.parse(stored));
-          } catch (e) {
+          } catch {
             setNotifs(INITIAL_NOTIFS);
           }
         } else {
@@ -47,7 +47,7 @@ export default function NotificationsPage() {
         if (stored) {
           try {
             setNotifs(JSON.parse(stored));
-          } catch (e) {
+          } catch {
             setNotifs(INITIAL_NOTIFS);
           }
         } else {
@@ -92,7 +92,7 @@ export default function NotificationsPage() {
               title: n.title,
               meta: n.body || "",
               actor: n.meta?.actor ? { name: n.meta.actor.name, initials: n.meta.actor.initials || "?", tone: n.meta.actor.tone || "a" } : null,
-              link: "/dashboard/bookings",
+              link: n.type === "attendance_correction" ? "/dashboard/attendance" : "/dashboard/bookings",
             };
           });
           setNotifs(mappedNotifs);

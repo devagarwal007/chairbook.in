@@ -5,7 +5,6 @@ type IconProps = React.SVGProps<SVGSVGElement> & {
   height?: number | string;
   strokeWidth?: number | string;
 };
-
 export const Icons = {
   home: ({ width = 20, height = 20, strokeWidth = 2, style, ...props }: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
@@ -305,6 +304,31 @@ export const Icons = {
   share: ({ width = 16, height = 16, strokeWidth = 2, style, ...props }: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
       <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>
+    </svg>
+  ),
+  clockIn: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M16 3l2 2-2 2"/>
+    </svg>
+  ),
+  clockOut: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M20 3l-2 2 2 2"/>
+    </svg>
+  ),
+  pause: ({ width = 14, height = 14, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+    </svg>
+  ),
+  play: ({ width = 14, height = 14, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width={width} height={height} style={style} {...props}>
+      <path d="M8 5v14l11-7z"/>
+    </svg>
+  ),
+  clipboardList: ({ width = 16, height = 16, strokeWidth = 2, style, ...props }: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" width={width} height={height} style={style} {...props}>
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 12h6M9 16h6"/>
     </svg>
   ),
 };

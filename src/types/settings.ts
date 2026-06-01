@@ -6,6 +6,7 @@ export interface SalonInfo {
   area: string;
   type: string;
   city: string;
+  bookingWindowDays: number;
   timezone?: string;
   currency?: string;
   language?: string;

@@ -18,6 +18,7 @@ import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, WhatsAp
 
 import { DAYS, TABS, PLANS, INITIAL_DATA } from "@/constants/settings";
 import { validateGstin, INDIAN_STATE_OPTIONS } from "@/lib/gst";
+import { MAX_BOOKING_WINDOW_DAYS, MIN_BOOKING_WINDOW_DAYS, normalizeBookingWindowDays } from "@/lib/booking-window";
 import { WHATSAPP_CREDIT_PACKS } from "@/lib/whatsapp/credit-packs";
 import { buildBookingConfirmationPayload } from "@/lib/whatsapp/message-payloads";
 import { sendWhatsAppTemplateFromClient } from "@/lib/whatsapp-client";
@@ -716,6 +717,7 @@ export default function SettingsPage() {
         let salonTimezone = "Asia/Kolkata";
         let salonCurrency = "INR";
         let salonLanguage = "en";
+        let salonBookingWindowDays = INITIAL_DATA.salon.bookingWindowDays;
         let salonIsActive = true;
         let salonPhotos: string[] = [];
         let salonWaSettings = INITIAL_DATA.wa;
@@ -733,7 +735,7 @@ export default function SettingsPage() {
 
           const { data: salon } = await supabase
             .from("salons")
-            .select("id, name, area, city, type, hours, wa_number, timezone, currency, language, wa_settings, notification_settings, is_active, photos")
+            .select("id, name, area, city, type, hours, wa_number, timezone, currency, language, booking_window_days, wa_settings, notification_settings, is_active, photos")
             .eq("org_id", userProfile.org_id)
             .eq("is_primary", true)
             .maybeSingle();
@@ -742,7 +744,7 @@ export default function SettingsPage() {
           if (!selectedSalon) {
             const { data: firstSalon } = await supabase
               .from("salons")
-              .select("id, name, area, city, type, hours, wa_number, timezone, currency, language, wa_settings, notification_settings, is_active, photos")
+              .select("id, name, area, city, type, hours, wa_number, timezone, currency, language, booking_window_days, wa_settings, notification_settings, is_active, photos")
               .eq("org_id", userProfile.org_id)
               .limit(1)
               .maybeSingle();
@@ -767,6 +769,7 @@ export default function SettingsPage() {
             salonTimezone = selectedSalon.timezone || "Asia/Kolkata";
             salonCurrency = selectedSalon.currency || "INR";
             salonLanguage = selectedSalon.language || "en";
+            salonBookingWindowDays = normalizeBookingWindowDays(selectedSalon.booking_window_days);
             salonIsActive = selectedSalon.is_active !== false;
             salonPhotos = selectedSalon.photos || [];
             if (selectedSalon.wa_settings) {
@@ -995,6 +998,7 @@ export default function SettingsPage() {
             timezone: salonTimezone,
             currency: salonCurrency,
             language: salonLanguage,
+            bookingWindowDays: salonBookingWindowDays,
             is_active: salonIsActive,
             photos: salonPhotos,
           },
@@ -1395,6 +1399,7 @@ export default function SettingsPage() {
               timezone: data.salon.timezone || "Asia/Kolkata",
               currency: data.salon.currency || "INR",
               language: data.salon.language || "en",
+              booking_window_days: normalizeBookingWindowDays(data.salon.bookingWindowDays),
               is_active: data.salon.is_active !== false,
               wa_settings: buildWhatsAppSettingsPayload(data.wa),
               notification_settings: data.notifs,
@@ -2063,6 +2068,27 @@ export default function SettingsPage() {
                   </select>
                 </FormField>
               </div>
+              <FormField label="Accept bookings for next" style={{ marginTop: 14 }}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="number"
+                    min={MIN_BOOKING_WINDOW_DAYS}
+                    max={MAX_BOOKING_WINDOW_DAYS}
+                    step="1"
+                    value={data.salon.bookingWindowDays}
+                    onChange={e => update({
+                      ...data,
+                      salon: {
+                        ...data.salon,
+                        bookingWindowDays: normalizeBookingWindowDays(e.target.value),
+                      },
+                    })}
+                    style={{ width: 110, padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, outline: 0, fontSize: 14 }}
+                  />
+                  <span className="text-sm text-ink-2">days</span>
+                  <span className="text-xs text-ink-3">Customers and staff can book today through this many selectable dates.</span>
+                </div>
+              </FormField>
             </div>
 
             <SectionHead title="Photos" desc="At least one photo helps customers trust the salon. 3:2 aspect, < 5 MB each." />

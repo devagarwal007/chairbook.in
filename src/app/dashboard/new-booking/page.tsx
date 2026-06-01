@@ -18,28 +18,12 @@ import {
 import { useToast } from "@/context/ToastContext";
 import { buildBookingConfirmationPayload } from "@/lib/whatsapp/message-payloads";
 import { sendWhatsAppTemplateFromClient } from "@/lib/whatsapp-client";
+import { DEFAULT_BOOKING_WINDOW_DAYS, generateBookingDateOptions, normalizeBookingWindowDays } from "@/lib/booking-window";
 
 import { Customer, Service, Stylist, NewCustInput, DbBookingSimple, DbStylistRaw, DbServiceRaw, DbBookingSlotRaw, DbBookingStylistRaw } from "@/types";
 import { Icons as IN, FormField, PhoneInput, Avatar, Badge } from "@/components/ui";
 
 
-
-// ===== DATA LOADING FROM SUPABASE =====
-function generateDays(baseDate: Date) {
-  const arr = [];
-  const dayNames = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(baseDate.getTime() + i * 86400000);
-    arr.push({
-      key: d.toISOString().slice(0, 10),
-      dow: dayNames[d.getDay()],
-      dom: d.getDate(),
-      label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : null as string | null,
-      full: d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }),
-    });
-  }
-  return arr;
-}
 
 import { ALL_SLOTS_FULL as ALL_SLOTS } from "@/constants/bookings";
 
@@ -420,7 +404,7 @@ interface StepWhenProps {
   overrideAvail: boolean;
   setOverrideAvail: (val: boolean) => void;
   dbStylists: Stylist[];
-  days: ReturnType<typeof generateDays>;
+  days: ReturnType<typeof generateBookingDateOptions>;
   slots: { time: string; taken: boolean }[];
   loadingBookings: boolean;
 }
@@ -488,7 +472,7 @@ function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onD
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              padding: "8px 12px",
+              padding: "7px 10px",
               borderRadius: 10,
               border: date === d.key ? "1px solid var(--teal)" : "1px solid var(--line-2)",
               background: date === d.key ? "var(--teal-soft)" : "#fff",
@@ -496,7 +480,7 @@ function StepWhen({ services, totalDuration, stylist, date, time, onStylist, onD
               minWidth: 54
             }}
           >
-            <span className="date-dow" style={{ fontSize: 10, fontWeight: 600, color: "var(--ink-3)" }}>{d.dow}</span>
+            <span className="date-dow" style={{ fontSize: 9, fontWeight: 600, color: "var(--ink-3)", letterSpacing: 0, whiteSpace: "nowrap" }}>{d.dow} {d.monthShort}</span>
             <span className="date-dom" style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", marginTop: 2 }}>{d.dom}</span>
             {d.label && <span className="date-lbl" style={{ fontSize: 8, fontWeight: 600, color: "var(--teal)", marginTop: 2 }}>{d.label}</span>}
           </button>
@@ -564,7 +548,7 @@ interface StepConfirmProps {
   takePayment: boolean;
   setTakePayment: (val: boolean) => void;
   dbStylists: Stylist[];
-  days: ReturnType<typeof generateDays>;
+  days: ReturnType<typeof generateBookingDateOptions>;
 }
 
 function StepConfirm({ customer, services, totalDuration, totalPrice, stylist, date, time, note, setNote, sendConfirm, setSendConfirm, takePayment, setTakePayment, dbStylists, days }: StepConfirmProps) {
@@ -671,8 +655,9 @@ export default function NewBookingPage() {
   const [loadingCust, setLoadingCust] = useState(true);
   const [loadingSvcs, setLoadingSvcs] = useState(true);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [bookingWindowDays, setBookingWindowDays] = useState(DEFAULT_BOOKING_WINDOW_DAYS);
 
-  const days = useMemo(() => generateDays(new Date()), []);
+  const days = useMemo(() => generateBookingDateOptions(new Date(), bookingWindowDays), [bookingWindowDays]);
 
   const totalDuration = services.reduce((s, x) => s + x.duration, 0);
   const totalPrice = services.reduce((s, x) => s + x.price, 0);
@@ -697,6 +682,14 @@ export default function NewBookingPage() {
 
     const loadData = async () => {
       try {
+        const { data: salonConfig } = await supabase
+          .from("salons")
+          .select("booking_window_days")
+          .eq("id", salonId)
+          .maybeSingle();
+
+        setBookingWindowDays(normalizeBookingWindowDays(salonConfig?.booking_window_days));
+
         // Load customers with booking aggregates
         const { data: custData } = await supabase
           .from("customers")
@@ -811,6 +804,15 @@ export default function NewBookingPage() {
       loadStylistsAndServices();
     });
   }, [salonId]);
+
+  useEffect(() => {
+    if (date && days.length > 0 && !days.some((day) => day.key === date)) {
+      queueMicrotask(() => {
+        setDate(days[0].key);
+        setTime(null);
+      });
+    }
+  }, [date, days]);
 
   // Load real slot availability when date or stylist changes
   useEffect(() => {
@@ -945,7 +947,7 @@ export default function NewBookingPage() {
         setStylist(dbStylists[0].id);
       }
       if (step === 1 && !date) {
-        setDate(days[1]?.key || "");
+        setDate(days[0]?.key || "");
       }
       setStep(step + 1);
     } else {

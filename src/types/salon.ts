@@ -16,6 +16,7 @@ export interface Salon {
   city: string | null;
   type: string | null;
   hours: HoursData | null;
+  booking_window_days?: number | null;
 }
 
 export interface SalonWhatsAppSettings {
@@ -49,5 +50,6 @@ export interface DbSalon {
   notification_settings?: Record<string, SalonNotificationChannel> | null;
   is_active?: boolean | null;
   photos?: string[] | null;
+  booking_window_days?: number | null;
 }
 

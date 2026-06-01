@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -28,6 +28,7 @@ import {
   getServiceDuration,
   mapServiceWithBundleDetails,
 } from "@/lib/service-bundles";
+import { DEFAULT_BOOKING_WINDOW_DAYS, generateBookingDateOptions, normalizeBookingWindowDays } from "@/lib/booking-window";
 
 // ===== ICONS =====
 type IconProps = React.SVGProps<SVGSVGElement>;
@@ -123,7 +124,7 @@ const IBD = {
 
 // ===== TYPES =====
 
-import { CANCEL_REASONS, RESCH_DAYS, ALL_SLOTS } from "@/constants/bookings";
+import { CANCEL_REASONS, ALL_SLOTS } from "@/constants/bookings";
 
 const STATUS_LABEL = BOOKING_STATUS_LABEL;
 
@@ -154,14 +155,24 @@ const EMPTY_BOOKING: BookingData = {
 // ===== RESCHEDULE MODAL =====
 interface RescheduleModalProps {
   booking: BookingData;
+  days: ReturnType<typeof generateBookingDateOptions>;
   onClose: () => void;
   onConfirm: (data: { date: string; time: string; note: string }) => void;
 }
 
-function RescheduleModal({ booking, onClose, onConfirm }: RescheduleModalProps) {
-  const [date, setDate] = useState(RESCH_DAYS[5].key); // original date
+function RescheduleModal({ booking, days, onClose, onConfirm }: RescheduleModalProps) {
+  const [date, setDate] = useState(days[0]?.key || "");
   const [time, setTime] = useState(booking.time);
   const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (days.length > 0 && !days.some((day) => day.key === date)) {
+      queueMicrotask(() => {
+        setDate(days[0].key);
+      });
+    }
+  }, [date, days]);
+
   return (
     <Modal
       title="Reschedule booking"
@@ -170,7 +181,7 @@ function RescheduleModal({ booking, onClose, onConfirm }: RescheduleModalProps) 
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose}>Keep original</button>
-          <button className="btn btn-primary" onClick={() => onConfirm({ date, time, note })}>
+          <button className="btn btn-primary" disabled={!date} onClick={() => onConfirm({ date, time, note })}>
             Reschedule &amp; notify
           </button>
         </>
@@ -181,13 +192,13 @@ function RescheduleModal({ booking, onClose, onConfirm }: RescheduleModalProps) 
       </div>
       <FormField label="New date">
         <div className="date-row" style={{ margin: 0, padding: 0, maxWidth: "100%" }}>
-          {RESCH_DAYS.map(d => (
+          {days.map(d => (
             <button
               key={d.key}
               className={`date-pill ${date === d.key ? "on" : ""}`}
               onClick={() => setDate(d.key)}
             >
-              <span className="date-dow">{d.dow}</span>
+              <span className="date-dow" style={{ fontSize: 9, letterSpacing: 0, whiteSpace: "nowrap" }}>{d.dow} {d.monthShort}</span>
               <span className="date-dom">{d.dom}</span>
               {d.label && <span className="date-lbl">{d.label}</span>}
             </button>
@@ -331,6 +342,8 @@ export default function BookingDetailPage() {
     name: "ChairBook",
     area: "",
   });
+  const [bookingWindowDays, setBookingWindowDays] = useState(DEFAULT_BOOKING_WINDOW_DAYS);
+  const rescheduleDays = useMemo(() => generateBookingDateOptions(new Date(), bookingWindowDays), [bookingWindowDays]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -353,7 +366,7 @@ export default function BookingDetailPage() {
         if (userProfile?.org_id) {
           const { data: salon } = await supabase
             .from("salons")
-            .select("name, area")
+            .select("name, area, booking_window_days")
             .eq("org_id", userProfile.org_id)
             .eq("is_primary", true)
             .maybeSingle();
@@ -363,10 +376,11 @@ export default function BookingDetailPage() {
               name: salon.name,
               area: salon.area || "",
             });
+            setBookingWindowDays(normalizeBookingWindowDays(salon.booking_window_days));
           } else {
             const { data: firstSalon } = await supabase
               .from("salons")
-              .select("name, area")
+              .select("name, area, booking_window_days")
               .eq("org_id", userProfile.org_id)
               .limit(1)
               .maybeSingle();
@@ -375,6 +389,7 @@ export default function BookingDetailPage() {
                 name: firstSalon.name,
                 area: firstSalon.area || "",
               });
+              setBookingWindowDays(normalizeBookingWindowDays(firstSalon.booking_window_days));
             }
           }
         }
@@ -742,7 +757,7 @@ export default function BookingDetailPage() {
   };
 
   const handleReschedule = async ({ date, time, note }: { date: string; time: string; note: string }) => {
-    const day = RESCH_DAYS.find(d => d.key === date);
+    const day = rescheduleDays.find(d => d.key === date);
     if (day) {
       const isUuid = isUUID(bookingId);
       if (isUuid) {
@@ -1218,7 +1233,7 @@ export default function BookingDetailPage() {
 
 
 
-      {showResch && <RescheduleModal booking={b} onClose={() => setShowResch(false)} onConfirm={handleReschedule} />}
+      {showResch && <RescheduleModal booking={b} days={rescheduleDays} onClose={() => setShowResch(false)} onConfirm={handleReschedule} />}
       {showCancel && <CancelModal booking={b} onClose={() => setShowCancel(false)} onConfirm={handleCancel} />}
 
       {/* Navigation bar */}

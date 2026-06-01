@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Icons as I, Avatar, PhoneInput, ComboSaveBadge, ComboServiceChip } from "@/components/ui";
-import { DAY_KEYS } from "@/constants/common";
+import { generateBookingDateOptions } from "@/lib/booking-window";
 import { formatServiceCode } from "@/lib/service-codes";
 import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
 import { formatDateKey, formatPhone } from "@/lib/utils";
@@ -62,24 +62,7 @@ function toTime(mins: number) {
   return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 }
 
-function getDates() {
-  const today = new Date();
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
-
-    return {
-      key: formatDateKey(date),
-      dow: date.toLocaleDateString("en-IN", { weekday: "short" }).toUpperCase(),
-      dom: date.getDate(),
-      label: index === 0 ? "Today" : index === 1 ? "Tomorrow" : "",
-      full: date.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }),
-      dayKey: DAY_KEYS[date.getDay()],
-    };
-  });
-}
-
-function getSlotsForDate(salon: Salon | null, dateKey: string, dates: ReturnType<typeof getDates>, duration: number) {
+function getSlotsForDate(salon: Salon | null, dateKey: string, dates: ReturnType<typeof generateBookingDateOptions>, duration: number) {
   const date = dates.find((d) => d.key === dateKey);
   const hours = date && salon?.hours?.[date.dayKey];
   const from = hours?.from || "10:00";
@@ -495,13 +478,13 @@ export default function PublicBookingPage() {
   const searchParams = useSearchParams();
   const slug = params.slug;
   const stylistParam = searchParams.get("stylist");
-  const dates = useMemo(() => getDates(), []);
 
   const [state, setState] = useState<BookingState>({ salon: null, services: [], stylists: [], bookings: [] });
+  const dates = useMemo(() => generateBookingDateOptions(new Date(), state.salon?.booking_window_days), [state.salon?.booking_window_days]);
   const [step, setStep] = useState<Step>(1);
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [selectedStylist, setSelectedStylist] = useState<string | number>("any");
-  const [selectedDate, setSelectedDate] = useState(dates[0].key);
+  const [selectedDate, setSelectedDate] = useState(() => generateBookingDateOptions()[0]?.key || "");
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
@@ -548,7 +531,9 @@ export default function PublicBookingPage() {
         return;
       }
 
-      const endDate = dates[dates.length - 1].key;
+      const bookingDates = generateBookingDateOptions(new Date(), salon.booking_window_days);
+      const startDate = bookingDates[0]?.key || formatDateKey(new Date());
+      const endDate = bookingDates[bookingDates.length - 1]?.key || startDate;
       const [{ data: services, error: serviceError }, { data: stylists, error: stylistError }, { data: bookings, error: bookingError }] =
         await Promise.all([
           supabase
@@ -560,7 +545,7 @@ export default function PublicBookingPage() {
             .order("category")
             .order("name"),
           supabase.from("stylists").select("id,name,role_label,tone,booking_slug").eq("salon_id", salon.id).eq("active", true).order("name"),
-          supabase.from("bookings").select("id,stylist_id,date,start_time,duration,status").eq("salon_id", salon.id).gte("date", dates[0].key).lte("date", endDate),
+          supabase.from("bookings").select("id,stylist_id,date,start_time,duration,status").eq("salon_id", salon.id).gte("date", startDate).lte("date", endDate),
         ]);
 
       const error = serviceError || stylistError || bookingError;
@@ -589,7 +574,16 @@ export default function PublicBookingPage() {
     };
 
     loadSalon();
-  }, [dates, slug, stylistParam]);
+  }, [slug, stylistParam]);
+
+  useEffect(() => {
+    if (dates.length > 0 && !dates.some((date) => date.key === selectedDate)) {
+      queueMicrotask(() => {
+        setSelectedDate(dates[0].key);
+        setSelectedTime(null);
+      });
+    }
+  }, [dates, selectedDate]);
 
   const serviceCategories = useMemo(() => {
     const seen = new Set<string>();
@@ -927,7 +921,7 @@ export default function PublicBookingPage() {
                     type="button"
                     key={date.key}
                     className={cx(
-                      "min-w-[72px] rounded-xl border bg-white p-2.5 text-center transition-colors",
+                      "min-w-[72px] rounded-xl border bg-white p-2 text-center transition-colors",
                       selectedDate === date.key ? "border-teal bg-teal-soft" : "border-line hover:border-line-2"
                     )}
                     onClick={() => {
@@ -935,7 +929,7 @@ export default function PublicBookingPage() {
                       setSelectedTime(null);
                     }}
                   >
-                    <span className="block font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-ink-3">{date.dow}</span>
+                    <span className="block whitespace-nowrap font-mono text-[9px] font-semibold uppercase tracking-normal text-ink-3">{date.dow} {date.monthShort}</span>
                     <span className="mt-0.5 block text-xl font-semibold text-ink">{date.dom}</span>
                     {date.label && <span className="mt-0.5 block rounded-full bg-teal-soft px-1.5 py-0.5 text-[10px] font-medium text-teal">{date.label}</span>}
                   </button>

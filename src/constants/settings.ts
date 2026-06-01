@@ -31,7 +31,7 @@ export const PLANS = [
 
 export const INITIAL_DATA: SettingsData = {
   account: { name: "Ravi Varma", email: "ravi@glowsalon.in" },
-  salon: { name: "Glow Salon & Spa", area: "Andheri West, near Lokhandwala", type: "Unisex salon", city: "Mumbai" },
+  salon: { name: "Glow Salon & Spa", area: "Andheri West, near Lokhandwala", type: "Unisex salon", city: "Mumbai", bookingWindowDays: 7 },
   hours: {
     mon: { open: true,  from: "10:00", to: "20:00" },
     tue: { open: true,  from: "10:00", to: "20:00" },

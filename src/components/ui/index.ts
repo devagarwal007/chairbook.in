@@ -2,6 +2,7 @@ export * from "./Icons";
 export * from "./Modal";
 export * from "./Badge";
 export * from "./Avatar";
+export * from "./BrandLogo";
 export * from "./FormField";
 export * from "./PhoneInput";
 export * from "./Toggle";

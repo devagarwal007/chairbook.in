@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
 import { getPostLoginPath } from "@/lib/auth-routing";
 
 import { Icons } from "@/components/ui/Icons";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
 
 interface AuthScreenProps {
@@ -143,8 +144,7 @@ export function AuthScreen({ initialMode = "signup" }: AuthScreenProps) {
         {/* Left rail / brand panel */}
         <div className="auth-aside">
           <div className="auth-brand">
-            <div className="brand-mark" style={{ width: 40, height: 40, fontSize: 18, borderRadius: 12 }}>C</div>
-            <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>ChairBook</span>
+            <BrandLogo size="lg" />
           </div>
           <div className="auth-aside-body">
             <div className="auth-aside-quote">
@@ -178,6 +178,9 @@ export function AuthScreen({ initialMode = "signup" }: AuthScreenProps) {
           <Link className="auth-home" href="/">
             ← Back to home
           </Link>
+          <div className="auth-panel-brand">
+            <BrandLogo size="md" />
+          </div>
 
           <div className="auth-form">
             {isCheckingSession && (

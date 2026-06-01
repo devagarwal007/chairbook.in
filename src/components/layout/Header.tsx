@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/components/ui/Icons";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 import { useBookings } from "@/hooks";
@@ -16,7 +17,6 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 export default function Header({
   title,
   subtitle,
-  brandMark = "C",
   todayRevenue: propTodayRevenue,
   dailyTarget = 6000,
   showSearch = false,
@@ -147,8 +147,7 @@ export default function Header({
       <div className="bg-bg border-b border-line">
         <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-4 md:py-[22px] flex flex-wrap md:flex-nowrap items-center justify-between gap-4 md:gap-6">
           <Link href="/dashboard" className="flex items-center gap-[10px] font-semibold tracking-[-0.01em] text-base no-underline text-inherit cursor-pointer order-1 w-auto">
-            <div className="w-7 h-7 rounded-lg bg-teal grid place-items-center text-white font-bold text-sm">{brandMark}</div>
-            <span className="font-semibold tracking-[-0.01em] text-base">ChairBook</span>
+            <BrandLogo size="md" />
             <span className="hidden sm:inline-flex items-center gap-[5px] text-[10px] font-medium px-[9px] py-[3px] rounded-full tracking-[0.05em] leading-[1.4] whitespace-nowrap font-mono text-ink-2 bg-bg-2 no-underline">
               {profile.salonName}{profile.salonArea ? ` · ${profile.salonArea}` : ""}
             </span>

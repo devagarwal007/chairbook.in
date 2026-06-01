@@ -2002,6 +2002,11 @@ footer {
   color: var(--ink-2);
   text-decoration: underline;
 }
+.auth-panel-brand {
+  display: none;
+  color: var(--ink);
+  margin: 8px 0 26px;
+}
 
 @media (max-width: 720px) {
   .auth-stage {
@@ -2020,6 +2025,9 @@ footer {
   }
   .auth-panel {
     padding: 24px 22px;
+  }
+  .auth-panel-brand {
+    display: flex;
   }
   .auth-form {
     max-width: none;

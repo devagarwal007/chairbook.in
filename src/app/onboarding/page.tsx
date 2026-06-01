@@ -8,7 +8,7 @@ import { makeSalonSlug, saveOnboarding } from "@/lib/onboarding";
 import { DayHour, HoursData, OnboardingData } from "@/types";
 import { validateGstin } from "@/lib/gst";
 
-import { Icons as IO, StepBar, FormField, Avatar, PhoneInput } from "@/components/ui";
+import { Icons as IO, StepBar, FormField, Avatar, PhoneInput, BrandLogo } from "@/components/ui";
 
 
 import { DAYS, PRESET_SERVICES, STEPS } from "@/constants/onboarding";
@@ -50,7 +50,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
   return (
     <div className="ob-step ob-welcome">
       <div className="ob-welcome-mark">
-        <div className="brand-mark" style={{ width: 56, height: 56, fontSize: 26, borderRadius: 16 }}>C</div>
+        <BrandLogo variant="mark" size="xl" />
       </div>
       <h1 className="ob-h1">
         Welcome to ChairBook.<br />
@@ -749,8 +749,7 @@ export default function OnboardingPage() {
       <header className="ob-topbar">
         <div className="ob-topbar-inner">
           <div className="brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="brand-mark">C</div>
-            <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.015em" }}>ChairBook</span>
+            <BrandLogo size="md" />
           </div>
           {step.id !== "done" && step.id !== "welcome" && <div className="ob-step-count">Step {stepIdx} of 6</div>}
           {step.id !== "done" && (

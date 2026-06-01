@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { Icons } from "@/components/ui/Icons";
 import { getPostLoginPath } from "@/lib/auth-routing";
 import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
@@ -145,8 +146,7 @@ export default function AcceptInvitePage() {
       <div className="auth-frame">
         <div className="auth-aside">
           <div className="auth-brand">
-            <div className="brand-mark" style={{ width: 40, height: 40, fontSize: 18, borderRadius: 12 }}>C</div>
-            <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>ChairBook</span>
+            <BrandLogo size="lg" />
           </div>
           <div className="auth-aside-body">
             <div className="auth-aside-quote">
@@ -172,6 +172,9 @@ export default function AcceptInvitePage() {
           <Link className="auth-home" href="/signin">
             ← Back to sign in
           </Link>
+          <div className="auth-panel-brand">
+            <BrandLogo size="md" />
+          </div>
           <div className="auth-form">
             {state === "checking" && (
               <div className="auth-success">

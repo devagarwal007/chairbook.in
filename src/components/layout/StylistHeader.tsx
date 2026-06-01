@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { Icons } from "@/components/ui/Icons";
 import { Avatar } from "@/components/ui/Avatar";
 import { signOutCurrentUser } from "@/lib/auth-session";
@@ -28,8 +29,7 @@ export default function StylistHeader({ title, subtitle, profile, unreadCount = 
     <header className="bg-bg border-b border-line">
       <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-4 md:py-[22px] flex flex-wrap md:flex-nowrap items-center justify-between gap-4 md:gap-6">
         <Link href="/stylist" className="flex items-center gap-[10px] font-semibold text-base no-underline text-inherit order-1">
-          <div className="w-7 h-7 rounded-lg bg-ink grid place-items-center text-white font-bold text-sm">S</div>
-          <span>ChairBook</span>
+          <BrandLogo size="md" />
           <span className="hidden sm:inline-flex items-center gap-[5px] text-[10px] font-medium px-[9px] py-[3px] rounded-full tracking-[0.05em] leading-[1.4] whitespace-nowrap font-mono text-teal bg-teal-soft no-underline">
             STYLIST
           </span>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { useAuthState } from "@/hooks/useAuth";
 
 export default function Home() {
@@ -74,10 +75,7 @@ export default function Home() {
       {/* NAVIGATION */}
       <nav className="nav">
         <div className="wrap nav-inner">
-          <div className="logo">
-            <div className="logo-mark">C</div>
-            <span>ChairBook</span>
-          </div>
+          <BrandLogo className="logo" size="sm" />
           <div className="nav-links">
             <a href="#features">Features</a>
             <a href="#whatsapp">WhatsApp Native</a>
@@ -708,10 +706,7 @@ export default function Home() {
         <div className="wrap">
           <div className="foot-top">
             <div className="foot-brand">
-              <div className="logo">
-                <div className="logo-mark">C</div>
-                <span>ChairBook</span>
-              </div>
+              <BrandLogo className="logo" size="sm" />
               <p>Bookings, customers and insights for independent Indian salons. Made in Bengaluru.</p>
             </div>
             <div className="foot-col">

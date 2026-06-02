@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { mapDbNotificationToItem } from "@/lib/notification-routing";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
@@ -71,30 +72,7 @@ export default function NotificationsPage() {
 
         if (data && data.length > 0) {
 
-          const mappedNotifs: NotificationItem[] = (data as unknown as DbNotification[]).map((n, i: number) => {
-            const created = new Date(n.created_at);
-            const now = new Date();
-            const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-            const day = diffDays === 0 ? "Today" : diffDays === 1 ? "Yesterday" : "Earlier";
-            const hours = created.getHours();
-            const minutes = String(created.getMinutes()).padStart(2, "0");
-            const ampm = hours >= 12 ? "PM" : "AM";
-            const h = hours % 12 || 12;
-            const ts = `${h}:${minutes} ${ampm}`;
-
-            return {
-              id: i + 1,
-              dbId: n.id,
-              kind: n.type || "new_booking",
-              ts,
-              day,
-              unread: !n.read,
-              title: n.title,
-              meta: n.body || "",
-              actor: n.meta?.actor ? { name: n.meta.actor.name, initials: n.meta.actor.initials || "?", tone: n.meta.actor.tone || "a" } : null,
-              link: n.type === "attendance_correction" ? "/dashboard/attendance" : "/dashboard/bookings",
-            };
-          });
+          const mappedNotifs: NotificationItem[] = (data as unknown as DbNotification[]).map((n, i: number) => mapDbNotificationToItem(n, i));
           setNotifs(mappedNotifs);
         } else {
           setNotifs(INITIAL_NOTIFS);
@@ -124,8 +102,8 @@ export default function NotificationsPage() {
     const out: Record<string, number> = {
       all:      notifs.length,
       unread:   notifs.filter(n => n.unread).length,
-      bookings: notifs.filter(n => ['new_booking','confirmed','rescheduled','cancelled'].includes(n.kind)).length,
-      alerts:   notifs.filter(n => n.kind === 'noshow').length,
+      bookings: notifs.filter(n => ['new_booking','walk_in','status_update','confirmed','rescheduled','cancelled'].includes(n.kind)).length,
+      alerts:   notifs.filter(n => ['noshow','attendance_correction'].includes(n.kind)).length,
       payments: notifs.filter(n => n.kind === 'payment').length,
       wa:       notifs.filter(n => ['wa_reply','review'].includes(n.kind)).length,
     };

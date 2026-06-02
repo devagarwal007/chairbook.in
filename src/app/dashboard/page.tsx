@@ -169,7 +169,12 @@ export default function DashboardPage() {
             type: "status_update",
             title: "Booking updated",
             body: `${appt.customer} marked as ${STATUS_LABEL[result.status]}`,
-            meta: { booking_id: id, status: result.status },
+            meta: {
+              booking_id: id,
+              customer_id: appt.customerId,
+              status: result.status,
+              actor: { name: appt.customer, initials: appt.initials, tone: appt.tone },
+            },
           });
         }
       } catch (error) {
@@ -199,6 +204,14 @@ export default function DashboardPage() {
     const totalPrice = services.reduce((sum, service) => sum + Number(service.price || 0), 0);
     const serviceNames = services.map((service) => service.name).join(" + ") || "services";
     const serviceIds = services.map((service) => service.id);
+    const initials = name
+      .split(" ")
+      .map((p) => p[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+    const tones = ["a", "b", "c", "d", "e", "f"];
+    const tone = tones[name.length % tones.length];
     
     if (supabase && salonId && services.length > 0 && serviceIds.every((id) => isUUID(String(id))) && isUUID(String(stylistId))) {
       try {
@@ -209,7 +222,7 @@ export default function DashboardPage() {
         const dateStr = `${y}-${m}-${d}`;
         const startTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
         
-        const { error } = await supabase.rpc("create_public_booking", {
+        const { data: bookingRows, error } = await supabase.rpc("create_public_booking", {
           p_salon_id: salonId,
           p_customer_name: name,
           p_phone: phone ? `+91 ${phone}` : "+91 99999 99999",
@@ -221,6 +234,10 @@ export default function DashboardPage() {
         });
 
         if (error) throw error;
+        const createdBooking = Array.isArray(bookingRows) ? bookingRows[0] : bookingRows;
+        const createdBookingId = createdBooking && typeof createdBooking === "object" && "booking_id" in createdBooking
+          ? String(createdBooking.booking_id)
+          : null;
 
         insertNotification({
           salon_id: salonId!,
@@ -228,7 +245,12 @@ export default function DashboardPage() {
           type: "walk_in",
           title: "Walk-in arrived",
           body: `${name} walked in for ${serviceNames}`,
-          meta: { customer_name: name, service: serviceNames },
+          meta: {
+            booking_id: createdBookingId,
+            customer_name: name,
+            service: serviceNames,
+            actor: { name, initials, tone },
+          },
         });
 
         showFlash(`${name} added to schedule`, 2000);
@@ -243,15 +265,6 @@ export default function DashboardPage() {
         showFlash(`Error: ${errMsg}`, 3000);
       }
     }
-
-    const initials = name
-      .split(" ")
-      .map((p) => p[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-    const tones = ["a", "b", "c", "d", "e", "f"];
-    const tone = tones[name.length % tones.length];
 
     const newAppt: Appointment = {
       id: Math.max(...appts.map((a) => typeof a.id === "number" ? a.id : 0), 0) + 1,

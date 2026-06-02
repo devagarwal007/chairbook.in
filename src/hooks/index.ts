@@ -9,3 +9,4 @@ export * from "./useMyShift";
 export * from "./useTodayAttendance";
 export * from "./useCorrectionRequests";
 export * from "./useAttendanceReports";
+export * from "./useInvoiceSearch";

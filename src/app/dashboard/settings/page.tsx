@@ -13,8 +13,10 @@ import { Icons as I, Modal, FormField, Avatar, Badge, PhoneInput } from "@/compo
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 import AttendanceSettingsForm from "@/components/features/attendance/AttendanceSettingsForm";
+import { BillingInvoiceHistory, GstInvoiceHistory } from "@/components/features/invoices/InvoiceHistory";
+import { useBillingInvoices, useGstInvoices } from "@/hooks";
 
-import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, WhatsAppSenderPreference, DbSalon, DbServiceRow, DbStylistRow, BillingInvoice, SalonGstSettings, DEFAULT_GST_SETTINGS, GstInvoice } from "@/types";
+import { Service, ServiceKind, Stylist, SettingsData, WhatsAppTemplates, WhatsAppSenderPreference, DbSalon, DbServiceRow, DbStylistRow, SalonGstSettings, DEFAULT_GST_SETTINGS } from "@/types";
 
 import { DAYS, TABS, PLANS, INITIAL_DATA } from "@/constants/settings";
 import { validateGstin, INDIAN_STATE_OPTIONS } from "@/lib/gst";
@@ -606,6 +608,8 @@ export default function SettingsPage() {
   const [supabaseSalonId, setSupabaseSalonId] = useState<string | null>(null);
   const [supabaseOrgId, setSupabaseOrgId] = useState<string | null>(null);
   const [gstSchemaAvailable, setGstSchemaAvailable] = useState(true);
+  const billingInvoiceList = useBillingInvoices(Boolean(supabaseOrgId));
+  const gstInvoiceList = useGstInvoices(Boolean(supabaseSalonId));
 
   // Service menu state
   const [serviceModal, setServiceModal] = useState<ServiceModalState | null>(null);
@@ -628,9 +632,7 @@ export default function SettingsPage() {
   const [editingTemplateKey, setEditingTemplateKey] = useState<keyof WhatsAppTemplates | null>(null);
   const [templateText, setTemplateText] = useState("");
 
-  // Dynamic Invoices and Delete Modal state
-  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
-  const [gstInvoices, setGstInvoices] = useState<GstInvoice[]>([]);
+  // Dynamic billing and Delete Modal state
   const [whatsappChannels, setWhatsappChannels] = useState<WhatsAppChannelView[]>([]);
   const [whatsappTemplates, setWhatsappTemplates] = useState<WhatsAppTemplateView[]>([]);
   const [messageWallet, setMessageWallet] = useState<MessageCreditWalletRow | null>(null);
@@ -871,60 +873,6 @@ export default function SettingsPage() {
             }
           }
         }
-
-        // Load Billing Invoices
-        let dbInvoices: BillingInvoice[] = [];
-        if (userProfile.org_id) {
-          const { data: invoicesData } = await supabase
-            .from("billing_invoices")
-            .select("id, date, plan_name, amount, payment_method")
-            .eq("org_id", userProfile.org_id)
-            .order("date", { ascending: false });
-          if (invoicesData && invoicesData.length > 0) {
-            dbInvoices = invoicesData.map((inv) => {
-              let formattedDate = inv.date;
-              try {
-                formattedDate = new Date(inv.date).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric"
-                });
-              } catch {}
-              return {
-                id: inv.id,
-                date: formattedDate,
-                plan_name: inv.plan_name,
-                amount: Number(inv.amount),
-                payment_method: inv.payment_method
-              };
-            });
-          }
-        }
-        setInvoices(dbInvoices);
-
-        // Load GST Invoices
-        let dbGstInvoices: GstInvoice[] = [];
-        if (currentSalonId) {
-          try {
-            const { data: gstInvData, error: gstInvError } = await supabase
-              .from("gst_invoices")
-              .select("*")
-              .eq("salon_id", currentSalonId)
-              .order("created_at", { ascending: false })
-              .limit(50);
-            if (gstInvError) throw gstInvError;
-            if (gstInvData) {
-              dbGstInvoices = gstInvData as unknown as GstInvoice[];
-            }
-          } catch (err) {
-            if (isMissingGstSchemaError(err)) {
-              setGstSchemaAvailable(false);
-            } else {
-              console.error("Error loading GST invoices:", getSupabaseErrorMessage(err));
-            }
-          }
-        }
-        setGstInvoices(dbGstInvoices);
 
         if (currentSalonId) {
           try {
@@ -1619,31 +1567,7 @@ export default function SettingsPage() {
                   payment_method: "UPI · payment simulated"
                 });
 
-              // Reload invoices list
-              const { data: invoicesData } = await supabase
-                .from("billing_invoices")
-                .select("id, date, plan_name, amount, payment_method")
-                .eq("org_id", supabaseOrgId)
-                .order("date", { ascending: false });
-              if (invoicesData) {
-                setInvoices(invoicesData.map(inv => {
-                  let formattedDate = inv.date;
-                  try {
-                    formattedDate = new Date(inv.date).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric"
-                    });
-                  } catch {}
-                  return {
-                    id: inv.id,
-                    date: formattedDate,
-                    plan_name: inv.plan_name,
-                    amount: Number(inv.amount),
-                    payment_method: inv.payment_method
-                  };
-                }));
-              }
+              billingInvoiceList.refresh();
             }
           }
 
@@ -2760,25 +2684,7 @@ export default function SettingsPage() {
             </div>
 
             <SectionHead title="Billing history" />
-            <div className="bg-white border border-line rounded-xl p-0">
-              {invoices.length > 0 ? (
-                invoices.map((b, i) => (
-                  <div key={b.id || i} className="grid grid-cols-[1fr_1fr_auto_auto] gap-3.5 p-[14px_20px] items-center border-b border-line last:border-b-0 max-[720px]:grid-cols-[1fr_auto]">
-                    <div>
-                      <div className="text-[13px] font-semibold mono">{b.date}</div>
-                      <div className="text-xs text-ink-3 mt-0.5">{b.plan_name}</div>
-                    </div>
-                    <div className="text-xs text-ink-3 max-[720px]:col-span-full">{b.payment_method}</div>
-                    <div className="text-sm font-semibold font-mono">₹{b.amount.toLocaleString("en-IN")}</div>
-                    <button className="btn btn-ghost btn-sm max-[720px]:col-start-2" onClick={() => showFlash("Downloading receipt...")}>Receipt</button>
-                  </div>
-                ))
-              ) : (
-                <div style={{ padding: 24, textAlign: "center", color: "var(--ink-3)", fontSize: 13, fontStyle: "italic" }}>
-                  No billing history available.
-                </div>
-              )}
-            </div>
+            <BillingInvoiceHistory list={billingInvoiceList} onReceipt={() => showFlash("Downloading receipt...")} />
           </div>
         );
 
@@ -2874,61 +2780,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Invoice History Section */}
-                <div className="bg-white border border-line rounded-xl p-[20px_22px] mt-2">
-                  <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-3">Invoice history</div>
-                  <div className="flex flex-col border border-line rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-2 p-[12px_16px] bg-bg border-b border-line text-[10px] font-semibold tracking-[0.04em] uppercase text-ink-3 max-[720px]:hidden">
-                      <div>Invoice Number</div>
-                      <div>Customer</div>
-                      <div>Date</div>
-                      <div>Amount</div>
-                      <div className="text-right">Actions</div>
-                    </div>
-                    {gstInvoices.length > 0 ? (
-                      gstInvoices.map((inv) => {
-                        let formattedDate = inv.invoice_date;
-                        try {
-                          formattedDate = new Date(inv.invoice_date).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          });
-                        } catch {}
-
-                        return (
-                          <div key={inv.id} className="grid grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-2 p-[14px_16px] items-center border-b border-line last:border-b-0 text-sm max-[720px]:grid-cols-2 max-[720px]:gap-y-2">
-                            <div>
-                              <div className="font-semibold text-ink">{inv.invoice_number}</div>
-                              <div className="hidden max-[720px]:block text-xs text-ink-3 mt-0.5">{formattedDate}</div>
-                            </div>
-                            <div>
-                              <div className="font-medium text-ink-2">{inv.customer_name}</div>
-                              {inv.customer_phone && <div className="text-xs text-ink-3">{inv.customer_phone}</div>}
-                            </div>
-                            <div className="text-ink-2 max-[720px]:hidden">{formattedDate}</div>
-                            <div className="font-semibold font-mono text-ink">₹{Number(inv.total_amount).toLocaleString("en-IN")}</div>
-                            <div className="flex gap-2 justify-end max-[720px]:col-span-2">
-                              <a
-                                href={`/api/invoice/${inv.share_token}/pdf`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn btn-ghost btn-xs text-teal font-medium flex items-center gap-1.5 px-2 py-1 rounded"
-                                style={{ textDecoration: "none" }}
-                              >
-                                <I.download width={14} height={14} /> PDF
-                              </a>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div style={{ padding: 24, textAlign: "center", color: "var(--ink-3)", fontSize: 13, fontStyle: "italic" }}>
-                        No invoices generated yet. Invoices are generated automatically on payment checkout.
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <GstInvoiceHistory list={gstInvoiceList} />
               </>
             )}
           </div>

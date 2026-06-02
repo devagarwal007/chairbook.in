@@ -11,5 +11,6 @@ export * from "./user";
 export * from "./revenue";
 export * from "./stylistAccount";
 export * from "./gst";
+export * from "./invoice";
 export * from "./attendance";
 

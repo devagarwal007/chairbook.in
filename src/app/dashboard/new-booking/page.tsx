@@ -1026,7 +1026,16 @@ export default function NewBookingPage() {
             type: "new_booking",
             title: "New booking",
             body: `${customer.name} booked ${svcNames} for ${date}`,
-            meta: { booking_id: bookingData.id, customer_name: customer.name },
+            meta: {
+              booking_id: bookingData.id,
+              customer_id: customerId,
+              customer_name: customer.name,
+              actor: {
+                name: customer.name,
+                initials: customer.initials || initialsOf(customer.name),
+                tone: customer.tone || "a",
+              },
+            },
           });
 
           setNewBookingId(bookingData.id);

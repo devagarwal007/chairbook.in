@@ -495,7 +495,18 @@ export default function CheckoutPage() {
                 type: "payment",
                 title: notificationTitle,
                 body: notificationBody,
-                meta: { booking_id: bookingId, amount: amountToRecord, due: amountDueAfter, method: p.method },
+                meta: {
+                  booking_id: bookingId,
+                  customer_id: baseBooking.customer.id,
+                  amount: amountToRecord,
+                  due: amountDueAfter,
+                  method: p.method,
+                  actor: {
+                    name: baseBooking.customer.name,
+                    initials: baseBooking.customer.initials || "WC",
+                    tone: baseBooking.customer.tone || "a",
+                  },
+                },
               });
             }
 

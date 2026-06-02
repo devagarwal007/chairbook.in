@@ -2,6 +2,8 @@ import { NotificationItem } from "@/types";
 
 export const KINDS = {
   new_booking:    { icon: 'calendar' as const, tone: 'teal',  label: 'New booking' },
+  walk_in:        { icon: 'calendar' as const, tone: 'teal',  label: 'Walk-in' },
+  status_update:  { icon: 'check' as const,    tone: 'green', label: 'Booking updated' },
   confirmed:      { icon: 'check' as const,    tone: 'green', label: 'Customer confirmed' },
   rescheduled:    { icon: 'edit' as const,     tone: 'amber', label: 'Reschedule request' },
   cancelled:      { icon: 'cancel' as const,   tone: 'rose',  label: 'Booking cancelled' },
@@ -30,7 +32,7 @@ export const INITIAL_NOTIFS: NotificationItem[] = [
 export const FILTERS = [
   { id: 'all',      label: 'All' },
   { id: 'unread',   label: 'Unread' },
-  { id: 'bookings', label: 'Bookings',   kinds: ['new_booking', 'confirmed', 'rescheduled', 'cancelled'] },
+  { id: 'bookings', label: 'Bookings',   kinds: ['new_booking', 'walk_in', 'status_update', 'confirmed', 'rescheduled', 'cancelled'] },
   { id: 'alerts',   label: 'Alerts',     kinds: ['noshow', 'attendance_correction'] },
   { id: 'payments', label: 'Payments',   kinds: ['payment'] },
   { id: 'wa',       label: 'WhatsApp',   kinds: ['wa_reply', 'review'] },

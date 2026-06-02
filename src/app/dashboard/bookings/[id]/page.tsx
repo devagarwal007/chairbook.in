@@ -781,7 +781,13 @@ export default function BookingDetailPage() {
                 type: "reschedule",
                 title: "Booking rescheduled",
                 body: `${b.customer.name} rescheduled to ${date} at ${time}`,
-                meta: { booking_id: b.id, new_date: date, new_time: time },
+                meta: {
+                  booking_id: b.id,
+                  customer_id: b.customer.id,
+                  new_date: date,
+                  new_time: time,
+                  actor: { name: b.customer.name, initials: b.customer.initials, tone: b.customer.tone },
+                },
               });
             }
           } catch (err) {
@@ -828,7 +834,12 @@ export default function BookingDetailPage() {
               type: "cancellation",
               title: "Booking cancelled",
               body: `${b.customer.name}'s booking was cancelled — ${reasonLabel}`,
-              meta: { booking_id: b.id, reason: reasonLabel },
+              meta: {
+                booking_id: b.id,
+                customer_id: b.customer.id,
+                reason: reasonLabel,
+                actor: { name: b.customer.name, initials: b.customer.initials, tone: b.customer.tone },
+              },
             });
           }
         } catch (err) {

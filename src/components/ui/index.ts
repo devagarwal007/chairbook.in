@@ -5,6 +5,7 @@ export * from "./Avatar";
 export * from "./BrandLogo";
 export * from "./FormField";
 export * from "./PhoneInput";
+export * from "./SearchBar";
 export * from "./Toggle";
 export * from "./FilterChip";
 export * from "./StepBar";

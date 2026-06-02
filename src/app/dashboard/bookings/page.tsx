@@ -7,8 +7,9 @@ import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { toMinHours, initialsOf, formatDateKey, formatTime12hFromMin } from "@/lib/utils";
 import { Stylist, CalAppt, DbCalBookingRow } from "@/types";
-import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip } from "@/components/ui";
+import { Icons as I, Modal, Badge, Avatar, FormField, Toggle, FilterChip, SearchBar } from "@/components/ui";
 import { BOOKING_SERVICE_SELECT_WITH_BUNDLE_DETAILS, getBundleSavings, getBundleSavingsPct, getServiceDuration, mapServiceWithBundleDetails } from "@/lib/service-bundles";
+import { filterBookingListAppointments, normalizeBookingListSearchQuery } from "@/lib/booking-list-search";
 
 import { START_HOUR, SLOT_HEIGHT, MONTH_NAMES, DOW_FULL, STATUS_LABEL, TIME_LABELS } from "@/constants/bookings";
 
@@ -388,30 +389,38 @@ interface ListViewProps {
   appts: CalAppt[];
   stylists: Stylist[];
   stylistFilter: string | number;
+  searchQuery: string;
   onSelect: (a: CalAppt) => void;
   todayKey: string;
   nowMin: number;
 }
 
-function ListView({ weekDays, appts, stylists, stylistFilter, onSelect, todayKey, nowMin }: ListViewProps) {
+function ListView({ weekDays, appts, stylists, stylistFilter, searchQuery, onSelect, todayKey, nowMin }: ListViewProps) {
+  const normalizedSearchQuery = normalizeBookingListSearchQuery(searchQuery);
+  const hasActiveSearch = normalizedSearchQuery.length > 0;
+
   const groups = weekDays.map((day) => {
     const key = formatDateKey(day);
     const isToday = key === todayKey;
-    const items = appts
+    const dayItems = appts
       .filter(a => a.dayKey === key && (stylistFilter === "all" || a.stylistId === stylistFilter))
       .sort((a, b) => toMinHours(a.startH, a.startM) - toMinHours(b.startH, b.startM));
+    const items = filterBookingListAppointments(dayItems, stylists, normalizedSearchQuery);
     const totalMin = items.reduce((s, a) => s + a.duration, 0);
-    return { day, key, isToday, items, totalMin, dow: DOW_FULL[day.getDay()], dom: day.getDate(), dayName: DOW_LONG[day.getDay()] };
+    return { day, key, isToday, items, totalMin, baseCount: dayItems.length, dow: DOW_FULL[day.getDay()], dom: day.getDate(), dayName: DOW_LONG[day.getDay()] };
   });
 
   const totalAll = groups.reduce((s, g) => s + g.items.length, 0);
+  const totalAvailable = groups.reduce((s, g) => s + g.baseCount, 0);
 
   if (totalAll === 0) {
+    const isSearchEmpty = hasActiveSearch && totalAvailable > 0;
+
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-        <div className="font-mono text-[10px] text-ink-4 tracking-[0.06em] uppercase">{"// no bookings"}</div>
-        <div className="text-lg font-semibold text-ink-2">Nothing on the books</div>
-        <div className="text-sm text-ink-3">Try a different stylist filter or week.</div>
+        <div className="font-mono text-[10px] text-ink-4 tracking-[0.06em] uppercase">{isSearchEmpty ? "// no matches" : "// no bookings"}</div>
+        <div className="text-lg font-semibold text-ink-2">{isSearchEmpty ? "No matching bookings" : "Nothing on the books"}</div>
+        <div className="text-sm text-ink-3">{isSearchEmpty ? "Try another search, stylist filter, or week." : "Try a different stylist filter or week."}</div>
       </div>
     );
   }
@@ -443,7 +452,7 @@ function ListView({ weekDays, appts, stylists, stylistFilter, onSelect, todayKey
                     <span className="text-[9px] font-mono font-medium tracking-[0.06em] px-1.5 py-0.5 rounded bg-teal-soft text-teal-ink">TODAY</span>
                   )}
                 </div>
-                <div className="text-[12px] text-ink-4">No bookings</div>
+                <div className="text-[12px] text-ink-4">{hasActiveSearch && g.baseCount > 0 ? "No matches" : "No bookings"}</div>
               </div>
             </div>
           );
@@ -568,6 +577,7 @@ export default function BookingsPage() {
   const [view, setView] = useState<"week" | "day" | "list">("week");
   const [baseDate, setBaseDate] = useState<Date>(() => new Date());
   const [stylistFilter, setStylistFilter] = useState<string | number>("all");
+  const [listSearchQuery, setListSearchQuery] = useState("");
   const [selected, setSelected] = useState<CalAppt | null>(null);
   const [showBlockModal, setShowBlockModal] = useState(false);
 
@@ -785,7 +795,16 @@ export default function BookingsPage() {
               {(view === "week" || view === "list") && <span className="text-xs text-ink-3 font-mono tracking-[0.04em]">Week {getWeekNumber(weekDays[0])}</span>}
             </div>
           </div>
-          <div className="flex items-center gap-2.5 max-[980px]:justify-between max-[480px]:flex-wrap max-[480px]:gap-2">
+          <div className="flex items-center gap-2.5 max-[980px]:justify-between max-[720px]:flex-wrap max-[480px]:gap-2">
+            {view === "list" && (
+              <SearchBar
+                value={listSearchQuery}
+                onChange={setListSearchQuery}
+                placeholder="Search bookings"
+                aria-label="Search list bookings"
+                className="w-[260px] shrink-0 max-[720px]:basis-full max-[720px]:w-full"
+              />
+            )}
             <Toggle
               options={[
                 { value: "day", label: "Day" },
@@ -1051,6 +1070,7 @@ export default function BookingsPage() {
               appts={appts}
               stylists={stylists}
               stylistFilter={stylistFilter}
+              searchQuery={listSearchQuery}
               onSelect={setSelected}
               todayKey={todayKey}
               nowMin={nowMin}

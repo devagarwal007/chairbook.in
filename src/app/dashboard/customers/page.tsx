@@ -8,6 +8,8 @@ import Header from "@/components/layout/Header";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 import { initialsOf } from "@/lib/utils";
+import { buildCustomerSearchFilter } from "@/lib/customer-list";
+import { paginationRange, useDebouncedValue, usePagination } from "@/hooks";
 
 
 import { Customer, DbCustomerRow, DbCustomerBooking } from "@/types";
@@ -43,6 +45,9 @@ const formatPhone = (phone: string) => {
 
 import { SORT_OPTIONS, FILTER_TABS } from "@/constants/customers";
 
+const CUSTOMER_PAGE_SIZE = 20;
+const CUSTOMER_SELECT = "id, name, phone, pref_stylist_id, member_since, created_at, stylists:pref_stylist_id(name)";
+
 // ===== EXPORT COMPONENT =====
 export default function CustomersPage() {
   const { profile, salonId, loading: profileLoading } = useProfile();
@@ -53,9 +58,24 @@ export default function CustomersPage() {
   const [selected, setSelected] = useState<string | number | null>(null);
   const { show: showFlash } = useToast();
   const [sortOpen, setSortOpen] = useState(false);
+  const debouncedQ = useDebouncedValue(q, 300);
+  const {
+    page,
+    pageSize,
+    total: customerTotal,
+    pageCount,
+    loading: loadingCustomers,
+    setTotal: setCustomerTotal,
+    setLoading: setLoadingCustomers,
+    resetPage,
+    nextPage,
+    prevPage,
+    hasNextPage,
+    hasPrevPage,
+  } = usePagination(CUSTOMER_PAGE_SIZE);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [showCreateCust, setShowCreateCust] = useState(false);
   const [newCustName, setNewCustName] = useState("");
   const [newCustPhone, setNewCustPhone] = useState("");
@@ -67,34 +87,67 @@ export default function CustomersPage() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !salonId) {
       queueMicrotask(() => {
+        setCustomers([]);
+        setCustomerTotal(0);
         setLoadingCustomers(false);
       });
       return;
     }
 
+    let cancelled = false;
+
     const loadCustomersData = async () => {
       setLoadingCustomers(true);
       try {
+        const { from, to } = paginationRange(page, pageSize);
+        const searchFilter = buildCustomerSearchFilter(debouncedQ);
 
+        let customerQuery = supabase
+          .from("customers")
+          .select(CUSTOMER_SELECT, { count: "exact" })
+          .eq("salon_id", salonId);
 
-        // Fetch customers + all bookings with services in parallel
-        const [{ data: custData }, { data: bkData }] = await Promise.all([
-          supabase.from("customers").select("id, name, phone, pref_stylist_id, member_since, created_at, stylists:pref_stylist_id(name)").eq("salon_id", salonId),
-          supabase.from("bookings").select("id, customer_id, status, date, amount_paid, bill_total, booking_services(price_at_booking, qty, service:services(name)), stylist:stylists(name)").eq("salon_id", salonId),
-        ]);
+        if (searchFilter) {
+          customerQuery = customerQuery.or(searchFilter);
+        }
 
-        if (!custData || custData.length === 0) {
-          queueMicrotask(() => {
-            setLoadingCustomers(false);
-          });
+        customerQuery = sort === "name"
+          ? customerQuery.order("name", { ascending: true })
+          : customerQuery.order("created_at", { ascending: false });
+
+        const { data: custData, count, error: custError } = await customerQuery.range(from, to);
+        if (cancelled) return;
+        if (custError) throw custError;
+
+        const customerRows = (custData || []) as unknown as DbCustomerRow[];
+        setCustomerTotal(count || 0);
+
+        if (customerRows.length === 0) {
+          setCustomers([]);
           return;
+        }
+
+        const customerIds = customerRows.map((c) => c.id);
+        let bkData: DbCustomerBooking[] = [];
+
+        if (customerIds.length > 0) {
+          const { data: bookingsData, error: bookingsError } = await supabase
+            .from("bookings")
+            .select("id, customer_id, status, date, amount_paid, bill_total, booking_services(price_at_booking, qty, service:services(name)), stylist:stylists(name)")
+            .eq("salon_id", salonId)
+            .in("customer_id", customerIds)
+            .order("date", { ascending: false });
+
+          if (cancelled) return;
+          if (bookingsError) throw bookingsError;
+          bkData = (bookingsData || []) as unknown as DbCustomerBooking[];
         }
 
         const today = new Date(); today.setHours(0,0,0,0);
         const tones = ["a","b","c","d","e","f"];
 
-        const mapped: Customer[] = (custData as unknown as DbCustomerRow[]).map((c, idx: number) => {
-          const custBks = (bkData as unknown as DbCustomerBooking[] || []).filter((b) => b.customer_id === c.id);
+        const mapped: Customer[] = customerRows.map((c, idx: number) => {
+          const custBks = bkData.filter((b) => b.customer_id === c.id);
           const paidBks = custBks.filter((b) => ["Completed","Paid"].includes(b.status));
           const visits = paidBks.length;
           const spend = paidBks.reduce((sum: number, b) => {
@@ -102,7 +155,6 @@ export default function CustomersPage() {
             return sum + Number(b.amount_paid || (b.status === "Paid" ? b.bill_total || bkTotal : 0));
           }, 0);
 
-          // Days since last booking
           const completedDates = paidBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
           const lastMs = completedDates.length > 0 ? Math.max(...completedDates) : null;
           const lastDaysBaseline = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
@@ -116,19 +168,17 @@ export default function CustomersPage() {
 
           const lastDays = hasUpcoming ? 0 : lastDaysBaseline;
 
-          // Favourite service by frequency
           const svcCount: Record<string, number> = {};
           custBks.forEach((b) => (b.booking_services || []).forEach((bs) => { const sn = bs.service?.name; if (sn) svcCount[sn] = (svcCount[sn] || 0) + 1; }));
           const fav = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
-          // Preferred stylist from most recent booking
           const sortedBks = [...custBks].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           const stylist = sortedBks[0]?.stylist?.name || c.stylists?.name || "—";
 
           return {
             id: c.id,
             name: c.name,
-            tone: tones[idx % tones.length],
+            tone: tones[(from + idx) % tones.length],
             phone: c.phone || "",
             visits,
             lastDays,
@@ -140,18 +190,26 @@ export default function CustomersPage() {
 
         setCustomers(mapped);
       } catch (err) {
-        console.error("Error loading customers:", err);
+        if (!cancelled) {
+          console.error("Error loading customers:", err);
+          setCustomers([]);
+          setCustomerTotal(0);
+        }
       } finally {
-        setLoadingCustomers(false);
+        if (!cancelled) setLoadingCustomers(false);
       }
     };
 
-    loadCustomersData();
-  }, [profileLoading, salonId]);
+    void loadCustomersData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQ, page, pageSize, profileLoading, refreshKey, salonId, setCustomerTotal, setLoadingCustomers, sort]);
 
   // Engagement Counts (from live or mock customers)
   const counts = useMemo(() => {
-    const out = { all: customers.length, active: 0, cooling: 0, lost: 0 };
+    const out = { all: customerTotal, active: 0, cooling: 0, lost: 0 };
     customers.forEach(c => {
       const eng = engagementOf(c.lastDays ?? 999);
       if (eng === "active") out.active++;
@@ -159,25 +217,15 @@ export default function CustomersPage() {
       else if (eng === "lost") out.lost++;
     });
     return out;
-  }, [customers]);
+  }, [customerTotal, customers]);
 
   // Filtered + sorted customers
   const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase();
     const activeFilter = (c: Customer) => {
       if (tab === "all") return true;
       return engagementOf(c.lastDays ?? 999) === tab;
     };
-    let list = customers.filter(activeFilter);
-
-    if (query) {
-      list = list.filter(c =>
-        c.name.toLowerCase().includes(query) ||
-        c.phone.includes(query) ||
-        (c.fav && c.fav.toLowerCase().includes(query)) ||
-        (c.stylist && c.stylist.toLowerCase().includes(query))
-      );
-    }
+    const list = customers.filter(activeFilter);
 
     const sorted = [...list];
     if (sort === "recent") sorted.sort((a, b) => (a.lastDays ?? 999) - (b.lastDays ?? 999));
@@ -187,7 +235,12 @@ export default function CustomersPage() {
     else if (sort === "lost") sorted.sort((a, b) => (b.lastDays ?? 999) - (a.lastDays ?? 999));
 
     return sorted;
-  }, [q, tab, sort, customers]);
+  }, [tab, sort, customers]);
+
+  const pageSpend = useMemo(() => customers.reduce((s, c) => s + (c.spend ?? 0), 0), [customers]);
+  const computedSortAppliesToPage = sort !== "name";
+  const showingStart = customerTotal === 0 ? 0 : ((page - 1) * pageSize) + 1;
+  const showingEnd = customerTotal === 0 ? 0 : Math.min(customerTotal, ((page - 1) * pageSize) + customers.length);
 
   const onSelect = (c: Customer) => {
     setSelected(c.id);
@@ -236,7 +289,7 @@ export default function CustomersPage() {
     <div className="min-h-screen pb-[calc(var(--bottom-nav-h)+32px)] animate-[fadeIn_0.22s_cubic-bezier(0.16,1,0.3,1)_forwards]">
       <Header
         title="Customers"
-        subtitle={`${customers.length} TOTAL · ₹${(customers.reduce((s, c) => s + (c.spend ?? 0), 0) / 100000).toFixed(1)}L LIFETIME`}
+        subtitle={`${customerTotal} TOTAL · ₹${(pageSpend / 100000).toFixed(1)}L THIS PAGE`}
         actions={
           <button
             className="icon-btn"
@@ -253,13 +306,19 @@ export default function CustomersPage() {
         <div className="flex items-center gap-2.5 bg-white border border-line rounded-[12px] px-3.5 h-12 transition-colors duration-150 focus-within:border-teal mb-[18px]">
           <I.search className="text-ink-3" />
           <input
-            placeholder="Search by name, phone, service or stylist…"
+            placeholder="Search by name or phone…"
             value={q}
-            onChange={e => setQ(e.target.value)}
+            onChange={e => {
+              setQ(e.target.value);
+              resetPage();
+            }}
             className="flex-1 h-full border-0 outline-0 text-[14px] text-ink placeholder:text-ink-4 font-sans"
           />
           {q && (
-            <button className="border-0 bg-transparent cursor-pointer grid place-items-center" onClick={() => setQ("")}>
+            <button className="border-0 bg-transparent cursor-pointer grid place-items-center" onClick={() => {
+              setQ("");
+              resetPage();
+            }}>
               <I.x />
             </button>
           )}
@@ -276,7 +335,10 @@ export default function CustomersPage() {
                   ? "bg-ink border-ink text-white hover:border-ink" 
                   : "border-line bg-white text-ink-2 hover:border-line-2"
               }`}
-              onClick={() => setTab(f.id)}
+              onClick={() => {
+                setTab(f.id);
+                resetPage();
+              }}
             >
               {f.id !== "all" && (
                 <span
@@ -342,9 +404,11 @@ export default function CustomersPage() {
         {/* Result Head / Winback Broadcast */}
         <div className="flex items-center justify-between pb-2.5 px-1 gap-3 max-[720px]:flex-col max-[720px]:items-start max-[720px]:gap-2 mb-2 text-[13px] text-ink font-medium">
           <div>
-            {filtered.length} {filtered.length === 1 ? "customer" : "customers"}
+            {filtered.length} {filtered.length === 1 ? "customer" : "customers"} on this page
+            {customerTotal > 0 && <span className="text-ink-3 font-normal"> · {customerTotal} total</span>}
             {q && <span className="text-ink-3 font-normal"> matching &quot;{q}&quot;</span>}
             {tab !== "all" && <span className="text-ink-3 font-normal"> · {FILTER_TABS.find(f => f.id === tab)?.label?.toLowerCase()}</span>}
+            {computedSortAppliesToPage && <span className="text-ink-3 font-normal"> · sorting applies to loaded data</span>}
           </div>
           {tab === "cooling" && filtered.length > 0 && (
             <button
@@ -379,7 +443,7 @@ export default function CustomersPage() {
             <div>
               <strong className="block text-[15px] font-semibold">No customers match search</strong>
               <span className="text-[13px] text-ink-3 mt-1">
-                {q ? "Try searching by phone or service." : "Select another engagement filter."}
+                {q ? "Try another name or phone." : "Select another engagement filter."}
               </span>
             </div>
           </div>
@@ -462,6 +526,35 @@ export default function CustomersPage() {
             })}
           </div>
         )}
+
+        {!loadingCustomers && customerTotal > 0 && (
+          <div className="flex items-center justify-between gap-3 mt-4 text-[13px] text-ink-2 max-[720px]:flex-col max-[720px]:items-stretch">
+            <span className="text-ink-3">
+              Showing {showingStart}-{showingEnd} of {customerTotal} customers
+            </span>
+            <div className="inline-flex items-center gap-2 max-[720px]:justify-between">
+              <button
+                type="button"
+                disabled={!hasPrevPage}
+                onClick={prevPage}
+                className="h-9 px-3 rounded-[8px] border border-line bg-white text-ink disabled:opacity-45 disabled:cursor-not-allowed hover:border-line-2 transition-colors duration-150"
+              >
+                ← Prev
+              </button>
+              <span className="font-mono text-[12px] text-ink-3 px-1.5">
+                Page {page} of {pageCount}
+              </span>
+              <button
+                type="button"
+                disabled={!hasNextPage}
+                onClick={nextPage}
+                className="h-9 px-3 rounded-[8px] border border-line bg-white text-ink disabled:opacity-45 disabled:cursor-not-allowed hover:border-line-2 transition-colors duration-150"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Create Customer Modal */}
@@ -486,6 +579,22 @@ export default function CustomersPage() {
                     const phoneFormatted = newCustPhone && newCustPhone.trim()
                       ? `+91${newCustPhone.replace(/\D/g, "")}`
                       : null;
+
+                    if (phoneFormatted) {
+                      const { data: existingCustomer, error: existingError } = await supabase
+                        .from("customers")
+                        .select("id, name")
+                        .eq("salon_id", salonId)
+                        .eq("phone", phoneFormatted)
+                        .maybeSingle();
+
+                      if (existingError) throw existingError;
+                      if (existingCustomer) {
+                        showFlash(`Phone number is already linked to ${existingCustomer.name}.`, 3000);
+                        setSaving(false);
+                        return;
+                      }
+                    }
 
                     const { data: newCust, error } = await supabase
                       .from("customers")
@@ -512,7 +621,10 @@ export default function CustomersPage() {
                         fav: "—",
                         stylist: "—",
                       };
-                      setCustomers(prev => [newEntry, ...prev]);
+                      setCustomers(prev => [newEntry, ...prev].slice(0, pageSize));
+                      setCustomerTotal(customerTotal + 1);
+                      resetPage();
+                      setRefreshKey(current => current + 1);
                       showFlash("Customer added!", 1800);
                     }
                   } catch (err) {
@@ -533,7 +645,9 @@ export default function CustomersPage() {
                     fav: "—",
                     stylist: "—",
                   };
-                  setCustomers(prev => [newEntry, ...prev]);
+                  setCustomers(prev => [newEntry, ...prev].slice(0, pageSize));
+                  setCustomerTotal(customerTotal + 1);
+                  resetPage();
                 }
                 setNewCustName("");
                 setNewCustPhone("");

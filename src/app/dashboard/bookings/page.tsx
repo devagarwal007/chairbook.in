@@ -641,7 +641,8 @@ export default function BookingsPage() {
         .neq("status", "Cancelled")
         .gte("date", fromDate)
         .lte("date", toDate)
-        .order("start_time", { ascending: true });
+        .order("start_time", { ascending: true })
+        .limit(500);
 
       if (error) throw error;
 

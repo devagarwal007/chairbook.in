@@ -37,9 +37,9 @@ export function useSalonData(salonId: string | null) {
       queueMicrotask(() => setLoading(true));
       try {
         const [stRes, svRes, custRes] = await Promise.all([
-          supabase.from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true),
-          supabase.from("services").select(SERVICE_SELECT_WITH_BUNDLES).eq("salon_id", salonId).eq("active", true).is("deleted_at", null),
-          supabase.from("customers").select("id, name, phone, created_at").eq("salon_id", salonId).order("created_at", { ascending: false }),
+          supabase.from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true).order("name"),
+          supabase.from("services").select(SERVICE_SELECT_WITH_BUNDLES).eq("salon_id", salonId).eq("active", true).is("deleted_at", null).order("name"),
+          supabase.from("customers").select("id, name, phone, created_at").eq("salon_id", salonId).order("created_at", { ascending: false }).limit(500),
         ]);
 
         if (stRes.data) {

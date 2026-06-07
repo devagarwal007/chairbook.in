@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { Icons as I } from "@/components/ui/Icons";
 import { useToast } from "@/context/ToastContext";
-import { isUUID, initialsOf } from "@/lib/utils";
+import { formatDateKey, isUUID, initialsOf } from "@/lib/utils";
 import BottomNav from "@/components/layout/BottomNav";
-import { Modal } from "@/components/ui";
 
 import { Customer, DbBooking, DbCustomer } from "@/types";
 
@@ -52,77 +52,53 @@ interface CustomerProfile extends Customer {
   visitHistory: Visit[];
 }
 
+const VISIT_PAGE_SIZE = 20;
+const COMPLETED_VISIT_STATUSES = ["Completed", "Paid"];
+const VISIT_SELECT = `id, date, start_time, status, notes, payment_status, amount_paid, amount_due, bill_total,
+  booking_services(price_at_booking, qty, service:services(name)),
+  stylist:stylists(name),
+  payments(method, amount)`;
+
+function getBookingPaidAmount(b: DbBooking) {
+  const serviceTotal = (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0);
+  const payments = Array.isArray(b.payments) ? b.payments : b.payments ? [b.payments] : [];
+  const ledgerPaid = payments.reduce((paid: number, p) => paid + Number(p.amount || 0), 0);
+
+  return Number(b.amount_paid || ledgerPaid || (b.status === "Paid" ? b.bill_total || serviceTotal : 0));
+}
+
+function mapBookingToVisit(b: DbBooking): Visit {
+  const payments = Array.isArray(b.payments) ? b.payments : b.payments ? [b.payments] : [];
+  const amountPaid = getBookingPaidAmount(b);
+  const amountDue = Number(b.amount_due || 0);
+  let method = "—";
+  if (payments.length > 0) {
+    method = payments[0]?.method || "—";
+  } else if (amountDue > 0) {
+    method = "Due";
+  }
+
+  return {
+    id: b.id,
+    date: new Date(b.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+    services: (b.booking_services || []).map((bs) => ({
+      name: bs.service?.name || "Service",
+      amt: Number(bs.price_at_booking) * (bs.qty || 1)
+    })),
+    stylist: b.stylist?.name || "—",
+    amount: amountPaid,
+    payment: amountDue > 0 && amountPaid > 0 ? `${method} · ₹${amountDue.toLocaleString("en-IN")} due` : method
+  };
+}
 
 
-import { MOCK_PROFILE as MOCK_PROFILE_RAW, TEMPLATES } from "@/constants/customers";
+
+import { MOCK_PROFILE as MOCK_PROFILE_RAW } from "@/constants/customers";
 const MOCK_PROFILE = MOCK_PROFILE_RAW as CustomerProfile;
 
-// ===== RE-ENGAGEMENT MODAL =====
-interface MessageModalProps {
-  customer: CustomerProfile;
-  onClose: () => void;
-  onSend: (body: string) => void;
-}
-
-function MessageModal({ customer, onClose, onSend }: MessageModalProps) {
-  const [tpl, setTpl] = useState("thanks");
-  const [body, setBody] = useState(TEMPLATES[0].body);
-
-  const select = (id: string) => {
-    setTpl(id);
-    const t = TEMPLATES.find(x => x.id === id);
-    if (t) setBody(t.body);
-  };
-
-  return (
-    <Modal
-      title={`WhatsApp ${customer.name}`}
-      onClose={onClose}
-      width="min(500px, 92%)"
-      footer={
-        <>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button
-            className="bg-wa text-[#052B11] border-0 rounded-[10px] px-4 h-10 font-medium inline-flex items-center gap-2 cursor-pointer hover:bg-[#1FBA5A]"
-            onClick={() => { onSend(body); onClose(); }}
-            disabled={!body.trim()}
-          >
-            <I.wa /> Send on WhatsApp
-          </button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[12px] font-medium text-ink-3">Pick a template</label>
-          <div className="flex flex-col gap-1.5">
-            {TEMPLATES.map(t => (
-              <button
-                key={t.id}
-                className={`text-left p-[10px_14px] rounded-[10px] border font-inherit text-[13px] text-ink-2 cursor-pointer font-medium transition-[border-color,background,color] duration-150 ${
-                  tpl === t.id ? "border-teal bg-teal-soft text-teal-ink" : "border-line bg-white hover:border-line-2"
-                }`}
-                onClick={() => select(t.id)}
-              >
-                {t.title}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[12px] font-medium text-ink-3">Message preview</label>
-          <textarea
-            value={body}
-            onChange={e => setBody(e.target.value)}
-            placeholder="Type your message…"
-            className="w-full h-[110px] rounded-[8px] border border-line-2 p-[12px_14px] text-[14px] font-sans resize-y outline-0 focus:border-teal"
-          />
-          <div className="text-[11px] text-ink-3 mt-1">{body.length} characters</div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
+const MessageModal = dynamic(() => import("@/components/features/customers/MessageModal"), {
+  loading: () => null,
+});
 
 // ===== MAIN PAGE =====
 export default function CustomerProfilePage() {
@@ -138,6 +114,7 @@ export default function CustomerProfilePage() {
   const [showMsg, setShowMsg] = useState(false);
   const { show: showFlash } = useToast();
   const [ownerName, setOwnerName] = useState("Owner");
+  const [loadingMoreVisits, setLoadingMoreVisits] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -178,61 +155,95 @@ export default function CustomerProfilePage() {
           return;
         }
 
-        const { data: bookingsRaw } = await supabase
-          .from("bookings")
-          .select(`id, date, start_time, status, notes, payment_status, amount_paid, amount_due, bill_total,
-            booking_services(price_at_booking, qty, service:services(name)),
-            stylist:stylists(name),
-            payments(method, amount)`)
-          .eq("customer_id", customerId)
-          .order("date", { ascending: false });
-
-        const bookings = (bookingsRaw || []) as unknown as DbBooking[];
-
         const today = new Date(); today.setHours(0,0,0,0);
-        const completedBks = bookings.filter((b) =>
-          ["Completed", "Paid"].includes(b.status)
-        );
-        const visits = completedBks.length;
-        const spend = completedBks.reduce((sum: number, b) => {
-          const t = (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0);
-          const payments = Array.isArray(b.payments) ? b.payments : b.payments ? [b.payments] : [];
-          const ledgerPaid = payments.reduce((paid: number, p) => paid + Number(p.amount || 0), 0);
-          return sum + Number(b.amount_paid || ledgerPaid || (b.status === "Paid" ? b.bill_total || t : 0));
-        }, 0);
+        const todayKey = formatDateKey(today);
 
-        const dates = completedBks.map((b) => new Date(b.date).getTime()).filter(Boolean);
-        const lastMs = dates.length > 0 ? Math.max(...dates) : null;
+        const [
+          visitsPageRes,
+          visitsCountRes,
+          spendRowsRes,
+          latestCompletedRes,
+          latestBookingRes,
+          upcomingRes,
+        ] = await Promise.all([
+          supabase
+            .from("bookings")
+            .select(VISIT_SELECT, { count: "exact" })
+            .eq("customer_id", customerId)
+            .in("status", COMPLETED_VISIT_STATUSES)
+            .order("date", { ascending: false })
+            .range(0, VISIT_PAGE_SIZE - 1),
+          supabase
+            .from("bookings")
+            .select("id", { count: "exact", head: true })
+            .eq("customer_id", customerId)
+            .in("status", COMPLETED_VISIT_STATUSES),
+          supabase
+            .from("bookings")
+            .select(VISIT_SELECT)
+            .eq("customer_id", customerId)
+            .in("status", COMPLETED_VISIT_STATUSES),
+          supabase
+            .from("bookings")
+            .select("date")
+            .eq("customer_id", customerId)
+            .in("status", COMPLETED_VISIT_STATUSES)
+            .order("date", { ascending: false })
+            .limit(1),
+          supabase
+            .from("bookings")
+            .select("stylist:stylists(name)")
+            .eq("customer_id", customerId)
+            .order("date", { ascending: false })
+            .limit(1),
+          supabase
+            .from("bookings")
+            .select(`date, start_time, status, booking_services(price_at_booking, qty, service:services(name)), stylist:stylists(name)`)
+            .eq("customer_id", customerId)
+            .neq("status", "Cancelled")
+            .gte("date", todayKey)
+            .order("date", { ascending: true })
+            .limit(1),
+        ]);
+
+        if (visitsPageRes.error) throw visitsPageRes.error;
+        if (visitsCountRes.error) throw visitsCountRes.error;
+        if (spendRowsRes.error) throw spendRowsRes.error;
+        if (latestCompletedRes.error) throw latestCompletedRes.error;
+        if (latestBookingRes.error) throw latestBookingRes.error;
+        if (upcomingRes.error) throw upcomingRes.error;
+
+        const visits = visitsCountRes.count || 0;
+        const spendRows = (spendRowsRes.data || []) as unknown as DbBooking[];
+        const spend = spendRows.reduce((sum: number, b) => sum + getBookingPaidAmount(b), 0);
+
+        const latestCompleted = ((latestCompletedRes.data || []) as Array<{ date: string }>)[0];
+        const lastMs = latestCompleted?.date ? new Date(latestCompleted.date).getTime() : null;
         const lastDays = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
-
-        const hasUpcoming = bookings.some(b => {
-          const bkDate = new Date(b.date);
-          const bkDateZero = new Date(bkDate);
-          bkDateZero.setHours(0, 0, 0, 0);
-          return bkDateZero >= today && ["Pending", "Confirmed", "Arrived", "In Service"].includes(b.status);
-        });
+        const upcomingRows = (upcomingRes.data || []) as unknown as DbBooking[];
+        const hasUpcoming = upcomingRows.length > 0;
 
         const engagement: "active" | "cooling" | "lost" =
           hasUpcoming ? "active" :
           lastDays <= 30 ? "active" : lastDays <= 60 ? "cooling" : "lost";
 
         const svcCount: Record<string, number> = {};
-        bookings.forEach((b) =>
+        spendRows.forEach((b) =>
           (b.booking_services || []).forEach((bs) => {
             const sn = bs.service?.name; if (sn) svcCount[sn] = (svcCount[sn] || 0) + 1;
           })
         );
         const fav = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
-        const prefStylist = bookings[0]?.stylist?.name || cust.stylists?.name || "—";
+        const latestBooking = ((latestBookingRes.data || []) as unknown as DbBooking[])[0];
+        const prefStylist = latestBooking?.stylist?.name || cust.stylists?.name || "—";
 
         const msDt = cust.member_since ? new Date(cust.member_since) : new Date(cust.created_at || Date.now());
         const memberSince = msDt.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
-        const futureBks = bookings.filter((b) => new Date(b.date) >= today && b.status !== "Cancelled");
         let upcoming: CustomerProfile["upcoming"] = undefined;
-        if (futureBks.length > 0) {
-          const fb = futureBks[futureBks.length - 1];
+        if (upcomingRows.length > 0) {
+          const fb = upcomingRows[0];
           const fbDate = new Date(fb.date).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
           const [hh, mm] = (fb.start_time || "09:00").split(":");
           const h = parseInt(hh); const ampm = h >= 12 ? "PM" : "AM";
@@ -242,30 +253,7 @@ export default function CustomerProfilePage() {
           upcoming = { date: fbDate, time: fbTime, service: fbSvc, stylist: fbStylist };
         }
 
-        const visitHistory: Visit[] = completedBks.map((b) => {
-          const serviceTotal = (b.booking_services || []).reduce((s: number, bs) => s + Number(bs.price_at_booking) * (bs.qty || 1), 0);
-          const payments = Array.isArray(b.payments) ? b.payments : b.payments ? [b.payments] : [];
-          const ledgerPaid = payments.reduce((paid: number, p) => paid + Number(p.amount || 0), 0);
-          const amountPaid = Number(b.amount_paid || ledgerPaid || (b.status === "Paid" ? b.bill_total || serviceTotal : 0));
-          const amountDue = Number(b.amount_due || 0);
-          let method = "—";
-          if (payments.length > 0) {
-            method = payments[0]?.method || "—";
-          } else if (amountDue > 0) {
-            method = "Due";
-          }
-          return {
-            id: b.id,
-            date: new Date(b.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-            services: (b.booking_services || []).map((bs) => ({
-              name: bs.service?.name || "Service",
-              amt: Number(bs.price_at_booking) * (bs.qty || 1)
-            })),
-            stylist: b.stylist?.name || "—",
-            amount: amountPaid,
-            payment: amountDue > 0 && amountPaid > 0 ? `${method} · ₹${amountDue.toLocaleString("en-IN")} due` : method
-          };
-        });
+        const visitHistory = ((visitsPageRes.data || []) as unknown as DbBooking[]).map(mapBookingToVisit);
 
         const tones = ["a","b","c","d","e","f"];
         const nameHash = cust.name.split("").reduce((h: number, ch: string) => h + ch.charCodeAt(0), 0);
@@ -342,6 +330,36 @@ export default function CustomerProfilePage() {
     setTimeout(() => {
       window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(body)}`, "_blank");
     }, 800);
+  };
+
+  const loadMoreVisits = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !isUUID(customerId) || !profile || loadingMoreVisits) return;
+
+    setLoadingMoreVisits(true);
+    try {
+      const from = profile.visitHistory.length;
+      const { data, error } = await supabase
+        .from("bookings")
+        .select(VISIT_SELECT)
+        .eq("customer_id", customerId)
+        .in("status", COMPLETED_VISIT_STATUSES)
+        .order("date", { ascending: false })
+        .range(from, from + VISIT_PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      const nextVisits = ((data || []) as unknown as DbBooking[]).map(mapBookingToVisit);
+      setProfile((current) => current
+        ? { ...current, visitHistory: [...current.visitHistory, ...nextVisits] }
+        : current
+      );
+    } catch (err) {
+      console.error("Error loading more customer visits:", err);
+      showFlash("Could not load more visits.", 2500);
+    } finally {
+      setLoadingMoreVisits(false);
+    }
   };
 
   const engPillBg = engColor === "green" ? "bg-[#DFF1E6] text-[#137A4A]" : engColor === "amber" ? "bg-amber-soft text-amber-ink" : "bg-rose-soft text-rose";
@@ -432,7 +450,7 @@ export default function CustomerProfilePage() {
             <div className="text-[30px] font-semibold tracking-[-0.025em] text-ink flex items-baseline max-[640px]:col-start-2 max-[640px]:row-start-1 max-[640px]:row-span-2 max-[640px]:text-[22px]">
               <small className="text-[16px] font-normal text-ink-3">₹</small>{c.spend.toLocaleString("en-IN")}
             </div>
-            <div className="text-[12px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Avg ₹{Math.round(c.spend/c.visits).toLocaleString("en-IN")} per visit</div>
+            <div className="text-[12px] text-ink-3 mt-1 max-[640px]:col-start-1 max-[640px]:mt-0">Avg ₹{Math.round(c.visits > 0 ? c.spend/c.visits : 0).toLocaleString("en-IN")} per visit</div>
           </div>
           <div className="bg-surface border border-line rounded-[var(--radius)] p-[18px_20px] max-[640px]:p-[14px_16px] max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:items-center max-[640px]:gap-y-1">
             <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-3 mb-1.5 max-[640px]:col-start-1 max-[640px]:mb-0">Favourite service</div>
@@ -498,7 +516,7 @@ export default function CustomerProfilePage() {
           <div className="flex items-center justify-between mb-[14px]">
             <div className="flex items-baseline gap-3">
               <h2 className="text-[18px] font-semibold tracking-[-0.01em] m-0">Visit history</h2>
-              <span className="font-mono text-[13px] text-ink-3">{c.visitHistory.length} visits</span>
+              <span className="font-mono text-[13px] text-ink-3">{c.visitHistory.length} of {c.visits} visits</span>
             </div>
             <div className="flex items-center gap-2">
               <button className="btn btn-ghost btn-sm" onClick={() => showFlash("Exporting customer history...")}>Export CSV</button>
@@ -530,6 +548,18 @@ export default function CustomerProfilePage() {
               </div>
             ))}
           </div>
+          {isUUID(customerId) && c.visitHistory.length < c.visits && (
+            <div className="flex justify-center pt-4 border-t border-line mt-1">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={loadMoreVisits}
+                disabled={loadingMoreVisits}
+              >
+                {loadingMoreVisits ? "Loading..." : `Show more visits (${c.visitHistory.length} of ${c.visits})`}
+              </button>
+            </div>
+          )}
         </section>
       </main>}
 

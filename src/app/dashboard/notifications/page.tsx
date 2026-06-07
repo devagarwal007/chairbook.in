@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getNotificationTypeFilter } from "@/lib/notification-filters";
 import { mapDbNotificationToItem } from "@/lib/notification-routing";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
@@ -14,79 +15,107 @@ import type { NotificationItem, DbNotification } from "@/types";
 
 import { KINDS, INITIAL_NOTIFS, FILTERS } from "@/constants/notifications";
 
+const NOTIFICATION_PAGE_SIZE = 50;
+
 export default function NotificationsPage() {
   const router = useRouter();
   const { salonId } = useProfile();
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
+  const [totalNotifs, setTotalNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState('all');
   const { show: flashMsg } = useToast();
+
+  const loadFallbackNotifs = useCallback(() => {
+    const stored = localStorage.getItem("cb_notifications");
+    let fallbackNotifs = INITIAL_NOTIFS;
+
+    if (stored) {
+      try {
+        fallbackNotifs = JSON.parse(stored);
+      } catch {
+        fallbackNotifs = INITIAL_NOTIFS;
+      }
+    } else {
+      localStorage.setItem("cb_notifications", JSON.stringify(INITIAL_NOTIFS));
+    }
+
+    setNotifs(fallbackNotifs);
+    setTotalNotifs(fallbackNotifs.length);
+    setLoading(false);
+  }, []);
+
+  const fetchNotificationPage = useCallback(async (offset: number) => {
+    if (!salonId) throw new Error("Missing salon id.");
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) throw new Error("Supabase is not configured.");
+
+    let query = supabase
+      .from("notifications")
+      .select("*", { count: "exact" })
+      .eq("salon_id", salonId);
+
+    if (filter === "unread") {
+      query = query.eq("read", false);
+    }
+
+    const typeFilter = getNotificationTypeFilter(filter);
+    if (typeFilter) {
+      query = query.in("type", typeFilter);
+    }
+
+    const { data, count, error } = await query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + NOTIFICATION_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    return {
+      items: (data || []).map((n, i: number) => mapDbNotificationToItem(n as unknown as DbNotification, offset + i)),
+      total: count || 0,
+    };
+  }, [filter, salonId]);
 
   // Load notifications from DB or localStorage fallback
   useEffect(() => {
     if (!salonId) {
       queueMicrotask(() => {
-        const stored = localStorage.getItem("cb_notifications");
-        if (stored) {
-          try {
-            setNotifs(JSON.parse(stored));
-          } catch {
-            setNotifs(INITIAL_NOTIFS);
-          }
-        } else {
-          setNotifs(INITIAL_NOTIFS);
-          localStorage.setItem("cb_notifications", JSON.stringify(INITIAL_NOTIFS));
-        }
-        setLoading(false);
+        loadFallbackNotifs();
       });
       return;
     }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       queueMicrotask(() => {
-        const stored = localStorage.getItem("cb_notifications");
-        if (stored) {
-          try {
-            setNotifs(JSON.parse(stored));
-          } catch {
-            setNotifs(INITIAL_NOTIFS);
-          }
-        } else {
-          setNotifs(INITIAL_NOTIFS);
-          localStorage.setItem("cb_notifications", JSON.stringify(INITIAL_NOTIFS));
-        }
-        setLoading(false);
+        loadFallbackNotifs();
       });
       return;
     }
 
+    let cancelled = false;
+
     const loadNotifs = async () => {
       setLoading(true);
       try {
-        const { data } = await supabase
-          .from("notifications")
-          .select("*")
-          .eq("salon_id", salonId)
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (data && data.length > 0) {
-
-          const mappedNotifs: NotificationItem[] = (data as unknown as DbNotification[]).map((n, i: number) => mapDbNotificationToItem(n, i));
-          setNotifs(mappedNotifs);
-        } else {
-          setNotifs(INITIAL_NOTIFS);
-        }
+        const { items, total } = await fetchNotificationPage(0);
+        if (cancelled) return;
+        setNotifs(items);
+        setTotalNotifs(total);
       } catch (err) {
         console.error("Error loading notifications:", err);
-        setNotifs(INITIAL_NOTIFS);
+        if (!cancelled) loadFallbackNotifs();
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    loadNotifs();
-  }, [salonId]);
+    void loadNotifs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchNotificationPage, loadFallbackNotifs, salonId]);
 
 
 
@@ -107,15 +136,38 @@ export default function NotificationsPage() {
       payments: notifs.filter(n => n.kind === 'payment').length,
       wa:       notifs.filter(n => ['wa_reply','review'].includes(n.kind)).length,
     };
+    out[filter] = totalNotifs;
     return out;
-  }, [notifs]);
+  }, [filter, notifs, totalNotifs]);
+
+  const hasMoreNotifs = Boolean(salonId) && notifs.length < totalNotifs;
+
+  const loadMoreNotifs = async () => {
+    if (!salonId || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { items, total } = await fetchNotificationPage(notifs.length);
+      setNotifs(prev => [...prev, ...items]);
+      setTotalNotifs(total);
+    } catch (err) {
+      console.error("Error loading more notifications:", err);
+      flashMsg("Could not load more notifications.", 2500);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const markRead = async (id: number) => {
     setNotifs(prev => {
-      const next = prev.map(n => n.id === id ? { ...n, unread: false } : n);
+      const next = filter === "unread"
+        ? prev.filter(n => n.id !== id)
+        : prev.map(n => n.id === id ? { ...n, unread: false } : n);
       localStorage.setItem("cb_notifications", JSON.stringify(next));
       return next;
     });
+    if (filter === "unread") {
+      setTotalNotifs(prev => Math.max(0, prev - 1));
+    }
     if (salonId) {
       const supabase = getSupabaseBrowserClient();
       if (supabase) {
@@ -150,10 +202,11 @@ export default function NotificationsPage() {
 
   const markAllRead = async () => {
     setNotifs(prev => {
-      const next = prev.map(n => ({ ...n, unread: false }));
+      const next = filter === "unread" ? [] : prev.map(n => ({ ...n, unread: false }));
       localStorage.setItem("cb_notifications", JSON.stringify(next));
       return next;
     });
+    if (filter === "unread") setTotalNotifs(0);
     flashMsg('All marked as read');
     if (salonId) {
       const supabase = getSupabaseBrowserClient();
@@ -371,6 +424,24 @@ export default function NotificationsPage() {
               </div>
             </div>
           ))
+        )}
+
+        {salonId && totalNotifs > 0 && (
+          <div className="flex items-center justify-between gap-3 mt-4 text-[13px] text-ink-2 max-[540px]:flex-col max-[540px]:items-stretch">
+            <span className="text-ink-3">
+              Showing {notifs.length} of {totalNotifs} notifications
+            </span>
+            {hasMoreNotifs && (
+              <button
+                type="button"
+                onClick={loadMoreNotifs}
+                disabled={loadingMore}
+                className="h-9 px-3 rounded-[8px] border border-line bg-white text-ink disabled:opacity-45 disabled:cursor-not-allowed hover:border-line-2 transition-colors duration-150"
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            )}
+          </div>
         )}
       </main>
 

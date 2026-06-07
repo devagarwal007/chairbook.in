@@ -61,7 +61,8 @@ export function useBookings(salonId: string | null, day: string) {
         `)
         .eq("salon_id", salonId)
         .eq("date", dateStr)
-        .order("start_time", { ascending: true });
+        .order("start_time", { ascending: true })
+        .limit(200);
 
       if (cancelledRef.cancelled) return;
       if (fetchError) throw fetchError;
@@ -76,7 +77,8 @@ export function useBookings(salonId: string | null, day: string) {
             .from("bookings")
             .select("customer_id, status")
             .in("customer_id", customerIds)
-            .in("status", ["Completed", "Paid"]);
+            .in("status", ["Completed", "Paid"])
+            .limit(200);
             
           if (visitsData && !cancelledRef.cancelled) {
             visitsData.forEach((v) => {

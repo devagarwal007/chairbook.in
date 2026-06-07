@@ -39,7 +39,8 @@ export function useCorrectionRequests(salonId: string | null) {
         .from("correction_requests")
         .select("*")
         .eq("salon_id", salonId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(100);
 
       if (error) throw error;
       setRequests((data || []) as CorrectionRequest[]);

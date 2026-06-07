@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { MOCK_ATTENDANCE_SETTINGS, DEFAULT_ATTENDANCE_SETTINGS } from "@/constants/attendanceConfig";
 import type { AttendanceSettings } from "@/types";
 import { useToast } from "@/context/ToastContext";
+import { ATTENDANCE_SETTINGS_SELECT } from "@/lib/supabase-selects";
 
 export function useAttendanceSettings(salonId: string | null) {
   const [settings, setSettings] = useState<AttendanceSettings | null>(null);
@@ -12,17 +13,23 @@ export function useAttendanceSettings(salonId: string | null) {
   const [saving, setSaving] = useState(false);
   const { show: showToast } = useToast();
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = useCallback(async (signal?: AbortSignal) => {
+    const requestSignal = signal ?? new AbortController().signal;
+
     if (!salonId) {
-      setSettings(MOCK_ATTENDANCE_SETTINGS);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setSettings(MOCK_ATTENDANCE_SETTINGS);
+        setLoading(false);
+      }
       return;
     }
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setSettings(MOCK_ATTENDANCE_SETTINGS);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setSettings(MOCK_ATTENDANCE_SETTINGS);
+        setLoading(false);
+      }
       return;
     }
 
@@ -30,10 +37,12 @@ export function useAttendanceSettings(salonId: string | null) {
     try {
       const { data, error } = await supabase
         .from("attendance_settings")
-        .select("*")
+        .select(ATTENDANCE_SETTINGS_SELECT)
         .eq("salon_id", salonId)
+        .abortSignal(requestSignal)
         .maybeSingle();
 
+      if (requestSignal.aborted) return;
       if (error) throw error;
 
       if (data) {
@@ -48,18 +57,20 @@ export function useAttendanceSettings(salonId: string | null) {
         const { data: inserted, error: insertError } = await supabase
           .from("attendance_settings")
           .insert(newSettings)
-          .select()
+          .select(ATTENDANCE_SETTINGS_SELECT)
           .single();
 
+        if (requestSignal.aborted) return;
         if (insertError) throw insertError;
         setSettings(inserted as AttendanceSettings);
       }
     } catch (err) {
+      if (requestSignal.aborted) return;
       console.error("Error loading attendance settings:", err);
       // Fallback
       setSettings(MOCK_ATTENDANCE_SETTINGS);
     } finally {
-      setLoading(false);
+      if (!requestSignal.aborted) setLoading(false);
     }
   }, [salonId]);
 
@@ -99,9 +110,11 @@ export function useAttendanceSettings(salonId: string | null) {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     queueMicrotask(() => {
-      void loadSettings();
+      void loadSettings(controller.signal);
     });
+    return () => controller.abort();
   }, [loadSettings]);
 
   return { settings, loading, saving, updateSettings, reload: loadSettings };

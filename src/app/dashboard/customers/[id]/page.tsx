@@ -129,6 +129,8 @@ export default function CustomerProfilePage() {
       return;
     }
 
+    const controller = new AbortController();
+
     const loadProfile = async () => {
       try {
         queueMicrotask(() => setLoading(true));
@@ -142,7 +144,10 @@ export default function CustomerProfilePage() {
           .from("customers")
           .select("id, name, phone, member_since, birthday, created_at, pref_stylist_id, stylists:pref_stylist_id(name)")
           .eq("id", customerId)
+          .abortSignal(controller.signal)
           .maybeSingle();
+
+        if (controller.signal.aborted) return;
 
         const cust = custRaw as unknown as DbCustomer | null;
 
@@ -160,10 +165,7 @@ export default function CustomerProfilePage() {
 
         const [
           visitsPageRes,
-          visitsCountRes,
           spendRowsRes,
-          latestCompletedRes,
-          latestBookingRes,
           upcomingRes,
         ] = await Promise.all([
           supabase
@@ -172,30 +174,14 @@ export default function CustomerProfilePage() {
             .eq("customer_id", customerId)
             .in("status", COMPLETED_VISIT_STATUSES)
             .order("date", { ascending: false })
-            .range(0, VISIT_PAGE_SIZE - 1),
+            .range(0, VISIT_PAGE_SIZE - 1)
+            .abortSignal(controller.signal),
           supabase
             .from("bookings")
-            .select("id", { count: "exact", head: true })
-            .eq("customer_id", customerId)
-            .in("status", COMPLETED_VISIT_STATUSES),
-          supabase
-            .from("bookings")
-            .select(VISIT_SELECT)
-            .eq("customer_id", customerId)
-            .in("status", COMPLETED_VISIT_STATUSES),
-          supabase
-            .from("bookings")
-            .select("date")
+            .select("amount_paid, bill_total, status, booking_services(price_at_booking, qty, service:services(name))")
             .eq("customer_id", customerId)
             .in("status", COMPLETED_VISIT_STATUSES)
-            .order("date", { ascending: false })
-            .limit(1),
-          supabase
-            .from("bookings")
-            .select("stylist:stylists(name)")
-            .eq("customer_id", customerId)
-            .order("date", { ascending: false })
-            .limit(1),
+            .abortSignal(controller.signal),
           supabase
             .from("bookings")
             .select(`date, start_time, status, booking_services(price_at_booking, qty, service:services(name)), stylist:stylists(name)`)
@@ -203,22 +189,21 @@ export default function CustomerProfilePage() {
             .neq("status", "Cancelled")
             .gte("date", todayKey)
             .order("date", { ascending: true })
-            .limit(1),
+            .limit(1)
+            .abortSignal(controller.signal),
         ]);
 
+        if (controller.signal.aborted) return;
         if (visitsPageRes.error) throw visitsPageRes.error;
-        if (visitsCountRes.error) throw visitsCountRes.error;
         if (spendRowsRes.error) throw spendRowsRes.error;
-        if (latestCompletedRes.error) throw latestCompletedRes.error;
-        if (latestBookingRes.error) throw latestBookingRes.error;
         if (upcomingRes.error) throw upcomingRes.error;
 
-        const visits = visitsCountRes.count || 0;
+        const completedPageRows = (visitsPageRes.data || []) as unknown as DbBooking[];
+        const visits = visitsPageRes.count || 0;
         const spendRows = (spendRowsRes.data || []) as unknown as DbBooking[];
         const spend = spendRows.reduce((sum: number, b) => sum + getBookingPaidAmount(b), 0);
 
-        const latestCompleted = ((latestCompletedRes.data || []) as Array<{ date: string }>)[0];
-        const lastMs = latestCompleted?.date ? new Date(latestCompleted.date).getTime() : null;
+        const lastMs = completedPageRows[0]?.date ? new Date(completedPageRows[0].date).getTime() : null;
         const lastDays = lastMs ? Math.round((today.getTime() - lastMs) / 86400000) : 999;
         const upcomingRows = (upcomingRes.data || []) as unknown as DbBooking[];
         const hasUpcoming = upcomingRows.length > 0;
@@ -235,8 +220,7 @@ export default function CustomerProfilePage() {
         );
         const fav = Object.entries(svcCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
-        const latestBooking = ((latestBookingRes.data || []) as unknown as DbBooking[])[0];
-        const prefStylist = latestBooking?.stylist?.name || cust.stylists?.name || "—";
+        const prefStylist = completedPageRows[0]?.stylist?.name || cust.stylists?.name || "—";
 
         const msDt = cust.member_since ? new Date(cust.member_since) : new Date(cust.created_at || Date.now());
         const memberSince = msDt.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
@@ -253,7 +237,7 @@ export default function CustomerProfilePage() {
           upcoming = { date: fbDate, time: fbTime, service: fbSvc, stylist: fbStylist };
         }
 
-        const visitHistory = ((visitsPageRes.data || []) as unknown as DbBooking[]).map(mapBookingToVisit);
+        const visitHistory = completedPageRows.map(mapBookingToVisit);
 
         const tones = ["a","b","c","d","e","f"];
         const nameHash = cust.name.split("").reduce((h: number, ch: string) => h + ch.charCodeAt(0), 0);
@@ -280,6 +264,7 @@ export default function CustomerProfilePage() {
           setLoading(false);
         });
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Error loading customer profile:", err);
         queueMicrotask(() => {
           setProfile(MOCK_PROFILE);
@@ -292,6 +277,7 @@ export default function CustomerProfilePage() {
     queueMicrotask(() => {
       loadProfile();
     });
+    return () => controller.abort();
   }, [customerId]);
 
   const c = profile || MOCK_PROFILE;

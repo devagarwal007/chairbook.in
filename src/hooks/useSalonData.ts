@@ -33,14 +33,18 @@ export function useSalonData(salonId: string | null) {
       return;
     }
 
+    const controller = new AbortController();
+
     const loadAll = async () => {
       queueMicrotask(() => setLoading(true));
       try {
         const [stRes, svRes, custRes] = await Promise.all([
-          supabase.from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true).order("name"),
-          supabase.from("services").select(SERVICE_SELECT_WITH_BUNDLES).eq("salon_id", salonId).eq("active", true).is("deleted_at", null).order("name"),
-          supabase.from("customers").select("id, name, phone, created_at").eq("salon_id", salonId).order("created_at", { ascending: false }).limit(500),
+          supabase.from("stylists").select("id, name, tone").eq("salon_id", salonId).eq("active", true).order("name").abortSignal(controller.signal),
+          supabase.from("services").select(SERVICE_SELECT_WITH_BUNDLES).eq("salon_id", salonId).eq("active", true).is("deleted_at", null).order("name").abortSignal(controller.signal),
+          supabase.from("customers").select("id, name, phone, created_at").eq("salon_id", salonId).order("created_at", { ascending: false }).limit(500).abortSignal(controller.signal),
         ]);
+
+        if (controller.signal.aborted) return;
 
         if (stRes.data) {
           const rawStylists = stRes.data as unknown as DbStylistRaw[];
@@ -72,16 +76,20 @@ export function useSalonData(salonId: string | null) {
           })));
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Error loading salon data:", err);
         queueMicrotask(() => setError(true));
       } finally {
-        queueMicrotask(() => setLoading(false));
+        if (!controller.signal.aborted) {
+          queueMicrotask(() => setLoading(false));
+        }
       }
     };
 
     queueMicrotask(() => {
       loadAll();
     });
+    return () => controller.abort();
   }, [salonId]);
 
   return { stylists, services, customers, loading, error };

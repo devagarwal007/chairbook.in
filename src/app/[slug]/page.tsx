@@ -6,6 +6,7 @@ import { Icons as I, Avatar, PhoneInput, ComboSaveBadge, ComboServiceChip } from
 import { generateBookingDateOptions } from "@/lib/booking-window";
 import { formatServiceCode } from "@/lib/service-codes";
 import { getSupabaseBrowserClient, getSupabaseEnvError } from "@/lib/supabase";
+import { PUBLIC_SALON_SELECT } from "@/lib/supabase-selects";
 import { formatDateKey, formatPhone } from "@/lib/utils";
 import { BookingRow, DbServiceRaw, Salon, Service, Stylist } from "@/types";
 
@@ -509,6 +510,8 @@ export default function PublicBookingPage() {
   }, 0);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const loadSalon = async () => {
       const envError = getSupabaseEnvError();
       if (envError) {
@@ -524,7 +527,13 @@ export default function PublicBookingPage() {
         return;
       }
 
-      const { data: salon, error: salonError } = await supabase.from("salons").select("*").eq("slug", slug).single();
+      const { data: salon, error: salonError } = await supabase
+        .from("salons")
+        .select(PUBLIC_SALON_SELECT)
+        .eq("slug", slug)
+        .abortSignal(controller.signal)
+        .single();
+      if (controller.signal.aborted) return;
       if (salonError || !salon) {
         setMessage("We could not find this salon booking page.");
         setIsLoading(false);
@@ -543,11 +552,13 @@ export default function PublicBookingPage() {
             .eq("active", true)
             .is("deleted_at", null)
             .order("category")
-            .order("name"),
-          supabase.from("stylists").select("id,name,role_label,tone,booking_slug").eq("salon_id", salon.id).eq("active", true).order("name"),
-          supabase.from("bookings").select("id,stylist_id,date,start_time,duration,status").eq("salon_id", salon.id).gte("date", startDate).lte("date", endDate),
+            .order("name")
+            .abortSignal(controller.signal),
+          supabase.from("stylists").select("id,name,role_label,tone,booking_slug").eq("salon_id", salon.id).eq("active", true).order("name").abortSignal(controller.signal),
+          supabase.from("bookings").select("id,stylist_id,date,start_time,duration,status").eq("salon_id", salon.id).gte("date", startDate).lte("date", endDate).abortSignal(controller.signal),
         ]);
 
+      if (controller.signal.aborted) return;
       const error = serviceError || stylistError || bookingError;
       if (error) {
         setMessage(error.message);
@@ -573,7 +584,8 @@ export default function PublicBookingPage() {
       setIsLoading(false);
     };
 
-    loadSalon();
+    void loadSalon();
+    return () => controller.abort();
   }, [slug, stylistParam]);
 
   useEffect(() => {

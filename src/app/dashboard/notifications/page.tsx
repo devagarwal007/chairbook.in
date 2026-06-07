@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { getNotificationTypeFilter } from "@/lib/notification-filters";
 import { mapDbNotificationToItem } from "@/lib/notification-routing";
+import { NOTIFICATION_SELECT } from "@/lib/supabase-selects";
 import { useProfile } from "@/context/ProfileContext";
 import { useToast } from "@/context/ToastContext";
 
@@ -46,14 +47,14 @@ export default function NotificationsPage() {
     setLoading(false);
   }, []);
 
-  const fetchNotificationPage = useCallback(async (offset: number) => {
+  const fetchNotificationPage = useCallback(async (offset: number, signal?: AbortSignal) => {
     if (!salonId) throw new Error("Missing salon id.");
     const supabase = getSupabaseBrowserClient();
     if (!supabase) throw new Error("Supabase is not configured.");
 
     let query = supabase
       .from("notifications")
-      .select("*", { count: "exact" })
+      .select(NOTIFICATION_SELECT, { count: "exact" })
       .eq("salon_id", salonId);
 
     if (filter === "unread") {
@@ -67,8 +68,12 @@ export default function NotificationsPage() {
 
     const { data, count, error } = await query
       .order("created_at", { ascending: false })
-      .range(offset, offset + NOTIFICATION_PAGE_SIZE - 1);
+      .range(offset, offset + NOTIFICATION_PAGE_SIZE - 1)
+      .abortSignal(signal ?? new AbortController().signal);
 
+    if (signal?.aborted) {
+      return { items: [], total: 0 };
+    }
     if (error) throw error;
 
     return {
@@ -93,27 +98,28 @@ export default function NotificationsPage() {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const loadNotifs = async () => {
       setLoading(true);
       try {
-        const { items, total } = await fetchNotificationPage(0);
-        if (cancelled) return;
+        const { items, total } = await fetchNotificationPage(0, controller.signal);
+        if (controller.signal.aborted) return;
         setNotifs(items);
         setTotalNotifs(total);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Error loading notifications:", err);
-        if (!cancelled) loadFallbackNotifs();
+        if (!controller.signal.aborted) loadFallbackNotifs();
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     void loadNotifs();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [fetchNotificationPage, loadFallbackNotifs, salonId]);
 
@@ -144,9 +150,10 @@ export default function NotificationsPage() {
 
   const loadMoreNotifs = async () => {
     if (!salonId || loadingMore) return;
+    const controller = new AbortController();
     setLoadingMore(true);
     try {
-      const { items, total } = await fetchNotificationPage(notifs.length);
+      const { items, total } = await fetchNotificationPage(notifs.length, controller.signal);
       setNotifs(prev => [...prev, ...items]);
       setTotalNotifs(total);
     } catch (err) {
@@ -284,11 +291,6 @@ export default function NotificationsPage() {
             </div>
           </div>
         </main>
-        <nav className="bottom-nav">
-          {["Home", "Bookings", "Customers", "Insights", "Settings"].map(t => (
-            <span key={t} className="bn-item"><span>{t}</span></span>
-          ))}
-        </nav>
       </div>
     );
   }
@@ -445,31 +447,6 @@ export default function NotificationsPage() {
         )}
       </main>
 
-
-
-      {/* Bottom Nav Bar */}
-      <nav className="bottom-nav">
-        <Link href="/dashboard" className="bn-item">
-          <I.home />
-          <span>Home</span>
-        </Link>
-        <Link href="/dashboard/bookings" className="bn-item">
-          <I.calendar />
-          <span>Bookings</span>
-        </Link>
-        <Link href="/dashboard/customers" className="bn-item">
-          <I.users />
-          <span>Customers</span>
-        </Link>
-        <Link href="/dashboard/revenue" className="bn-item">
-          <I.insights />
-          <span>Insights</span>
-        </Link>
-        <Link href="/dashboard/settings" className="bn-item">
-          <I.settings />
-          <span>Settings</span>
-        </Link>
-      </nav>
     </div>
   );
 }

@@ -10,9 +10,11 @@ export function useBookings(salonId: string | null, day: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const load = useCallback(async (cancelledRef: { cancelled: boolean }) => {
+  const load = useCallback(async (signal?: AbortSignal) => {
+    const requestSignal = signal ?? new AbortController().signal;
+
     if (!salonId) {
-      if (!cancelledRef.cancelled) {
+      if (!requestSignal.aborted) {
         setBookings([]);
         setLoading(false);
       }
@@ -24,7 +26,7 @@ export function useBookings(salonId: string | null, day: string) {
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      if (!cancelledRef.cancelled) {
+      if (!requestSignal.aborted) {
         setLoading(false);
       }
       return;
@@ -62,9 +64,10 @@ export function useBookings(salonId: string | null, day: string) {
         .eq("salon_id", salonId)
         .eq("date", dateStr)
         .order("start_time", { ascending: true })
-        .limit(200);
+        .limit(200)
+        .abortSignal(requestSignal);
 
-      if (cancelledRef.cancelled) return;
+      if (requestSignal.aborted) return;
       if (fetchError) throw fetchError;
 
       if (data) {
@@ -78,16 +81,17 @@ export function useBookings(salonId: string | null, day: string) {
             .select("customer_id, status")
             .in("customer_id", customerIds)
             .in("status", ["Completed", "Paid"])
-            .limit(200);
+            .limit(200)
+            .abortSignal(requestSignal);
             
-          if (visitsData && !cancelledRef.cancelled) {
+          if (visitsData && !requestSignal.aborted) {
             visitsData.forEach((v) => {
               visitsMap[v.customer_id] = (visitsMap[v.customer_id] || 0) + 1;
             });
           }
         }
 
-        if (cancelledRef.cancelled) return;
+        if (requestSignal.aborted) return;
 
         const cleanTone = (t: string) => t.replace("tone-", "");
         const mappedAppts: Appointment[] = dataList.map((b) => {
@@ -153,31 +157,33 @@ export function useBookings(salonId: string | null, day: string) {
         setBookings(mappedAppts);
       }
     } catch (err) {
+      if (requestSignal.aborted) return;
       const errorObj = err as Error;
       console.error("Error loading bookings from Supabase:", errorObj);
-      if (!cancelledRef.cancelled) {
+      if (!requestSignal.aborted) {
         setError(errorObj);
         setBookings([]);
       }
     } finally {
-      if (!cancelledRef.cancelled) {
+      if (!requestSignal.aborted) {
         setLoading(false);
       }
     }
   }, [salonId, day]);
 
   useEffect(() => {
-    const cancelledRef = { cancelled: false };
+    const controller = new AbortController();
     queueMicrotask(() => {
-      load(cancelledRef);
+      load(controller.signal);
     });
     return () => {
-      cancelledRef.cancelled = true;
+      controller.abort();
     };
   }, [load]);
 
   const refresh = useCallback(async () => {
-    await load({ cancelled: false });
+    const controller = new AbortController();
+    await load(controller.signal);
   }, [load]);
 
   return { bookings, setBookings, loading, error, refresh };

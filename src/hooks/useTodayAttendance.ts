@@ -10,7 +10,8 @@ import {
   todayDateKey,
   validateChronologicalRange,
 } from "@/lib/attendance";
-import type { AttendanceBreak, AttendanceStylistRow } from "@/types";
+import { ATTENDANCE_BLOCK_SELECT, ATTENDANCE_BREAK_SELECT, ATTENDANCE_SESSION_SELECT } from "@/lib/supabase-selects";
+import type { AttendanceBreak, AttendanceSession, AttendanceStylistRow } from "@/types";
 import { MOCK_ADMIN_ATTENDANCE_ROWS } from "@/constants/attendanceConfig";
 
 export function useTodayAttendance(salonId: string | null, dateKey?: string) {
@@ -21,17 +22,23 @@ export function useTodayAttendance(salonId: string | null, dateKey?: string) {
 
   const targetDate = dateKey || todayDateKey();
 
-  const loadTodayAttendance = useCallback(async () => {
+  const loadTodayAttendance = useCallback(async (signal?: AbortSignal) => {
+    const requestSignal = signal ?? new AbortController().signal;
+
     if (!salonId) {
-      setRows(MOCK_ADMIN_ATTENDANCE_ROWS);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setRows(MOCK_ADMIN_ATTENDANCE_ROWS);
+        setLoading(false);
+      }
       return;
     }
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setRows(MOCK_ADMIN_ATTENDANCE_ROWS);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setRows(MOCK_ADMIN_ATTENDANCE_ROWS);
+        setLoading(false);
+      }
       return;
     }
 
@@ -42,27 +49,34 @@ export function useTodayAttendance(salonId: string | null, dateKey?: string) {
         .from("stylists")
         .select("id, name, tone")
         .eq("salon_id", salonId)
-        .eq("active", true);
+        .eq("active", true)
+        .abortSignal(requestSignal);
 
+      if (requestSignal.aborted) return;
       if (stylistsErr) throw stylistsErr;
 
       // 2. Fetch all attendance sessions for target date
       const { data: sessions, error: sessionsErr } = await supabase
         .from("attendance_sessions")
-        .select("*")
+        .select(ATTENDANCE_SESSION_SELECT)
         .eq("salon_id", salonId)
-        .eq("session_date", targetDate);
+        .eq("session_date", targetDate)
+        .abortSignal(requestSignal);
 
+      if (requestSignal.aborted) return;
       if (sessionsErr) throw sessionsErr;
+      const attendanceSessions = (sessions || []) as AttendanceSession[];
 
       // 3. Fetch all breaks for target date sessions
-      const sessionIds = (sessions || []).map((s) => s.id);
+      const sessionIds = attendanceSessions.map((s) => s.id);
       let breaks: AttendanceBreak[] = [];
       if (sessionIds.length > 0) {
         const { data: breaksData } = await supabase
           .from("attendance_breaks")
-          .select("*")
-          .in("session_id", sessionIds);
+          .select(ATTENDANCE_BREAK_SELECT)
+          .in("session_id", sessionIds)
+          .abortSignal(requestSignal);
+        if (requestSignal.aborted) return;
         breaks = (breaksData || []) as AttendanceBreak[];
       }
 
@@ -71,17 +85,23 @@ export function useTodayAttendance(salonId: string | null, dateKey?: string) {
         .from("correction_requests")
         .select("stylist_id, status")
         .eq("salon_id", salonId)
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .abortSignal(requestSignal);
+
+      if (requestSignal.aborted) return;
 
       // 5. Fetch calendar blocks to check for absent/leaves
       const { data: blocks } = await supabase
         .from("blocks")
-        .select("*")
+        .select(ATTENDANCE_BLOCK_SELECT)
         .eq("salon_id", salonId)
-        .eq("date_from", targetDate);
+        .eq("date_from", targetDate)
+        .abortSignal(requestSignal);
+
+      if (requestSignal.aborted) return;
 
       const mappedRows: AttendanceStylistRow[] = (stylists || []).map((stylist) => {
-        const session = (sessions || []).find((s) => s.stylist_id === stylist.id);
+        const session = attendanceSessions.find((s) => s.stylist_id === stylist.id) || null;
         const pendingCorr = (corrections || []).some((c) => c.stylist_id === stylist.id);
         const stylistBreaks = breaks.filter((b) => b.session_id === session?.id);
         const activeBreak = stylistBreaks.find((b) => b.break_end === null) || null;
@@ -129,10 +149,11 @@ export function useTodayAttendance(salonId: string | null, dateKey?: string) {
 
       setRows(mappedRows);
     } catch (err) {
+      if (requestSignal.aborted) return;
       console.error("Error loading today's attendance grid:", err);
       setRows(MOCK_ADMIN_ATTENDANCE_ROWS);
     } finally {
-      setLoading(false);
+      if (!requestSignal.aborted) setLoading(false);
     }
   }, [salonId, targetDate]);
 
@@ -206,7 +227,7 @@ export function useTodayAttendance(salonId: string | null, dateKey?: string) {
       // Fetch session data first to calculate worked time
       const { data: sessionData } = await supabase
         .from("attendance_sessions")
-        .select("*")
+        .select(ATTENDANCE_SESSION_SELECT)
         .eq("id", sessionId)
         .single();
 
@@ -288,7 +309,7 @@ export function useTodayAttendance(salonId: string | null, dateKey?: string) {
       // Fetch original session
       const { data: original } = await supabase
         .from("attendance_sessions")
-        .select("*")
+        .select(ATTENDANCE_SESSION_SELECT)
         .eq("id", sessionId)
         .single();
 
@@ -476,9 +497,11 @@ export function useTodayAttendance(salonId: string | null, dateKey?: string) {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     queueMicrotask(() => {
-      void loadTodayAttendance();
+      void loadTodayAttendance(controller.signal);
     });
+    return () => controller.abort();
   }, [loadTodayAttendance]);
 
   return {

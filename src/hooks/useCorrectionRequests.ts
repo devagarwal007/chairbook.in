@@ -11,6 +11,7 @@ import {
   validateChronologicalRange,
 } from "@/lib/attendance";
 import { insertNotification } from "@/lib/notifications";
+import { ATTENDANCE_SESSION_SELECT, CORRECTION_REQUEST_SELECT } from "@/lib/supabase-selects";
 import type { CorrectionRequest } from "@/types";
 
 export function useCorrectionRequests(salonId: string | null) {
@@ -19,17 +20,23 @@ export function useCorrectionRequests(salonId: string | null) {
   const [actionBusy, setActionBusy] = useState(false);
   const { show: showToast } = useToast();
 
-  const loadRequests = useCallback(async () => {
+  const loadRequests = useCallback(async (signal?: AbortSignal) => {
+    const requestSignal = signal ?? new AbortController().signal;
+
     if (!salonId) {
-      setRequests([]);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setRequests([]);
+        setLoading(false);
+      }
       return;
     }
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setRequests([]);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setRequests([]);
+        setLoading(false);
+      }
       return;
     }
 
@@ -37,17 +44,20 @@ export function useCorrectionRequests(salonId: string | null) {
     try {
       const { data, error } = await supabase
         .from("correction_requests")
-        .select("*")
+        .select(CORRECTION_REQUEST_SELECT)
         .eq("salon_id", salonId)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(100)
+        .abortSignal(requestSignal);
 
+      if (requestSignal.aborted) return;
       if (error) throw error;
       setRequests((data || []) as CorrectionRequest[]);
     } catch (err) {
+      if (requestSignal.aborted) return;
       console.error("Error loading correction requests:", err);
     } finally {
-      setLoading(false);
+      if (!requestSignal.aborted) setLoading(false);
     }
   }, [salonId]);
 
@@ -164,7 +174,7 @@ export function useCorrectionRequests(salonId: string | null) {
 
       const { data: request, error: fetchErr } = await supabase
         .from("correction_requests")
-        .select("*")
+        .select(CORRECTION_REQUEST_SELECT)
         .eq("id", requestId)
         .single();
 
@@ -186,7 +196,7 @@ export function useCorrectionRequests(salonId: string | null) {
       if (status === "approved" && request) {
         const { data: sessionData } = await supabase
           .from("attendance_sessions")
-          .select("*")
+          .select(ATTENDANCE_SESSION_SELECT)
           .eq("id", request.session_id)
           .single();
 
@@ -289,9 +299,11 @@ export function useCorrectionRequests(salonId: string | null) {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     queueMicrotask(() => {
-      void loadRequests();
+      void loadRequests(controller.signal);
     });
+    return () => controller.abort();
   }, [loadRequests]);
 
   return {

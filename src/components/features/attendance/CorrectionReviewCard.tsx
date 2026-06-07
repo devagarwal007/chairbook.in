@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { ATTENDANCE_SESSION_SELECT } from "@/lib/supabase-selects";
 import { Avatar } from "@/components/ui";
 import type { CorrectionRequest, Stylist, AttendanceSession } from "@/types";
 
@@ -24,6 +25,8 @@ export default function CorrectionReviewCard({
   const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchMeta = async () => {
       const supabase = getSupabaseBrowserClient();
       if (!supabase) {
@@ -37,8 +40,10 @@ export default function CorrectionReviewCard({
           .from("stylists")
           .select("name, tone")
           .eq("id", request.stylist_id)
+          .abortSignal(controller.signal)
           .single();
 
+        if (controller.signal.aborted) return;
         if (stData) {
           setStylist({
             id: request.stylist_id,
@@ -50,19 +55,23 @@ export default function CorrectionReviewCard({
         // Fetch original Session
         const { data: sessData } = await supabase
           .from("attendance_sessions")
-          .select("*")
+          .select(ATTENDANCE_SESSION_SELECT)
           .eq("id", request.session_id)
+          .abortSignal(controller.signal)
           .single();
 
+        if (controller.signal.aborted) return;
         if (sessData) {
           setSession(sessData as AttendanceSession);
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Error fetching request metadata:", err);
       }
     };
 
-    fetchMeta();
+    void fetchMeta();
+    return () => controller.abort();
   }, [request]);
 
   const handleRejectSubmit = async (e: React.FormEvent) => {

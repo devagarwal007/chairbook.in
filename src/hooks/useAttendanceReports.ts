@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { ATTENDANCE_BLOCK_SELECT, ATTENDANCE_SESSION_SELECT } from "@/lib/supabase-selects";
 import type { HoursData } from "@/types";
 
 export interface DailyReportItem {
@@ -39,7 +40,9 @@ export function useAttendanceReports(salonId: string | null) {
   const [loading, setLoading] = useState(false);
 
   const loadDailyReport = useCallback(
-    async (dateKey: string): Promise<DailyReportItem[]> => {
+    async (dateKey: string, signal?: AbortSignal): Promise<DailyReportItem[]> => {
+      const requestSignal = signal ?? new AbortController().signal;
+
       if (!salonId) {
         // Return Mock data
         return getMockDailyReport();
@@ -57,32 +60,42 @@ export function useAttendanceReports(salonId: string | null) {
           .from("stylists")
           .select("id, name, tone")
           .eq("salon_id", salonId)
-          .eq("active", true);
+          .eq("active", true)
+          .abortSignal(requestSignal);
 
+        if (requestSignal.aborted) return [];
         if (stylistsErr) throw stylistsErr;
 
         // 2. Fetch sessions for the date
         const { data: sessions, error: sessionsErr } = await supabase
           .from("attendance_sessions")
-          .select("*")
+          .select(ATTENDANCE_SESSION_SELECT)
           .eq("salon_id", salonId)
-          .eq("session_date", dateKey);
+          .eq("session_date", dateKey)
+          .abortSignal(requestSignal);
 
+        if (requestSignal.aborted) return [];
         if (sessionsErr) throw sessionsErr;
 
         // 3. Fetch calendar blocks for the date
         const { data: blocks } = await supabase
           .from("blocks")
-          .select("*")
+          .select(ATTENDANCE_BLOCK_SELECT)
           .eq("salon_id", salonId)
-          .eq("date_from", dateKey);
+          .eq("date_from", dateKey)
+          .abortSignal(requestSignal);
+
+        if (requestSignal.aborted) return [];
 
         // 4. Fetch salon hours to see if it's a Rest Day
         const { data: salonProfile } = await supabase
           .from("salons")
           .select("hours")
           .eq("id", salonId)
+          .abortSignal(requestSignal)
           .maybeSingle();
+
+        if (requestSignal.aborted) return [];
 
         const hours = salonProfile?.hours as HoursData | null;
         const dObj = new Date(dateKey + "T12:00:00");
@@ -139,17 +152,20 @@ export function useAttendanceReports(salonId: string | null) {
 
         return results;
       } catch (err) {
+        if (requestSignal.aborted) return [];
         console.error("Error loading daily report:", err);
         return getMockDailyReport();
       } finally {
-        setLoading(false);
+        if (!requestSignal.aborted) setLoading(false);
       }
     },
     [salonId]
   );
 
   const loadMonthlyReport = useCallback(
-    async (startDate: string, endDate: string): Promise<MonthlyReportItem[]> => {
+    async (startDate: string, endDate: string, signal?: AbortSignal): Promise<MonthlyReportItem[]> => {
+      const requestSignal = signal ?? new AbortController().signal;
+
       if (!salonId) {
         return getMockMonthlyReport();
       }
@@ -166,34 +182,44 @@ export function useAttendanceReports(salonId: string | null) {
           .from("stylists")
           .select("id, name, tone")
           .eq("salon_id", salonId)
-          .eq("active", true);
+          .eq("active", true)
+          .abortSignal(requestSignal);
 
+        if (requestSignal.aborted) return [];
         if (stylistsErr) throw stylistsErr;
 
         // 2. Fetch sessions in range
         const { data: sessions, error: sessionsErr } = await supabase
           .from("attendance_sessions")
-          .select("*")
+          .select(ATTENDANCE_SESSION_SELECT)
           .eq("salon_id", salonId)
           .gte("session_date", startDate)
-          .lte("session_date", endDate);
+          .lte("session_date", endDate)
+          .abortSignal(requestSignal);
 
+        if (requestSignal.aborted) return [];
         if (sessionsErr) throw sessionsErr;
 
         // 3. Fetch blocks in range
         const { data: blocks } = await supabase
           .from("blocks")
-          .select("*")
+          .select(ATTENDANCE_BLOCK_SELECT)
           .eq("salon_id", salonId)
           .gte("date_from", startDate)
-          .lte("date_from", endDate);
+          .lte("date_from", endDate)
+          .abortSignal(requestSignal);
+
+        if (requestSignal.aborted) return [];
 
         // 4. Fetch salon hours to count salon-open working days
         const { data: salonProfile } = await supabase
           .from("salons")
           .select("hours")
           .eq("id", salonId)
+          .abortSignal(requestSignal)
           .maybeSingle();
+
+        if (requestSignal.aborted) return [];
 
         const hours = salonProfile?.hours as HoursData | null;
 
@@ -252,10 +278,11 @@ export function useAttendanceReports(salonId: string | null) {
 
         return results;
       } catch (err) {
+        if (requestSignal.aborted) return [];
         console.error("Error loading monthly report:", err);
         return getMockMonthlyReport();
       } finally {
-        setLoading(false);
+        if (!requestSignal.aborted) setLoading(false);
       }
     },
     [salonId]

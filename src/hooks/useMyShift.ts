@@ -12,6 +12,7 @@ import {
   isTooEarlyToClockIn,
   todayDateKey,
 } from "@/lib/attendance";
+import { ATTENDANCE_BREAK_SELECT, ATTENDANCE_SESSION_SELECT } from "@/lib/supabase-selects";
 import type { AttendanceSession, AttendanceBreak, HoursData } from "@/types";
 import {
   MOCK_ATTENDANCE_SESSION,
@@ -29,7 +30,8 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
   const { settings, loading: settingsLoading } = useAttendanceSettings(salonId);
 
   // Helper to load salon business hours
-  const loadSalonHours = useCallback(async () => {
+  const loadSalonHours = useCallback(async (signal?: AbortSignal) => {
+    const requestSignal = signal ?? new AbortController().signal;
     if (!salonId) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -39,32 +41,41 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
         .from("salons")
         .select("hours")
         .eq("id", salonId)
+        .abortSignal(requestSignal)
         .maybeSingle();
 
+      if (requestSignal.aborted) return;
       if (error) throw error;
       if (data?.hours) {
         setSalonHours(data.hours as HoursData);
       }
     } catch (err) {
+      if (requestSignal.aborted) return;
       console.error("Error loading salon hours:", err);
     }
   }, [salonId]);
 
   // Load stylist's today session + breaks
-  const loadTodayShift = useCallback(async () => {
+  const loadTodayShift = useCallback(async (signal?: AbortSignal) => {
+    const requestSignal = signal ?? new AbortController().signal;
+
     if (!stylistId || !salonId) {
-      setSession(null);
-      setBreaks([]);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setSession(null);
+        setBreaks([]);
+        setLoading(false);
+      }
       return;
     }
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase || stylistId === "preview-stylist") {
       // Mock Fallback
-      setSession(MOCK_ATTENDANCE_SESSION as AttendanceSession);
-      setBreaks(MOCK_ATTENDANCE_BREAKS as AttendanceBreak[]);
-      setLoading(false);
+      if (!requestSignal.aborted) {
+        setSession(MOCK_ATTENDANCE_SESSION as AttendanceSession);
+        setBreaks(MOCK_ATTENDANCE_BREAKS as AttendanceBreak[]);
+        setLoading(false);
+      }
       return;
     }
 
@@ -75,10 +86,13 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
       // Check for missed clock-outs of previous days (status = 'open' and session_date < today)
       const { data: openYesterday, error: yesterdayError } = await supabase
         .from("attendance_sessions")
-        .select("*")
+        .select(ATTENDANCE_SESSION_SELECT)
         .eq("stylist_id", stylistId)
         .eq("status", "open")
-        .lt("session_date", today);
+        .lt("session_date", today)
+        .abortSignal(requestSignal);
+
+      if (requestSignal.aborted) return;
 
       if (!yesterdayError && openYesterday && openYesterday.length > 0) {
         for (const prevSess of openYesterday) {
@@ -92,11 +106,13 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
       // Fetch today's session
       const { data: sessData, error: sessError } = await supabase
         .from("attendance_sessions")
-        .select("*")
+        .select(ATTENDANCE_SESSION_SELECT)
         .eq("stylist_id", stylistId)
         .eq("session_date", today)
+        .abortSignal(requestSignal)
         .maybeSingle();
 
+      if (requestSignal.aborted) return;
       if (sessError) throw sessError;
 
       if (sessData) {
@@ -105,10 +121,12 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
         // Fetch breaks for this session
         const { data: breaksData, error: breaksError } = await supabase
           .from("attendance_breaks")
-          .select("*")
+          .select(ATTENDANCE_BREAK_SELECT)
           .eq("session_id", sessData.id)
-          .order("break_start", { ascending: true });
+          .order("break_start", { ascending: true })
+          .abortSignal(requestSignal);
 
+        if (requestSignal.aborted) return;
         if (breaksError) throw breaksError;
         setBreaks((breaksData || []) as AttendanceBreak[]);
       } else {
@@ -116,12 +134,13 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
         setBreaks([]);
       }
     } catch (err) {
+      if (requestSignal.aborted) return;
       console.error("Error loading today's shift:", err);
       showToast("Error loading shift. Working in offline fallback mode.", 2500);
       setSession(MOCK_ATTENDANCE_SESSION as AttendanceSession);
       setBreaks(MOCK_ATTENDANCE_BREAKS as AttendanceBreak[]);
     } finally {
-      setLoading(false);
+      if (!requestSignal.aborted) setLoading(false);
     }
   }, [stylistId, salonId, showToast]);
 
@@ -391,11 +410,11 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
       if (error) throw error;
 
       // Fetch fresh breaks & recalculate total
-      const { data: freshBreaks } = await supabase
-        .from("attendance_breaks")
-        .select("*")
-        .eq("session_id", session.id)
-        .order("break_start", { ascending: true });
+        const { data: freshBreaks } = await supabase
+          .from("attendance_breaks")
+          .select(ATTENDANCE_BREAK_SELECT)
+          .eq("session_id", session.id)
+          .order("break_start", { ascending: true });
 
       setBreaks((freshBreaks || []) as AttendanceBreak[]);
 
@@ -426,10 +445,12 @@ export function useMyShift(stylistId: string | null, salonId: string | null) {
   // Initial load
   useEffect(() => {
     if (stylistId && salonId) {
+      const controller = new AbortController();
       queueMicrotask(() => {
-        void loadSalonHours();
-        void loadTodayShift();
+        void loadSalonHours(controller.signal);
+        void loadTodayShift(controller.signal);
       });
+      return () => controller.abort();
     }
   }, [stylistId, salonId, loadSalonHours, loadTodayShift]);
 

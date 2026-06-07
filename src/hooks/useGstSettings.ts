@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { getSupabaseErrorMessage, isMissingGstSchemaError } from "@/lib/supabase-errors";
+import { GST_INVOICE_SELECT, GST_SETTINGS_SELECT } from "@/lib/supabase-selects";
 import type { SalonGstSettings, GstInvoice } from "@/types/gst";
 import { DEFAULT_GST_SETTINGS } from "@/types/gst";
 
@@ -33,15 +34,19 @@ export function useGstSettings(salonId: string | null): UseGstSettingsReturn {
       return;
     }
 
+    const controller = new AbortController();
+
     const load = async () => {
       queueMicrotask(() => setLoading(true));
       try {
         const { data, error } = await supabase
           .from("salon_gst_settings")
-          .select("*")
+          .select(GST_SETTINGS_SELECT)
           .eq("salon_id", salonId)
+          .abortSignal(controller.signal)
           .maybeSingle();
 
+        if (controller.signal.aborted) return;
         if (error) throw error;
 
         if (data) {
@@ -64,26 +69,32 @@ export function useGstSettings(salonId: string | null): UseGstSettingsReturn {
         // Load recent invoices
         const { data: invData, error: invError } = await supabase
           .from("gst_invoices")
-          .select("*")
+          .select(GST_INVOICE_SELECT)
           .eq("salon_id", salonId)
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(50)
+          .abortSignal(controller.signal);
 
+        if (controller.signal.aborted) return;
         if (invError) throw invError;
 
         if (invData) {
           setInvoices(invData as unknown as GstInvoice[]);
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         if (!isMissingGstSchemaError(err)) {
           console.error("Error loading GST settings:", getSupabaseErrorMessage(err));
         }
       } finally {
-        queueMicrotask(() => setLoading(false));
+        if (!controller.signal.aborted) {
+          queueMicrotask(() => setLoading(false));
+        }
       }
     };
 
     queueMicrotask(() => { load(); });
+    return () => controller.abort();
   }, [salonId]);
 
   const save = useCallback(async (newSettings: SalonGstSettings) => {
@@ -145,7 +156,7 @@ export function useGstSettings(salonId: string | null): UseGstSettingsReturn {
     try {
       const { data, error } = await supabase
         .from("gst_invoices")
-        .select("*")
+        .select(GST_INVOICE_SELECT)
         .eq("salon_id", salonId)
         .order("created_at", { ascending: false })
         .limit(50);

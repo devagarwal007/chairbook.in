@@ -94,7 +94,7 @@ export default function CustomersPage() {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const loadCustomersData = async () => {
       setLoadingCustomers(true);
@@ -115,8 +115,10 @@ export default function CustomersPage() {
           ? customerQuery.order("name", { ascending: true })
           : customerQuery.order("created_at", { ascending: false });
 
-        const { data: custData, count, error: custError } = await customerQuery.range(from, to);
-        if (cancelled) return;
+        const { data: custData, count, error: custError } = await customerQuery
+          .range(from, to)
+          .abortSignal(controller.signal);
+        if (controller.signal.aborted) return;
         if (custError) throw custError;
 
         const customerRows = (custData || []) as unknown as DbCustomerRow[];
@@ -136,9 +138,11 @@ export default function CustomersPage() {
             .select("id, customer_id, status, date, amount_paid, bill_total, booking_services(price_at_booking, qty, service:services(name)), stylist:stylists(name)")
             .eq("salon_id", salonId)
             .in("customer_id", customerIds)
-            .order("date", { ascending: false });
+            .order("date", { ascending: false })
+            .limit(2000)
+            .abortSignal(controller.signal);
 
-          if (cancelled) return;
+          if (controller.signal.aborted) return;
           if (bookingsError) throw bookingsError;
           bkData = (bookingsData || []) as unknown as DbCustomerBooking[];
         }
@@ -190,20 +194,20 @@ export default function CustomersPage() {
 
         setCustomers(mapped);
       } catch (err) {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           console.error("Error loading customers:", err);
           setCustomers([]);
           setCustomerTotal(0);
         }
       } finally {
-        if (!cancelled) setLoadingCustomers(false);
+        if (!controller.signal.aborted) setLoadingCustomers(false);
       }
     };
 
     void loadCustomersData();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [debouncedQ, page, pageSize, profileLoading, refreshKey, salonId, setCustomerTotal, setLoadingCustomers, sort]);
 

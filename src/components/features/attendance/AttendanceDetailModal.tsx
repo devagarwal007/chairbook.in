@@ -5,6 +5,7 @@ import { Modal, Avatar, Icons as I } from "@/components/ui";
 import type { AttendanceStylistRow as RowType, AttendanceSession, AttendanceBreak, AttendanceAuditEntry } from "@/types";
 import { useTodayAttendance } from "@/hooks/useTodayAttendance";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { ATTENDANCE_AUDIT_SELECT, ATTENDANCE_BREAK_SELECT, ATTENDANCE_SESSION_SELECT } from "@/lib/supabase-selects";
 import AttendanceStatusBadge from "./AttendanceStatusBadge";
 import AdminEditForm from "./AdminEditForm";
 import BreakEditor from "./BreakEditor";
@@ -32,15 +33,17 @@ export default function AttendanceDetailModal({
   const [loading, setLoading] = useState(true);
 
   // Fetch session details, breaks, and audit log
-  const loadDetails = useCallback(async () => {
+  const loadDetails = useCallback(async (signal?: AbortSignal) => {
+    const requestSignal = signal ?? new AbortController().signal;
+
     if (!row.sessionId || !salonId) {
-      setLoading(false);
+      if (!requestSignal.aborted) setLoading(false);
       return;
     }
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setLoading(false);
+      if (!requestSignal.aborted) setLoading(false);
       return;
     }
 
@@ -49,10 +52,12 @@ export default function AttendanceDetailModal({
       // 1. Fetch Session row
       const { data: sessData } = await supabase
         .from("attendance_sessions")
-        .select("*")
+        .select(ATTENDANCE_SESSION_SELECT)
         .eq("id", row.sessionId)
+        .abortSignal(requestSignal)
         .single();
       
+      if (requestSignal.aborted) return;
       if (sessData) {
         setSession(sessData as AttendanceSession);
       }
@@ -60,31 +65,38 @@ export default function AttendanceDetailModal({
       // 2. Fetch Breaks
       const { data: breaksData } = await supabase
         .from("attendance_breaks")
-        .select("*")
+        .select(ATTENDANCE_BREAK_SELECT)
         .eq("session_id", row.sessionId)
-        .order("break_start", { ascending: true });
+        .order("break_start", { ascending: true })
+        .abortSignal(requestSignal);
 
+      if (requestSignal.aborted) return;
       setBreaks((breaksData || []) as AttendanceBreak[]);
 
       // 3. Fetch Audit Log
       const { data: auditData } = await supabase
         .from("attendance_audit_log")
-        .select("*")
+        .select(ATTENDANCE_AUDIT_SELECT)
         .eq("session_id", row.sessionId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .abortSignal(requestSignal);
 
+      if (requestSignal.aborted) return;
       setAuditLog((auditData || []) as AttendanceAuditEntry[]);
     } catch (err) {
+      if (requestSignal.aborted) return;
       console.error("Error loading session details:", err);
     } finally {
-      setLoading(false);
+      if (!requestSignal.aborted) setLoading(false);
     }
   }, [row.sessionId, salonId]);
 
   useEffect(() => {
+    const controller = new AbortController();
     queueMicrotask(() => {
-      void loadDetails();
+      void loadDetails(controller.signal);
     });
+    return () => controller.abort();
   }, [loadDetails]);
 
   const handleManualClockIn = async () => {
